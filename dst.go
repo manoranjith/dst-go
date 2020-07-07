@@ -3,6 +3,7 @@ package dst
 
 import (
 	"context"
+	"net"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence"
@@ -18,10 +19,27 @@ type Peer struct {
 	// It is unique within a session on the node.
 	Alias string
 
-	OffchainID peer.Address // Permanent identity used for authenticating the peer in the off-chain network.
+	OffchainID       peer.Address // Permanent identity used for authenticating the peer in the off-chain network.
+	Transport        Transport    // Transport Layer protocol used for commmunicating with a peer in the off-chain network.
+	TransportBackend              // Defines the methods required for using a particular transport protocol.
+}
 
-	TransportAddr string // Transport layer protocol address used for off-chain communication
-	TransportType string // Type of transport layer protocol used for off-chain communication.
+// Transport represents the transport layer protocol adapter required for off-chain comunication.
+type Transport struct {
+	Addr net.Addr // Transport layer protocol address
+	Type string   // Type of transport layer protocol
+}
+
+// TransportBackend defines the set of methods required for communicating with the peer on any transport layer protocol.
+type TransportBackend interface {
+	// Parse a network address from string.
+	ParseAddress(string) net.Addr
+
+	// Initialize a listener for a the given network address.
+	NewListener(net.Addr) (peer.Listener, error)
+
+	// Initialize a dialer for the given network address.
+	NewDialer(net.Addr) (peer.Dialer, error)
 }
 
 // User represents a participant in the off-chain network that uses a session on this node for sending transactions.
