@@ -40,6 +40,16 @@ type Peer struct {
 	CommType string // Type of off-chain communication protocol
 }
 
+// CommBackend defines the set of methods required for initializing components required for off-chain communication.
+type CommBackend interface {
+	// Returns a listener that can listen incommig messages at the specified address using the communication protocol.
+	NewListener(address string) (peer.Listener, error)
+
+	// Returns a dialer that can dial for new outgoing connections.
+	// If timeout is zero, program will use no timeout, but standard OS timeouts may still apply.
+	NewDialer() peer.Dialer
+}
+
 // User represents a participant in the off-chain network that uses a session on this node for sending transactions.
 type User struct {
 	Peer
