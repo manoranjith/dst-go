@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wallet"
@@ -52,4 +53,15 @@ func (wb *WalletBackend) NewWallet(keystorePath, password string) (wallet.Wallet
 // NewAccount retreives the account correspoding to the given address, unlocks and returns it.
 func (wb *WalletBackend) NewAccount(w wallet.Wallet, addr wallet.Address) (wallet.Account, error) {
 	return w.Unlock(addr)
+}
+
+// ParseAddr parses the ethereum address from the given string.
+func (wb *WalletBackend) ParseAddr(str string) (wallet.Address, error) {
+	addr := ethwallet.AsWalletAddr(common.HexToAddress(str))
+
+	zeroValue := ethwallet.Address{}
+	if addr.Equals(&zeroValue) && str != zeroValue.String() {
+		return nil, errors.New("invalid address string - " + str)
+	}
+	return addr, nil
 }

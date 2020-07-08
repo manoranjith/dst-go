@@ -111,6 +111,7 @@ type OnChainTxBackend interface {
 
 // WalletBackend wraps the methods for instanting wallets and accounts that are specific to a blockchain platform.
 type WalletBackend interface {
+	ParseAddr(string) (wallet.Address, error)
 	NewWallet(keystore string, password string) (wallet.Wallet, error)
 	NewAccount(wallet.Wallet, wallet.Address) (wallet.Account, error)
 }
