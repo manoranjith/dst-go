@@ -20,7 +20,10 @@ import (
 	"math/rand"
 	"testing"
 
+	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/direct-state-transfer/dst-go"
 	"github.com/direct-state-transfer/dst-go/blockchain/ethereum/ethereumtest"
@@ -68,5 +71,30 @@ func Test_WalletBackend_NewAccount(t *testing.T) {
 		w, err := wb.NewAccount(setup.Wallet, randomAddr)
 		assert.Error(t, err)
 		assert.Nil(t, w)
+	})
+}
+
+func Test_WalletBackend_ParseAddr(t *testing.T) {
+	rng := rand.New(rand.NewSource(1729))
+	wb := ethereumtest.NewTestWalletBackend()
+
+	t.Run("happy_non_zero_value", func(t *testing.T) {
+		validAddr := ethereumtest.NewRandomAddress(rng)
+		gotAddr, err := wb.ParseAddr(validAddr.String())
+		assert.NoError(t, err)
+		require.NotNil(t, gotAddr)
+		assert.Equal(t, validAddr.Bytes(), gotAddr.Bytes())
+	})
+	t.Run("happy_zero_value", func(t *testing.T) {
+		validAddr := ethwallet.Address{}
+		gotAddr, err := wb.ParseAddr(validAddr.String())
+		assert.NoError(t, err)
+		require.NotNil(t, gotAddr)
+		assert.Equal(t, validAddr.Bytes(), gotAddr.Bytes())
+	})
+	t.Run("invalid-addr", func(t *testing.T) {
+		gotAddr, err := wb.ParseAddr("invalid-addr")
+		assert.Error(t, err)
+		require.Nil(t, gotAddr)
 	})
 }
