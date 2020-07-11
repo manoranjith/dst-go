@@ -34,7 +34,7 @@ type Peer struct {
 	// It is unique within a session on the node.
 	Alias string
 
-	OffchainID peer.Address // Permanent identity used for authenticating the peer in the off-chain network.
+	OffChainAddr peer.Address // Permanent identity used for authenticating the peer in the off-chain network.
 
 	CommAddr string // Address for off-chain communication
 	CommType string // Type of off-chain communication protocol
@@ -52,25 +52,24 @@ type CommBackend interface {
 	NewDialer() peer.Dialer
 }
 
+// Credential represents the parameters required for a to create a signature for a given address.
+type Credential struct {
+	Addr     wallet.Address
+	Wallet   wallet.Wallet
+	Keystore string
+	Password string
+}
+
 // User represents a participant in the off-chain network that uses a session on this node for sending transactions.
 type User struct {
 	Peer
 
-	OnChainAcc      wallet.Account // Account for funding the channel and the on-chain transactions.
-	OnChainWallet   wallet.Wallet  // Wallet that stores the keys corresponding to on-chain account.
-	OnChainKeystore string         // Path of keystore directory containning the keys for on-chain account.
+	OnChain  Credential // Account for funding the channel and the on-chain transactions.
+	OffChain Credential // Account (corresponding to off-chain ID) used for signing authentication messages.
 
-	OffchainAcc wallet.Account // Account (corresponding to off-chain ID) used for signing authentication messages.
-
-	// Map of channel IDs to the accounts corresponding to participant IDs for this user in all open channels.
-	// Participant IDs are used to represent the user in a channel and for signing state updates.
-	// These addresses are ephemeral (one per channel) and created when a channel is established and destroyed
-	// the channel is closed.
-	PartAccs map[string]wallet.Account
-
-	// Wallet that stores the keys corresponding to off-chain account and participant accounts.
-	OffChainWallet   wallet.Wallet
-	OffChainKeystore string // Path of keystore directory containing keys for off-chain account.
+	// List of participant addresses for this user in each open channel.
+	// OffChain credential is used for managing all these accounts.
+	PartAddrs []wallet.Address
 }
 
 // Session provides a context for the user to interact with a node. It manages user data (such as IDs, contacts),
