@@ -40,3 +40,17 @@ func Test_NewGanacheBackendSetup(t *testing.T) {
 	assert.NotEqual(t, setup1.Accs[0], setup2.Accs[0])
 
 }
+
+func Test_ImportAcc(t *testing.T) {
+	prng := rand.New(rand.NewSource(1729))
+	cntAccs := 1
+	w := ethereumtest.NewHDWalletAccs2(t, prng.Int63(), cntAccs)
+	require.Len(t, w.Accounts(), cntAccs)
+
+	privKey, err := w.PrivateKey(w.Accounts()[0])
+	require.NoError(t, err)
+	ks, _, ethAcc, err := ethereumtest.ImportAcc(t, privKey)
+	require.NoError(t, err)
+	assert.Equal(t, ethAcc.Address().String(), w.Accounts()[0].Address.Hex())
+	t.Log(ks)
+}
