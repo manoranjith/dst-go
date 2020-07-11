@@ -56,8 +56,9 @@ type CommBackend interface {
 type User struct {
 	Peer
 
-	OnChainAcc    wallet.Account // Account for funding the channel and the on-chain transactions.
-	OnChainWallet wallet.Wallet  // Wallet that stores the keys corresponding to on-chain account.
+	OnChainAcc      wallet.Account // Account for funding the channel and the on-chain transactions.
+	OnChainWallet   wallet.Wallet  // Wallet that stores the keys corresponding to on-chain account.
+	OnChainKeystore string         // Path of keystore directory containning the keys for on-chain account.
 
 	OffchainAcc wallet.Account // Account (corresponding to off-chain ID) used for signing authentication messages.
 
@@ -68,7 +69,8 @@ type User struct {
 	PartAccs map[string]wallet.Account
 
 	// Wallet that stores the keys corresponding to off-chain account and participant accounts.
-	OffChainWallet wallet.Wallet
+	OffChainWallet   wallet.Wallet
+	OffChainKeystore string // Path of keystore directory containing keys for off-chain account.
 }
 
 // Session provides a context for the user to interact with a node. It manages user data (such as IDs, contacts),
