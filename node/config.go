@@ -31,7 +31,10 @@ type UserConfig struct {
 	OnChainAddr   string
 	OnChainWallet WalletConfig
 
+	PartAddrs      []string
 	OffChainAddr   string
-	PartAddrs      map[string]string
 	OffChainWallet WalletConfig
+
+	CommAddr string
+	CommType string
 }

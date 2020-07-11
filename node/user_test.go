@@ -18,12 +18,10 @@ package node_test
 
 import (
 	"math/rand"
-	"strconv"
 	"testing"
 
-	"perun.network/go-perun/wallet"
-
 	"github.com/direct-state-transfer/dst-go/node"
+	"perun.network/go-perun/wallet"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,64 +32,63 @@ import (
 
 func Test_New_Happy(t *testing.T) {
 	rng := rand.New(rand.NewSource(1729))
-	cntPartAccs := uint(4)
-	setup, testUser := newTestUser(t, rng, cntPartAccs)
+	cntParts := uint(4)
+	setup, testUser := newTestUser(t, rng, cntParts)
 	wb := setup.WalletBackend
 	userCfg := node.UserConfig{
 		Alias:       testUser.Alias,
-		OnChainAddr: testUser.OnChainAcc.Address().String(),
+		OnChainAddr: testUser.OnChain.Addr.String(),
 		OnChainWallet: node.WalletConfig{
 			KeystorePath: setup.KeystorePath,
 			Password:     ""},
-		OffChainAddr: testUser.OffchainAcc.Address().String(),
+		OffChainAddr: testUser.OffChain.Addr.String(),
 		OffChainWallet: node.WalletConfig{
 			KeystorePath: setup.KeystorePath,
 			Password:     ""}}
 
-	userCfg.PartAddrs = make(map[string]string)
-	for k, v := range testUser.PartAccs {
-		userCfg.PartAddrs[k] = v.Address().String()
+	userCfg.PartAddrs = make([]string, len(testUser.PartAddrs))
+	for i, addr := range testUser.PartAddrs {
+		userCfg.PartAddrs[i] = addr.String()
 	}
 
-	gotUser, err := node.NewUser(wb, userCfg)
+	gotUser, err := node.NewUnlockedUser(wb, userCfg)
 	require.NoError(t, err)
 	require.NotZero(t, gotUser)
-	require.Len(t, gotUser.PartAccs, int(cntPartAccs))
+	require.Len(t, gotUser.PartAddrs, int(cntParts))
 
 }
 func Test_New_Unhappy_Parts(t *testing.T) {
 	rng := rand.New(rand.NewSource(1729))
-	cntPartAccs := uint(1)
-	setup, testUser := newTestUser(t, rng, cntPartAccs)
+	cntParts := uint(1)
+	setup, testUser := newTestUser(t, rng, cntParts)
 	wb := setup.WalletBackend
 	userCfg := node.UserConfig{
 		Alias:       testUser.Alias,
-		OnChainAddr: testUser.OnChainAcc.Address().String(),
+		OnChainAddr: testUser.OnChain.Addr.String(),
 		OnChainWallet: node.WalletConfig{
 			KeystorePath: setup.KeystorePath,
 			Password:     ""},
-		OffChainAddr: testUser.OffchainAcc.Address().String(),
+		OffChainAddr: testUser.OffChain.Addr.String(),
 		OffChainWallet: node.WalletConfig{
 			KeystorePath: setup.KeystorePath,
 			Password:     ""}}
 
 	t.Run("invalid-parts-address", func(t *testing.T) {
-		userCfg.PartAddrs = make(map[string]string)
-		for k := range testUser.PartAccs {
-			userCfg.PartAddrs[k] = "invalid-addr"
+		userCfg.PartAddrs = make([]string, cntParts)
+		for i := range testUser.PartAddrs {
+			userCfg.PartAddrs[i] = "invalid-addr"
 		}
 
-		gotUser, err := node.NewUser(wb, userCfg)
+		gotUser, err := node.NewUnlockedUser(wb, userCfg)
 		require.Error(t, err)
 		require.Zero(t, gotUser)
 	})
 	t.Run("missing-parts-address", func(t *testing.T) {
-		userCfg.PartAddrs = make(map[string]string)
-		for k := range testUser.PartAccs {
-			userCfg.PartAddrs[k] = ethereumtest.NewRandomAddress(rng).String()
+		userCfg.PartAddrs = make([]string, cntParts)
+		for i := range testUser.PartAddrs {
+			userCfg.PartAddrs[i] = ethereumtest.NewRandomAddress(rng).String()
 		}
-
-		gotUser, err := node.NewUser(wb, userCfg)
+		gotUser, err := node.NewUnlockedUser(wb, userCfg)
 		require.Error(t, err)
 		require.Zero(t, gotUser)
 	})
@@ -120,7 +117,7 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""},
-					OffChainAddr: testUser.OffchainAcc.Address().String(),
+					OffChainAddr: testUser.OffChain.Addr.String(),
 					OffChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""}}},
@@ -131,7 +128,7 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 				wb: setup.WalletBackend,
 				cfg: node.UserConfig{
 					Alias:       testUser.Alias,
-					OnChainAddr: testUser.OnChainAcc.Address().String(),
+					OnChainAddr: testUser.OnChain.Addr.String(),
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""},
@@ -150,7 +147,7 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""},
-					OffChainAddr: testUser.OffchainAcc.Address().String(),
+					OffChainAddr: testUser.OffChain.Addr.String(),
 					OffChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""}}},
@@ -161,7 +158,7 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 				wb: setup.WalletBackend,
 				cfg: node.UserConfig{
 					Alias:       testUser.Alias,
-					OnChainAddr: testUser.OnChainAcc.Address().String(),
+					OnChainAddr: testUser.OnChain.Addr.String(),
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""},
@@ -176,11 +173,11 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 				wb: setup.WalletBackend,
 				cfg: node.UserConfig{
 					Alias:       testUser.Alias,
-					OnChainAddr: testUser.OnChainAcc.Address().String(),
+					OnChainAddr: testUser.OnChain.Addr.String(),
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     "invalid-password"},
-					OffChainAddr: testUser.OffchainAcc.Address().String(),
+					OffChainAddr: testUser.OffChain.Addr.String(),
 					OffChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""}}},
@@ -191,11 +188,11 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 				wb: setup.WalletBackend,
 				cfg: node.UserConfig{
 					Alias:       testUser.Alias,
-					OnChainAddr: testUser.OnChainAcc.Address().String(),
+					OnChainAddr: testUser.OnChain.Addr.String(),
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""},
-					OffChainAddr: testUser.OffchainAcc.Address().String(),
+					OffChainAddr: testUser.OffChain.Addr.String(),
 					OffChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     "invalid-pwd"}}},
@@ -206,11 +203,11 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 				wb: setup.WalletBackend,
 				cfg: node.UserConfig{
 					Alias:       testUser.Alias,
-					OnChainAddr: testUser.OnChainAcc.Address().String(),
+					OnChainAddr: testUser.OnChain.Addr.String(),
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: "invalid-keystore-path",
 						Password:     ""},
-					OffChainAddr: testUser.OffchainAcc.Address().String(),
+					OffChainAddr: testUser.OffChain.Addr.String(),
 					OffChainWallet: node.WalletConfig{
 						KeystorePath: setup.KeystorePath,
 						Password:     ""}}},
@@ -218,29 +215,26 @@ func Test_New_Unhappy_Wallets(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := node.NewUser(tt.args.wb, tt.args.cfg)
+			got, err := node.NewUnlockedUser(tt.args.wb, tt.args.cfg)
 			require.Error(t, err)
 			assert.Zero(t, got)
 		})
 	}
 }
 
-func newTestUser(t *testing.T, rng *rand.Rand, cntPartAccs uint) (*ethereumtest.WalletSetup, dst.User) {
-	ws := ethereumtest.NewWalletSetup(t, rng, 2+cntPartAccs)
-	user := dst.User{
-		OnChainAcc:     ws.Accs[0],
-		OnChainWallet:  ws.Wallet,
-		OffchainAcc:    ws.Accs[1],
-		OffChainWallet: ws.Wallet,
-		Peer: dst.Peer{
-			Alias:      "test-user",
-			OffchainID: ws.Accs[1].Address(),
-		},
-	}
-	user.PartAccs = make(map[string]wallet.Account)
+func newTestUser(t *testing.T, rng *rand.Rand, cntParts uint) (*ethereumtest.WalletSetup, dst.User) {
+	ws := ethereumtest.NewWalletSetup(t, rng, 2+cntParts)
+	u := dst.User{}
+	u.OnChain.Addr = ws.Accs[0].Address()
+	u.OnChain.Wallet = ws.Wallet
+	u.OffChain.Addr = ws.Accs[1].Address()
+	u.OffChain.Wallet = ws.Wallet
+	u.Alias = "test-user"
+	u.OffChain.Addr = ws.Accs[1].Address()
+	u.PartAddrs = make([]wallet.Address, cntParts)
 	for i := range ws.Accs[2:] {
-		user.PartAccs[strconv.Itoa(i-1)] = ws.Accs[i]
+		u.PartAddrs[i] = ws.Accs[i].Address()
 	}
 
-	return ws, user
+	return ws, u
 }
