@@ -17,6 +17,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/pkg/errors"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
@@ -26,6 +28,8 @@ import (
 	"github.com/direct-state-transfer/dst-go"
 )
 
+const ChainConnTimeout = 30 * time.Second
+
 // Backend implements the dst.ProtocolService interface.
 type Backend struct {
 	*client.Client
@@ -34,16 +38,16 @@ type Backend struct {
 	assetAddr       wallet.Address // Address of the asset holder contract deployed on the blockchain.
 }
 
-// New initializes a protocol service for the given user and backends.
+// New initializes a channel client for the given user. It uses the comm backend for off-chain communiation and
+// connects to an ethereum backend. a timeout of 30s (ChainConnTImeout) is used when connecting to the node.
 func New(url string, user dst.User, comm dst.CommBackend, adjudicator, asset wallet.Address) (*Backend, error) {
-
 	dialer := comm.NewDialer()
 	listener, err := comm.NewListener(user.CommAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	onChainTx, err := ethereum.NewOnChainTxBackend(url, user.OnChainKeystore, user.OnChainAcc.Address())
+	onChainTx, err := ethereum.NewOnChainTxBackend(url, ChainConnTimeout, user.OnChain)
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +55,16 @@ func New(url string, user dst.User, comm dst.CommBackend, adjudicator, asset wal
 		return nil, errors.Wrap(err, "validating contracts")
 	}
 	funderInst := onChainTx.NewFunder(asset)
-	adjudicatorInst := onChainTx.NewAdjudicator(adjudicator, user.OnChainAcc.Address())
+	adjudicatorInst := onChainTx.NewAdjudicator(adjudicator, user.OnChain.Addr)
 
-	client := client.New(user.OffchainAcc, dialer, funderInst, adjudicatorInst, user.OffChainWallet)
+	// Only offchain account is unlocked. Accounts for the participant addresses
+	// will be unlocked by the client when required.
+	offChainAcc, err := user.OffChain.Wallet.Unlock(user.OffChain.Addr)
+	if err != nil {
+		return nil, err
+	}
+	client := client.New(offChainAcc, dialer, funderInst, adjudicatorInst, user.OffChain.Wallet)
+
 	backend := &Backend{
 		Client:          client,
 		adjudicatoraddr: adjudicator,
