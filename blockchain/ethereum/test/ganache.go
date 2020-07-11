@@ -4,8 +4,10 @@ package ethereumtest
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -17,6 +19,7 @@ import (
 
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 	"github.com/phayes/freeport"
 	"github.com/stretchr/testify/require"
@@ -67,6 +70,15 @@ func (a *Account) SignData(data []byte) ([]byte, error) {
 //
 // When used with ganache cli, the same seed and path.
 func NewHDWalletAccs(t *testing.T, seed int64, n int) []wallet.Account {
+	w := NewHDWalletAccs2(t, seed, n)
+	accs := make([]wallet.Account, n)
+	for i := 0; i < n; i++ {
+		accs[i] = &Account{wallet: w, idx: i}
+	}
+	return accs
+}
+
+func NewHDWalletAccs2(t *testing.T, seed int64, n int) *hdwallet.Wallet {
 	//rand package is directly used to Read function safe for concurrent use, while rand.Rand.Read method is not.
 	rand.Seed(seed)
 	walletSeed := make([]byte, 20)
@@ -78,16 +90,13 @@ func NewHDWalletAccs(t *testing.T, seed int64, n int) []wallet.Account {
 	w, err := hdwallet.NewFromMnemonic(mnemonic)
 	require.NoError(t, err)
 
-	accs := make([]wallet.Account, n)
 	for i := 0; i < n; i++ {
 		path, err := hdwallet.ParseDerivationPath(fmt.Sprintf("%s%d", defaultHDPath, i))
 		require.NoError(t, err)
 		_, err = w.Derive(path, true)
 		require.NoError(t, err)
-
-		accs[i] = &Account{wallet: w, idx: i}
 	}
-	return accs
+	return w
 }
 
 // NewGanacheBackendSetup returns a ganacheBackendSetup with n funded accounts, each with 100 ethers.
@@ -190,4 +199,27 @@ func ActiveTCPListener(addr string, timeout time.Duration) bool {
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
+}
+
+// ImportAcc imports the given private key into an ethereum keystore and returns the keystore path,
+// wallet and the account. Password to unlock the wallet it set to empty string.
+func ImportAcc(t *testing.T, privKey *ecdsa.PrivateKey) (string, *ethwallet.Wallet, *ethwallet.Account, error) {
+	ksPath, err := ioutil.TempDir("", "dst-go-test-keystore-*")
+	require.NoError(t, err)
+	ks := keystore.NewKeyStore(ksPath, weakScryptN, weakScryptP)
+	t.Cleanup(func() {
+		err := os.RemoveAll(ksPath)
+		if err != nil {
+			t.Log("error in cleanup - ", err)
+		}
+	})
+
+	ethAcc, err := ks.ImportECDSA(privKey, "")
+	require.NoError(t, err)
+	wallet, err := ethwallet.NewWallet(ks, "")
+	require.NoError(t, err)
+
+	wAcc := ethwallet.NewAccountFromEth(wallet, &ethAcc)
+	acc, err := wallet.Unlock(wAcc.Address())
+	return ksPath, wallet, acc.(*ethwallet.Account), err
 }
