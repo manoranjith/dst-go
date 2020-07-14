@@ -86,8 +86,12 @@ func NewWalletSetup(t *testing.T, rng *rand.Rand, n uint) *WalletSetup {
 // NewRandomAddress generates a random wallet address. It generates the address only as a byte array.
 // Hence it does not generate any public or private keys corresponding to the address.
 // If you need an address with keys, use Wallet.NewAccount method.
-func NewRandomAddress(rnd *rand.Rand) wallet.Address {
+//
+// Take randSeed as arg instead of rand.Rand because tests are run concurrently by `go test` command and
+// function Read is safe for concurrent use, while method Read is not.
+func NewRandomAddress(seed int64) wallet.Address {
 	var a common.Address
-	rnd.Read(a[:])
+	rand.Seed(seed)
+	rand.Read(a[:])
 	return ethwallet.AsWalletAddr(a)
 }

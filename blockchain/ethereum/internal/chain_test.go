@@ -55,8 +55,8 @@ func Test_ChainBackend_ValidateContracts(t *testing.T) {
 		assert.NoError(t, setup.ChainBackend.ValidateContracts(setup.AdjAddr, setup.AssetAddr))
 	})
 	t.Run("invalid_random_addrs", func(t *testing.T) {
-		randomAddr1 := ethereumtest.NewRandomAddress(rng)
-		randomAddr2 := ethereumtest.NewRandomAddress(rng)
+		randomAddr1 := ethereumtest.NewRandomAddress(rng.Int63())
+		randomAddr2 := ethereumtest.NewRandomAddress(rng.Int63())
 		assert.Error(t, setup.ChainBackend.ValidateContracts(randomAddr1, randomAddr2))
 	})
 }

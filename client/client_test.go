@@ -108,7 +108,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	t.Run("err_invalid_adjudicator", func(t *testing.T) {
 		invalidCfg := cfg
 		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
-		randomAddr := ethereumtest.NewRandomAddress(prng)
+		randomAddr := ethereumtest.NewRandomAddress(prng.Int63())
 		invalidCfg.Chain.Adjudicator = randomAddr.String()
 
 		_, err := client.NewEthereumPaymentClient(invalidCfg, user, tcp.NewTCPAdapter(5*time.Second))
@@ -119,7 +119,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	t.Run("err_invalid_asset", func(t *testing.T) {
 		invalidCfg := cfg
 		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
-		randomAddr := ethereumtest.NewRandomAddress(prng)
+		randomAddr := ethereumtest.NewRandomAddress(prng.Int63())
 		invalidCfg.Chain.Asset = randomAddr.String()
 
 		_, err := client.NewEthereumPaymentClient(invalidCfg, user, tcp.NewTCPAdapter(5*time.Second))
