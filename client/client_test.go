@@ -165,7 +165,10 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 		err = emptyFile.Close()
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			os.Remove(emptyFile.Name())
+			// nolint:govet	// not shadowing, err is inside anonymous function.
+			if err := os.Remove(emptyFile.Name()); err != nil {
+				t.Logf("error in test cleanup, deleting file %s", emptyFile.Name())
+			}
 		})
 
 		cfgInvalidPeristence := cfg
@@ -179,10 +182,12 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 }
 
 func newDatabaseDir(t *testing.T) (dir string) {
-	persistenceDir, err := ioutil.TempDir("", "")
+	databaseDir, err := ioutil.TempDir("", "")
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		os.Remove(persistenceDir)
+		if err := os.Remove(databaseDir); err != nil {
+			t.Logf("error in test cleanup, deleting dir %s", databaseDir)
+		}
 	})
-	return persistenceDir
+	return databaseDir
 }
