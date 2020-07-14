@@ -67,7 +67,7 @@ func Test_WalletBackend_NewAccount(t *testing.T) {
 		assert.NotNil(t, w)
 	})
 	t.Run("account_not_present", func(t *testing.T) {
-		randomAddr := ethereumtest.NewRandomAddress(rng)
+		randomAddr := ethereumtest.NewRandomAddress(rng.Int63())
 		w, err := wb.NewAccount(setup.Wallet, randomAddr)
 		assert.Error(t, err)
 		assert.Nil(t, w)
@@ -79,7 +79,7 @@ func Test_WalletBackend_ParseAddr(t *testing.T) {
 	wb := ethereumtest.NewTestWalletBackend()
 
 	t.Run("happy_non_zero_value", func(t *testing.T) {
-		validAddr := ethereumtest.NewRandomAddress(rng)
+		validAddr := ethereumtest.NewRandomAddress(rng.Int63())
 		gotAddr, err := wb.ParseAddr(validAddr.String())
 		assert.NoError(t, err)
 		require.NotNil(t, gotAddr)

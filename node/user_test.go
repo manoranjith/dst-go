@@ -90,7 +90,7 @@ func Test_New_Invalid_Parts(t *testing.T) {
 	t.Run("missing_parts_address", func(t *testing.T) {
 		userCfg.PartAddrs = make([]string, cntParts)
 		for i := range testUser.PartAddrs {
-			userCfg.PartAddrs[i] = ethereumtest.NewRandomAddress(rng).String()
+			userCfg.PartAddrs[i] = ethereumtest.NewRandomAddress(rng.Int63()).String()
 		}
 		gotUser, err := node.NewUnlockedUser(wb, userCfg)
 		require.Error(t, err)
@@ -174,7 +174,7 @@ func Test_New_Invalid_Wallets(t *testing.T) {
 				wb: wb,
 				cfg: node.UserConfig{
 					Alias:       testUser.Alias,
-					OnChainAddr: ethereumtest.NewRandomAddress(rng).String(),
+					OnChainAddr: ethereumtest.NewRandomAddress(rng.Int63()).String(),
 					OnChainWallet: node.WalletConfig{
 						KeystorePath: testUser.OnChain.Keystore,
 						Password:     "",
@@ -198,7 +198,7 @@ func Test_New_Invalid_Wallets(t *testing.T) {
 						KeystorePath: testUser.OnChain.Keystore,
 						Password:     "",
 					},
-					OffChainAddr: ethereumtest.NewRandomAddress(rng).String(),
+					OffChainAddr: ethereumtest.NewRandomAddress(rng.Int63()).String(),
 					OffChainWallet: node.WalletConfig{
 						KeystorePath: testUser.OffChain.Keystore,
 						Password:     "",
