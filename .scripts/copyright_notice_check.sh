@@ -1,7 +1,7 @@
 #!/bin/bash
 
-template="$(dirname $(readlink -f $0))/copyright_notice_template.txt"
-n=$(wc -l $template | cut -d ' ' -f 1)
+template="$(dirname $0)/copyright_notice_template.txt"
+n=$(wc -l $template | awk '{ print $1 }')
 
 function check_copyright_notice() {
   start_line=1
@@ -12,19 +12,12 @@ function check_copyright_notice() {
   [ $? -ne 0 ] && echo -e "$f\n"
 }
 
-# Its trickier to pass custom bash functions as argument to -exec 
-# option of find, so pass the list of files, recursively as args
-# to this script.
-#
-# During the next invocation, since count of arguments is not zero,
-# copyright notice check is executed for each file in the list.
-if [ $# -eq 0 ]; then
-  find . -path "./internal/mocks/*" -prune -o -name "*.go" -exec $0 {} +
-else
-  code=0
-  for f in "$@"; do
+exit_status=0
+for f in $(find . -name "*.go"); do
+  # Skip generated files, Identified by DO NOT EDIT phrase in line 1.
+  if ! sed -ne '1,1p' $f | grep "DO NOT EDIT." -q; then
     check_copyright_notice $f
-    [ $? -ne 0 ] && code=1
-  done
-  exit $code
-fi
+  fi
+  [ $? -ne 0 ] && exit_status=1
+done
+exit $exit_status
