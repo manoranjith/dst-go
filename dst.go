@@ -28,7 +28,7 @@ import (
 	"perun.network/go-perun/wallet"
 )
 
-// Peer represents any participant in the off-chain network that the user wants to transact with.
+// dsPeer represents any participant in the off-chain network that the user wants to transact with.
 type Peer struct {
 	// Name assigned by user for referring to this peer in api requests to the node.
 	// It is unique within a session on the node.
