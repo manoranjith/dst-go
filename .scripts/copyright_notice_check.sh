@@ -7,9 +7,9 @@ function check_copyright_notice() {
   start_line=1
   end_line=$n
   f=$1
-  diff $template <(sed -ne "${start_line},${end_line}p" $f | \
-  sed "s/20\(19\|2[0-9]\)/20XX/")
-  [ $? -ne 0 ] && echo -e "$f\n"
+  diff_output=$(diff --color=always <(sed -ne "${start_line},${end_line}p" $f | \
+  sed "s/20\(19\|2[0-9]\)/20XX/") $template)
+  [ $? -ne 0 ] && echo -e "\033[1m\n$f\033[0m" && echo "$diff_output"
 }
 
 exit_status=0
@@ -20,4 +20,6 @@ for f in $(find . -name "*.go"); do
   fi
   [ $? -ne 0 ] && exit_status=1
 done
+[ $exit_status -ne 0 ] && echo -e "\033[1m\n\nTo fix,\
+ replace the lines marked \"\<\" (red) with lines marked \"\>\" (green). \033[0m"
 exit $exit_status
