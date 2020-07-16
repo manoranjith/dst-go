@@ -29,6 +29,11 @@ commands:
       - store_artifacts:
           path: /tmp/artifacts
 
+  install-ansi2html:
+    steps:
+      - run: sudo apt-get update
+      - run: sudo apt-get install ansi2html
+
 jobs:
 
   lint:
@@ -42,9 +47,10 @@ jobs:
       - run:
           name: Run linter
           command: golangci-lint run --out-format='junit-xml' -v ./... | tee ${RESULTS}/lint.xml
+      - install-ansi2html
       - run:
           name: Check copyright notice
-          command: .scripts/copyright_notice_check.sh | tee ${ARTIFACTS}/copyright_notice_check.txt
+          command: .scripts/copyright_notice_check.sh | tee >(ansi2html -l > ${ARTIFACTS}/copyright_notice_check.html)
       - upload-results-artifacts
 
 
