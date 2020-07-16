@@ -1,4 +1,4 @@
-// cOPyright (c) 2020 - for information on the respective copyright owner
+// Copyright (c) 2020 - for information on the respective copyright owner
 // see the NOTICE file and/or the repository at
 // HTtps://github.com/direct-state-transfer/dst-go
 //
@@ -28,7 +28,7 @@ import (
 	"perun.network/go-perun/wallet"
 )
 
-// dsPeer represents any participant in the off-chain network that the user wants to transact with.
+// Peer represents any participant in the off-chain network that the user wants to transact with.
 type Peer struct {
 	// Name assigned by user for referring to this peer in api requests to the node.
 	// It is unique within a session on the node.

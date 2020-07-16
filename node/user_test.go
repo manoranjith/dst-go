@@ -57,7 +57,6 @@ func Test_New_Happy(t *testing.T) {
 	require.NoError(t, err)
 	require.NotZero(t, gotUser)
 	require.Len(t, gotUser.PartAddrs, int(cntParts))
-	t.Fail()
 }
 
 func Test_New_Invalid_Parts(t *testing.T) {
