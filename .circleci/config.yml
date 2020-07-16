@@ -45,13 +45,14 @@ jobs:
       - run:
           name: Install linter
           command: curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh| sh -s -- -b $(go env GOPATH)/bin v1.28.2
+      - install-txt-to-html-coverter-aha
       - run:
           name: Run linter
           command: golangci-lint run --out-format='junit-xml' -v ./... | tee ${RESULTS}/lint.xml
-      - install-txt-to-html-coverter-aha
       - run:
           name: Check copyright notice
           command: .scripts/copyright_notice_check.sh | tee >(aha --title "Check for Copyright Notice" --pink > ${ARTIFACTS}/copyright_notice_check.html)
+          when: always
       - upload-results-artifacts
 
 
@@ -62,9 +63,11 @@ jobs:
       - make-results-artifacts-dir
       - run:
           name: Run unit tests
-          command: |
-            gotestsum --junitfile ${RESULTS}/unit-tests.xml --format=short-verbose -- -coverprofile=c.out ./...
-            go tool cover -html=c.out -o ${ARTIFACTS}/unit_test_coverage.html
+          command: gotestsum --junitfile ${RESULTS}/unit-tests.xml --format=short-verbose -- -coverprofile=c.out ./...
+      - run:
+          name: Generate coverage report
+          command: go tool cover -html=c.out -o ${ARTIFACTS}/unit_test_coverage.html
+          when: always
       - upload-results-artifacts
 
 
