@@ -21,5 +21,5 @@ for f in $(find . -name "*.go"); do
   [ $? -ne 0 ] && exit_status=1
 done
 [ $exit_status -ne 0 ] && echo -e "\033[1m\n\nTo fix,\
- replace the lines marked \"\<\" (red) with lines marked \"\>\" (green). \033[0m"
+ replace the red lines marked \"\<\" with green lines marked \"\>\". \033[0m"
 exit $exit_status
