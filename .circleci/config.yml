@@ -50,7 +50,7 @@ jobs:
       - install-ansi2html
       - run:
           name: Check copyright notice
-          command: .scripts/copyright_notice_check.sh | tee >(ansi2html -l > ${ARTIFACTS}/copyright_notice_check.html)
+          command: .scripts/copyright_notice_check.sh | tee >(ansi2html > ${ARTIFACTS}/copyright_notice_check.html)
       - upload-results-artifacts
 
 
