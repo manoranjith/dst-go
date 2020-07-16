@@ -1,5 +1,3 @@
-// +build integration
-
 // Copyright (c) 2020 - for information on the respective copyright owner
 // see the NOTICE file and/or the repository at
 // https://github.com/direct-state-transfer/dst-go
@@ -15,6 +13,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// +build integration
 
 package client_test
 
