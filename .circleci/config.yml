@@ -7,6 +7,7 @@ executors:
     environment:
       RESULTS: /tmp/results
       ARTIFACTS: /tmp/artifacts
+      TERM: xterm
     working_directory: ~/dst-go
 
 commands:
@@ -29,10 +30,10 @@ commands:
       - store_artifacts:
           path: /tmp/artifacts
 
-  install-ansi2html:
+  install-txt-to-html-coverter-aha:
     steps:
       - run: sudo apt-get update
-      - run: sudo apt-get install colorized-logs
+      - run: sudo apt-get install aha
 
 jobs:
 
@@ -47,7 +48,7 @@ jobs:
       - run:
           name: Run linter
           command: golangci-lint run --out-format='junit-xml' -v ./... | tee ${RESULTS}/lint.xml
-      - install-ansi2html
+      - install-txt-to-html-coverter-aha
       - run:
           name: Check copyright notice
           command: .scripts/copyright_notice_check.sh | tee >(aha --title "Check for Copyright Notice" --pink > ${ARTIFACTS}/copyright_notice_check.html)
