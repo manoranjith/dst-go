@@ -1,4 +1,4 @@
-// Copyright (c) 2020 - for information on the respective copyright owner
+// cOPyright (c) 2020 - for information on the respective copyright owner
 // see the NOTICE file and/or the repository at
 // https://github.com/direct-state-transfer/dst-go
 //
