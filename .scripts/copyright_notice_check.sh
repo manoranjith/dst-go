@@ -1,5 +1,9 @@
 #!/bin/bash
 
+bold=`tput bold`
+bold_highlight=`tput setab 120 bold`
+reset=`tput sgr0`
+
 template="$(dirname $0)/copyright_notice_template.txt"
 n=$(wc -l $template | awk '{ print $1 }')
 
@@ -9,7 +13,7 @@ function check_copyright_notice() {
   f=$1
   diff_output=$(diff --color=always <(sed -ne "${start_line},${end_line}p" $f | \
   sed "s/20\(19\|2[0-9]\)/20XX/") $template)
-  [ $? -ne 0 ] && echo -e "\033[1m\nIn file $f\033[0m" && echo "$diff_output"
+  [ $? -ne 0 ] && echo -e "${bold}\nIn file $f\n$diff_output"
 }
 
 exit_status=0
@@ -20,6 +24,9 @@ for f in $(find . -name "*.go"); do
   fi
   [ $? -ne 0 ] && exit_status=1
 done
-[ $exit_status -ne 0 ] && echo -e "\e[30;1;47m\n\nTo fix,\
- replace the red lines marked \"<\" with green lines marked \">\". \033[0m"
+[ $exit_status -ne 0 ] && echo -e "$bold_highlight\n\nHints to fix:$reset\n
+1. The actual text in the file is marked red and the expected content
+   is marked green.
+3. Number before the character a/c/d (in the text above each change)
+   is the line number in the file.\n"
 exit $exit_status
