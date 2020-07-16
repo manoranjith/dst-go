@@ -32,7 +32,7 @@ commands:
   install-ansi2html:
     steps:
       - run: sudo apt-get update
-      - run: sudo apt-get install ansi2html
+      - run: sudo apt-get install colorized-logs
 
 jobs:
 
