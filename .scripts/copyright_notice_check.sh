@@ -26,7 +26,7 @@ for f in $(find . -name "*.go"); do
 done
 
 [ $exit_status -ne 0 ] && echo -e "$bold\n\nHints to fix:$reset\n
-1. The actual text in the file is marked red and the expected content
+1. The actual text in the file is marked red and the expected text
    is marked green.
 3. Number before the character a/c/d (in the text above each change)
    is the line number in the file.\n"
