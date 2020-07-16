@@ -2,7 +2,6 @@
 
 # Formating directives for printing text.
 bold=`tput bold`
-bold_highlight=`tput setab 120 bold`
 reset=`tput sgr0`
 
 exit_status=0 #Set this to 1, when first error is detected.
@@ -26,7 +25,7 @@ for f in $(find . -name "*.go"); do
   fi
 done
 
-[ $exit_status -ne 0 ] && echo -e "$bold_highlight\n\nHints to fix:$reset\n
+[ $exit_status -ne 0 ] && echo -e "$bold\n\nHints to fix:$reset\n
 1. The actual text in the file is marked red and the expected content
    is marked green.
 3. Number before the character a/c/d (in the text above each change)
