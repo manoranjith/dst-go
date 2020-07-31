@@ -28,7 +28,7 @@ import (
 	"perun.network/go-perun/peer"
 	"perun.network/go-perun/pkg/sortedkv/leveldb"
 
-	node "github.com/direct-state-transfer/perun-node"
+	"github.com/direct-state-transfer/perun-node"
 	"github.com/direct-state-transfer/perun-node/blockchain/ethereum"
 )
 
@@ -43,7 +43,7 @@ type Client struct {
 // NewEthereumPaymentClient initializes a two party, ethereum payment channel client for the given user.
 // It establishes a connection to the blockchain and verifies the integrity of contracts at the given address.
 // It uses the comm backend to initialize adapters for off-chain communication network.
-func NewEthereumPaymentClient(cfg Config, user node.User, comm node.CommBackend) (*Client, error) {
+func NewEthereumPaymentClient(cfg Config, user perun.User, comm perun.CommBackend) (*Client, error) {
 	dialer, listener, err := initComm(comm, user.CommAddr)
 	if err != nil {
 		return nil, err
@@ -88,13 +88,13 @@ func (c *Client) Close() error {
 	return errors.Wrap(err, "closing channel client")
 }
 
-func initComm(comm node.CommBackend, listenAddr string) (peer.Dialer, peer.Listener, error) {
+func initComm(comm perun.CommBackend, listenAddr string) (peer.Dialer, peer.Listener, error) {
 	dialer := comm.NewDialer()
 	listener, err := comm.NewListener(listenAddr)
 	return dialer, listener, err
 }
 
-func connectToChain(cfg ChainConfig, cred node.Credential) (channel.Funder, channel.Adjudicator, error) {
+func connectToChain(cfg ChainConfig, cred perun.Credential) (channel.Funder, channel.Adjudicator, error) {
 	walletBackend := ethereum.NewWalletBackend()
 	assetAddr, err := walletBackend.ParseAddr(cfg.Asset)
 	if err != nil {

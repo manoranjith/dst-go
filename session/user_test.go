@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	node "github.com/direct-state-transfer/perun-node"
+	"github.com/direct-state-transfer/perun-node"
 	"github.com/direct-state-transfer/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/direct-state-transfer/perun-node/session"
 	"github.com/direct-state-transfer/perun-node/session/sessiontest"
@@ -107,13 +107,13 @@ func Test_New_Invalid_Wallets(t *testing.T) {
 	wb, testUser := sessiontest.NewTestUser(t, rng, 0)
 
 	type args struct {
-		wb  node.WalletBackend
+		wb  perun.WalletBackend
 		cfg session.UserConfig
 	}
 	tests := []struct {
 		name string
 		args args
-		want node.User
+		want perun.User
 	}{
 		{
 			name: "invalid_on-chain_address",

@@ -29,7 +29,7 @@ import (
 	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	"perun.network/go-perun/wallet"
 
-	node "github.com/direct-state-transfer/perun-node"
+	"github.com/direct-state-transfer/perun-node"
 	"github.com/direct-state-transfer/perun-node/blockchain/ethereum/internal"
 )
 
@@ -42,7 +42,7 @@ const ChainTxTimeout = 1 * time.Minute
 // see go-ethereum) with required contracts deployed on it and a UserSetup.
 type ChainBackendSetup struct {
 	*WalletSetup
-	ChainBackend       node.ChainBackend
+	ChainBackend       perun.ChainBackend
 	AdjAddr, AssetAddr wallet.Address
 }
 

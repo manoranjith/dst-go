@@ -25,12 +25,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	node "github.com/direct-state-transfer/perun-node"
+	"github.com/direct-state-transfer/perun-node"
 	"github.com/direct-state-transfer/perun-node/comm/tcp"
 )
 
 func Test_CommBackend_Interface(t *testing.T) {
-	assert.Implements(t, (*node.CommBackend)(nil), new(tcp.Backend))
+	assert.Implements(t, (*perun.CommBackend)(nil), new(tcp.Backend))
 }
 
 func Test_Backend(t *testing.T) {
