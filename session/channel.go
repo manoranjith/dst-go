@@ -66,7 +66,7 @@ func (c *Channel) RespondToPayChUpdateNotif(accept bool) error {
 }
 
 func (c *Channel) GetBalance() BalInfo {
-	panic("not implemented") // TODO: Implement
+	panic("not implemented")
 }
 
 func (c *Channel) ClosePayCh() (finalBals BalInfo, _ error) {
@@ -92,7 +92,7 @@ func (ch *Channel) BalInfo() BalInfo {
 	return BalInfo{}
 }
 
-type PayChUpdateNotify func(proposalID string, alias string, initBals BalInfo, ChallengeDurSecs uint64)
+type PayChUpdateNotify func(alias string, amount string)
 
 type PayChState struct {
 	channelID string

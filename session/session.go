@@ -2,6 +2,7 @@ package session
 
 import (
 	"github.com/hyperledger-labs/perun-node"
+	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
 
@@ -9,17 +10,17 @@ import (
 // Or replace it with an interface, that is accessible by the node ???
 // Do after full implementation....
 type Session struct {
-	chClient perun.ChannelClient   // Perun Channel client.... Used for making calls.
-	User     perun.User            // User of this session.... Move user inside session ?.. Wallet are attached to user.
-	Contacts perun.Contacts        // Contact provider for this session.
-	channels map[string][]*Channel // Map of channel IDs to channels in the Session.
+	chClient perun.ChannelClient  // Perun Channel client.... Used for making calls.
+	User     perun.User           // User of this session.... Move user inside session ?.. Wallet are attached to user.
+	Contacts perun.Contacts       // Contact provider for this session.
+	channels map[string][]Channel // Map of channel IDs to channels in the Session.
 
 	// send notification.
 	// Mechanism to create subscription ID ?.... What is it unique of... ?
 	// This subscription is for a session, but any number of subscriptions can be made and all are identical.
 	// So use SessionID as the subscription ID. Later this can be changed.
-	PayChProposalNotify PayChProposalNotify                  // Handler for sending notifications
-	PayChResponders     map[string]*client.ProposalResponder // Map of proposalIDs to ProposalResponders.
+	PayChProposalNotify PayChProposalNotify                      // Handler for sending notifications
+	PayChResponders     map[channel.ID]*client.ProposalResponder // Map of proposalIDs to ProposalResponders.
 
 	PayChProposalsCache []*client.ChannelProposal // Cached proposals due to missing subscription.
 	PayChCloseCache     map[string]PayChCloseInfo // Cached channel close events due to missing subscription.
@@ -58,3 +59,36 @@ type SessionAPI interface {
 }
 
 func NewSession() {}
+
+func (s *Session) ContainsPayCh(id channel.ID) bool {
+	for _, ch := range s.channels {
+		if ch.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Session) HandleProposal(_ *client.ChannelProposal, _ *client.ProposalResponder) {
+}
+func (s *Session) HandleUpdate(update client.ChannelUpdate, responder *client.UpdateResponder) {
+	//if !s.ContainsPayCh(update.State.ID) {
+	//	//Log the channel ID
+	//	return
+	//}
+	//// As per v0.4.0 of go-perun SDK, a node can send only one update at a time.
+	//// Since only two parties exists, there can be only one active responder at a time.
+	//s.channels[update.State.ID].UpdateResponders = responder
+	//if update.State.IsFinal {
+	//	s.channels[update.State.ID].LockState = ChannelFinalized
+	//	// TODO: Start settle timer.
+	//}
+	//if !s.channels[update.State.ID].HasActiveSub() {
+	//	s.channels[update.State.ID].UpdateCache = update
+	//}
+	//// StateID during proposal is proposal id
+	//alias := "as"  // retrieve peer index, address and get alias from contact
+	//amount := "as" // retrieve  amount
+
+	// s.channels[string(update.State.ID)].PayChUpdateNotify(alias string, amount string)
+}

@@ -133,6 +133,13 @@ type ChannelClient interface {
 
 // Channel defines a subset of method on go-perun/channel.Channel that will be used by the node.
 type Channel interface {
+	// Read methods
+	ID() channel.ID
+	Idx() channel.Index
+	Peers() []wire.Address
+	State() *channel.State
+
+	// Actuation methods
 	Watch() error
 	UpdateBy(context.Context, func(*channel.State)) error
 	Settle(context.Context) error

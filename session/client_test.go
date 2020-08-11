@@ -23,12 +23,12 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/client"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
+	"github.com/hyperledger-labs/perun-node/session"
 )
 
 func Test_ChannelClient_Interface(t *testing.T) {
-	assert.Implements(t, (*perun.ChannelClient)(nil), new(client.Client))
+	assert.Implements(t, (*perun.ChannelClient)(nil), new(session.Client))
 }
 
 func Test_Client_Close(t *testing.T) {
@@ -37,7 +37,7 @@ func Test_Client_Close(t *testing.T) {
 	t.Run("err_channelClient_Err", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}
 		msgBus := &mocks.WireBus{}
-		Client := client.Client{
+		Client := session.Client{
 			ChannelClient: chClient,
 			WireBus:       msgBus,
 		}
@@ -50,7 +50,7 @@ func Test_Client_Close(t *testing.T) {
 	t.Run("err_wireBus_Err", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}
 		msgBus := &mocks.WireBus{}
-		Client := client.Client{
+		Client := session.Client{
 			ChannelClient: chClient,
 			WireBus:       msgBus,
 		}
