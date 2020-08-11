@@ -16,6 +16,8 @@
 
 package session
 
+import "time"
+
 // WalletConfig defines the parameters required to configure a wallet.
 type WalletConfig struct {
 	KeystorePath string
@@ -36,4 +38,29 @@ type UserConfig struct {
 
 	CommAddr string
 	CommType string
+}
+
+// Content from client
+
+// Config represents the configuration parameters for state channel client.
+type Config struct {
+	Chain ChainConfig
+
+	// Path to directory containing persistence database.
+	DatabaseDir string
+	// Timeout for re-establishing all open channels (if any) that was persisted during the
+	// previous running instance of the node.
+	PeerReconnTimeout time.Duration
+}
+
+// ChainConfig represents the configuration parameters for connecting to blockchain.
+type ChainConfig struct {
+	// Addresses of on-chain contracts used for establishing state channel network.
+	Adjudicator string
+	Asset       string
+
+	// URL for connecting to the blockchain node.
+	URL string
+	// ConnTimeout is the timeout used when dialing for new connections to the on-chain node.
+	ConnTimeout time.Duration
 }

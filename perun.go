@@ -129,6 +129,24 @@ type ChannelClient interface {
 	Log() perunLog.Logger
 }
 
+//go:generate mockery -name Channel -output ./internal/mocks
+
+// Channel defines a subset of method on go-perun/channel.Channel that will be used by the node.
+type Channel interface {
+	Watch() error
+	UpdateBy(context.Context, func(*channel.State)) error
+	Settle(context.Context) error
+	Close() error
+}
+
+//go:generate mockery -name UpdateResponder -output ./internal/mocks
+
+// Update Responder defines the methods on update responder that will be used by the node.
+type UpdateResponder interface {
+	Accept(context.Context) error
+	Reject(ctx context.Context, reason string) error
+}
+
 //go:generate mockery -name WireBus -output ./internal/mocks
 
 // WireBus is a an extension of the wire.Bus interface in go-perun to include a "Close" method.

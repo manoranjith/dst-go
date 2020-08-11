@@ -16,7 +16,7 @@
 
 // +build integration
 
-package client_test
+package session_test
 
 import (
 	"errors"
