@@ -21,6 +21,11 @@ type CloseNotifier struct{}
 
 func (cn *CloseNotifier) PayChCloseNotify(finalBals session.BalInfo, _ error) {}
 
+func Test_Interface_SessionAPI(t *testing.T) {
+	// use this over assert.implements as this prints info on missing methods.
+	var _ session.SessionAPI = &session.Session{}
+}
+
 func Test_Session_OpenPayCh(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}

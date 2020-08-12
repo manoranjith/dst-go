@@ -59,11 +59,11 @@ type SessionAPI interface {
 	// For now, only one subscription per session (by the user of session) is allowed.
 	SubPayChProposals(PayChProposalNotify) (subID string)
 	// Clear the callback
-	UnsubPayChProposals() error // Err if there is no subscription.
+	UnsubPayChProposals(subID string) error // Err if there is no subscription.
 	RespondToPayChProposalNotif(proposalID string, accept bool) error
 	// Subscribe to payment channel close events
 	SubPayChClose(PayChCloseNotify) (subID string)
-	UnsubPayChClose() error // Err if there is no subscription.
+	UnsubPayChClose(subID string) error // Err if there is no subscription.
 	// If persistOpenCh is
 	// true - it will persist open channels, close the session and return the list of channels persisted.
 	// false - it will close the session if no open channels, will err otherwise.

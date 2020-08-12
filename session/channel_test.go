@@ -15,6 +15,11 @@ type UpdateNotifier struct{}
 func (un *UpdateNotifier) PayChUpdateNotify(alias string, bals session.BalInfo, ChannelgeDurSecs uint64) {
 }
 
+func Test_Interface_ChannelAPI(t *testing.T) {
+	// use this over assert.implements as this prints info on missing methods.
+	var _ session.ChannelAPI = &session.Channel{}
+}
+
 func Test_Channel_HasActiveSub(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
 		ch := session.Channel{
