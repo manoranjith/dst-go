@@ -28,242 +28,131 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
+	"github.com/hyperledger-labs/perun-node/contacts/contactstest"
 	"github.com/hyperledger-labs/perun-node/contacts/contactsyaml"
 )
 
 var (
-	peer1 = perun.Peer{
-		Alias:              "Alice",
-		OffChainAddrString: "0x928268172392079898338058137658695146658578982175",
-		CommType:           "tcpip",
-		CommAddr:           "127.0.0.1:5751",
-	}
-	peer2 = perun.Peer{
-		Alias:              "Bob",
-		OffChainAddrString: "0x33697833370718072480937308896027275057015318468",
-		CommType:           "tcpip",
-		CommAddr:           "127.0.0.1:5750",
-	}
-	missingPeer = perun.Peer{
-		Alias:              "Tom",
-		OffChainAddrString: "0x71873088960230724809336978333707275057015318468",
-		CommType:           "tcpip",
-		CommAddr:           "127.0.0.1:5753",
-	}
-
-	walletBackend = ethereum.NewWalletBackend()
-
 	testdataDir = filepath.Join("..", "..", "testdata", "contacts")
 
-	testDataFile            = filepath.Join(testdataDir, "test.yaml")
-	updatedTestDataFile     = filepath.Join(testdataDir, "test_added_entries.yaml")
-	invalidOffChainAddrFile = filepath.Join(testdataDir, "invalid_addr.yaml")
-	corruptedYAML           = filepath.Join(testdataDir, "corrupted.yaml")
-	missingFile             = "./con.yml"
+	validYAMLFile               = filepath.Join(testdataDir, "test.yaml")
+	zeroEntriesYAMLFile         = filepath.Join(testdataDir, "test_zero_entries.yaml")
+	updatedYAMLFile             = filepath.Join(testdataDir, "test_added_entries.yaml")
+	invalidOffChainAddrYAMLFile = filepath.Join(testdataDir, "invalid_addr.yaml")
+	corruptedYAMLFile           = filepath.Join(testdataDir, "corrupted.yaml")
+	nonExistentYAMLFile         = "./con.yml"
 )
 
-func init() {
-	peer1.OffChainAddr, _ = walletBackend.ParseAddr(peer1.OffChainAddrString)             // nolint:errcheck
-	peer2.OffChainAddr, _ = walletBackend.ParseAddr(peer2.OffChainAddrString)             // nolint:errcheck
-	missingPeer.OffChainAddr, _ = walletBackend.ParseAddr(missingPeer.OffChainAddrString) // nolint:errcheck
-}
-
-func Test_ContactsReader_Interface(t *testing.T) {
+func Test_Provider_ContactsReader_Interface(t *testing.T) {
 	assert.Implements(t, (*perun.ContactsReader)(nil), new(contactsyaml.Provider))
 }
 
-func Test_Contacts_Interface(t *testing.T) {
+func Test_Provider_Contacts_Interface(t *testing.T) {
 	assert.Implements(t, (*perun.Contacts)(nil), new(contactsyaml.Provider))
 }
 
-func Test_NewContactsFromYaml(t *testing.T) {
+func Test_Provider_GenericReadWriteDelete(t *testing.T) {
+	contactstest.GenericReadWriteDelete(t, contactsCloner(validYAMLFile))
+}
+
+func Test_New(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		gotContacts, err := contactsyaml.New(tempContactsFile(t), walletBackend)
+		gotContacts, err := contactsyaml.New(tempCopyOfFile(t, validYAMLFile), contactstest.WalletBackend)
 		assert.NoError(t, err)
 
-		gotPeer1, isPresent := gotContacts.ReadByAlias(peer1.Alias)
-		assert.Equal(t, peer1, gotPeer1)
+		gotPeer1, isPresent := gotContacts.ReadByAlias(contactstest.Peer1.Alias)
+		assert.Equal(t, contactstest.Peer1, gotPeer1)
 		assert.True(t, isPresent)
 
-		gotPeer2, isPresent := gotContacts.ReadByAlias(peer2.Alias)
-		assert.Equal(t, peer2, gotPeer2)
+		gotPeer2, isPresent := gotContacts.ReadByAlias(contactstest.Peer2.Alias)
+		assert.Equal(t, contactstest.Peer2, gotPeer2)
 		assert.True(t, isPresent)
 
-		_, isPresent = gotContacts.ReadByAlias(missingPeer.Alias)
+		_, isPresent = gotContacts.ReadByAlias(contactstest.MissingPeer.Alias)
 		assert.False(t, isPresent)
 	})
 
 	t.Run("corrupted_yaml", func(t *testing.T) {
-		_, err := contactsyaml.New(corruptedYAML, walletBackend)
+		_, err := contactsyaml.New(tempCopyOfFile(t, corruptedYAMLFile), contactstest.WalletBackend)
 		assert.Error(t, err)
 		t.Log(err)
 	})
 
 	t.Run("invalid_offchain_addr", func(t *testing.T) {
-		_, err := contactsyaml.New(invalidOffChainAddrFile, walletBackend)
+		_, err := contactsyaml.New(tempCopyOfFile(t, invalidOffChainAddrYAMLFile), contactstest.WalletBackend)
 		assert.Error(t, err)
 		t.Log(err)
 	})
 
 	t.Run("missing_file", func(t *testing.T) {
-		_, err := contactsyaml.New(missingFile, walletBackend)
+		_, err := contactsyaml.New(nonExistentYAMLFile, contactstest.WalletBackend)
 		assert.Error(t, err)
 		t.Log(err)
 	})
 }
 
-// nolint:dupl  // False positive. ReadByAlias is diff from ReadByOffChainAddr.
-func Test_YAML_ReadByAlias(t *testing.T) {
-	c, err := contactsyaml.New(tempContactsFile(t), walletBackend)
-	assert.NoError(t, err)
-
-	t.Run("happy", func(t *testing.T) {
-		gotPeer, isPresent := c.ReadByAlias(peer1.Alias)
-		assert.True(t, isPresent)
-		assert.Equal(t, gotPeer, peer1)
-	})
-
-	t.Run("missing_peer", func(t *testing.T) {
-		_, isPresent := c.ReadByAlias(missingPeer.Alias)
-		assert.False(t, isPresent)
-	})
-}
-
-// nolint:dupl  // False positive. ReadByOffChainAddr is diff from ReadByAlias.
-func Test_YAML_ReadByOffChainAddr(t *testing.T) {
-	c, err := contactsyaml.New(tempContactsFile(t), walletBackend)
-	assert.NoError(t, err)
-
-	t.Run("happy", func(t *testing.T) {
-		gotPeer, isPresent := c.ReadByOffChainAddr(peer1.OffChainAddrString)
-		assert.True(t, isPresent)
-		assert.Equal(t, gotPeer, peer1)
-	})
-
-	t.Run("missing_peer", func(t *testing.T) {
-		_, isPresent := c.ReadByOffChainAddr(missingPeer.OffChainAddrString)
-		assert.False(t, isPresent)
-	})
-}
-
-func Test_YAML_Write_Read(t *testing.T) {
-	c, err := contactsyaml.New(testDataFile, walletBackend)
-	assert.NoError(t, err)
-
-	t.Run("happy", func(t *testing.T) {
-		assert.NoError(t, c.Write(missingPeer.Alias, missingPeer))
-		gotPeer, isPresent := c.ReadByAlias(missingPeer.Alias)
-		assert.True(t, isPresent)
-		assert.Equal(t, gotPeer, missingPeer)
-	})
-
-	t.Run("peer_already_present", func(t *testing.T) {
-		err := c.Write(peer1.Alias, peer1)
-		assert.Error(t, err)
-		t.Log(err)
-	})
-
-	t.Run("alias_used_by_diff_peer", func(t *testing.T) {
-		err := c.Write(peer1.Alias, peer2)
-		assert.Error(t, err)
-		t.Log(err)
-	})
-
-	t.Run("invalid_offchain_addr", func(t *testing.T) {
-		c, err := contactsyaml.New(testDataFile, walletBackend)
+func Test_Provider_UpdateStorage(t *testing.T) {
+	t.Run("happy_add_entries_to_empty_file", func(t *testing.T) {
+		c, testYAMLFile := contactsClonerWithPath(zeroEntriesYAMLFile)(t, contactstest.WalletBackend)
+		c, err := contactsyaml.New(testYAMLFile, contactstest.WalletBackend)
 		assert.NoError(t, err)
+		require.NoError(t, c.Write(contactstest.Peer1.Alias, contactstest.Peer1))
+		require.NoError(t, c.Write(contactstest.Peer2.Alias, contactstest.Peer2))
 
-		missingPeerCopy := missingPeer
-		missingPeerCopy.OffChainAddrString = "invalid-addr"
-		err = c.Write(missingPeerCopy.Alias, missingPeerCopy)
-		assert.Error(t, err)
-		t.Log(err)
-	})
-}
-
-func Test_YAML_Delete_Read(t *testing.T) {
-	c, err := contactsyaml.New(testDataFile, walletBackend)
-	assert.NoError(t, err)
-
-	t.Run("happy", func(t *testing.T) {
-		assert.NoError(t, c.Delete(peer1.Alias))
-		_, isPresent := c.ReadByAlias(peer1.Alias)
-		assert.False(t, isPresent)
-	})
-
-	t.Run("missing_peer", func(t *testing.T) {
-		err := c.Delete(missingPeer.Alias)
-		assert.Error(t, err)
-		t.Log(err)
-	})
-}
-
-func Test_YAML_UpdateStorage(t *testing.T) {
-	t.Run("happy_empty_file", func(t *testing.T) {
-		// Setup: NewYAML with zero entries
-		tempFile, err := ioutil.TempFile("", "")
-		require.NoError(t, err)
-		require.NoError(t, tempFile.Close())
-		t.Cleanup(func() {
-			if err = os.Remove(tempFile.Name()); err != nil {
-				t.Log("Error in test cleanup: removing file - " + tempFile.Name())
-			}
-		})
-		c, err := contactsyaml.New(tempFile.Name(), walletBackend)
-		assert.NoError(t, err)
-
-		// Setup: Add entries to cache.
-		require.NoError(t, c.Write(peer1.Alias, peer1))
-		require.NoError(t, c.Write(peer2.Alias, peer2))
-
-		// Test
 		assert.NoError(t, c.UpdateStorage())
-		assert.True(t, compareFileContent(t, tempFile.Name(), testDataFile))
+		assert.True(t, compareFileContent(t, testYAMLFile, validYAMLFile))
 	})
 
-	t.Run("happy_non_empty_file", func(t *testing.T) {
-		// Setup: Create a copy of contacts file with test data and add entry
-		tempTestDataFile := tempContactsFile(t)
-		c, err := contactsyaml.New(tempTestDataFile, walletBackend)
-		assert.NoError(t, err)
-		assert.NoError(t, c.Write(missingPeer.Alias, missingPeer))
+	t.Run("happy_add_entries_to_non_empty_file", func(t *testing.T) {
+		c, testYAMLFile := contactsClonerWithPath(validYAMLFile)(t, contactstest.WalletBackend)
+		assert.NoError(t, c.Write(contactstest.MissingPeer.Alias, contactstest.MissingPeer))
 
-		// Test
 		assert.NoError(t, c.UpdateStorage())
-		assert.True(t, compareFileContent(t, tempTestDataFile, updatedTestDataFile))
+		assert.True(t, compareFileContent(t, testYAMLFile, updatedYAMLFile))
 	})
 
 	t.Run("file_permission_error", func(t *testing.T) {
-		// Setup: Create a copy of contacts file with test data and add entry
-		tempTestDataFile := tempContactsFile(t)
-		c, err := contactsyaml.New(tempTestDataFile, walletBackend)
-		assert.NoError(t, err)
-		assert.NoError(t, c.Write(missingPeer.Alias, missingPeer))
+		c, testYAMLFile := contactsClonerWithPath(validYAMLFile)(t, contactstest.WalletBackend)
 
-		// Change file permission
-		err = os.Chmod(tempTestDataFile, 0o444)
+		// Change file permission and test
+		err := os.Chmod(testYAMLFile, 0o444)
 		require.NoError(t, err)
-
-		// Test
 		err = c.UpdateStorage()
 		assert.Error(t, err)
 		t.Log(err)
 	})
 }
 
-// tempContactsFile makes a copy of the testdata contacts file and
-// returns the path to it.
-func tempContactsFile(t *testing.T) string {
+func contactsCloner(testDataFile string) contactstest.ContactsCloner {
+	return func(t *testing.T, walletBackend perun.WalletBackend) perun.Contacts {
+		c, _ := cloneContactsWithPath(t, testDataFile, walletBackend)
+		return c
+	}
+}
+
+func contactsClonerWithPath(testDataFile string) func(*testing.T, perun.WalletBackend) (perun.Contacts, string) {
+	return func(t *testing.T, walletBackend perun.WalletBackend) (perun.Contacts, string) {
+		return cloneContactsWithPath(t, testDataFile, walletBackend)
+	}
+}
+
+func cloneContactsWithPath(t *testing.T, testDataFile string, walletBackend perun.WalletBackend) (perun.Contacts, string) {
+	tempFilePath := tempCopyOfFile(t, testDataFile)
+	c, err := contactsyaml.New(tempFilePath, walletBackend)
+	require.NoError(t, err)
+	return c, tempFilePath
+}
+
+func tempCopyOfFile(t *testing.T, srcFilePath string) (tempFilePath string) {
 	tempFile, err := ioutil.TempFile("", "")
 	require.NoError(t, err)
-	testDataFile, err := os.Open(testDataFile)
+	sourceFile, err := os.Open(srcFilePath)
 	require.NoError(t, err)
 
-	_, err = io.Copy(tempFile, testDataFile)
+	_, err = io.Copy(tempFile, sourceFile)
 	require.NoError(t, err)
 	require.NoError(t, tempFile.Close())
-	require.NoError(t, testDataFile.Close())
+	require.NoError(t, sourceFile.Close())
 
 	t.Cleanup(func() {
 		if err = os.Remove(tempFile.Name()); err != nil {
