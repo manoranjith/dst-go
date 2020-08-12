@@ -22,14 +22,13 @@ type Session struct {
 
 	Dialer perun.Registerer // instance for dialer for registering contacts with the sdk.
 
-	// The purpose of sub id is to enable the client refer to it and unsubscribe.
-	// So each subscription should have a unique id. For now, id is simple the count of existing subscriptions + 1
-	PayChProposalNotify map[string]PayChProposalNotify     // Map of subIDs to notifiers
+	// Only one subscription is allowed. Cache and deliver works only then
+	PayChProposalNotify PayChProposalNotify                // Map of subIDs to notifiers
 	PayChProposalsCache []*client.ChannelProposal          // Cached proposals due to missing subscription.
 	PayChResponders     map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
 
-	PayChCloseNotify map[string]PayChCloseNotify // Map of subIDs to notifiers
-	PayChCloseCache  []*PayChCloseInfo           // Cached channel close events due to missing subscription.
+	PayChCloseNotify PayChCloseNotify  // Map of subIDs to notifiers
+	PayChCloseCache  []*PayChCloseInfo // Cached channel close events due to missing subscription.
 }
 
 // To use type func | interface method, decide later... For now type func.
@@ -55,15 +54,16 @@ type SessionAPI interface {
 	// Session adopts fire and forget model for calling this function and hence does not care about error.
 	// Retries etc., should be handled by the correspoding implementation.
 	// This function registers the call back and returns the subscription id which is constant for a session.
-	// For now, session id itself is used as a subscription id.
 	// For now, only one subscription per session (by the user of session) is allowed.
-	SubPayChProposals(PayChProposalNotify) (subID string)
+	// Errors when sub exists
+	SubPayChProposals(PayChProposalNotify) error
 	// Clear the callback
-	UnsubPayChProposals(subID string) error // Err if there is no subscription.
+	// Errors when no sub exists
+	UnsubPayChProposals() error // Err if there is no subscription.
 	RespondToPayChProposalNotif(proposalID string, accept bool) error
 	// Subscribe to payment channel close events
-	SubPayChClose(PayChCloseNotify) (subID string)
-	UnsubPayChClose(subID string) error // Err if there is no subscription.
+	SubPayChClose(PayChCloseNotify) error
+	UnsubPayChClose() error // Err if there is no subscription.
 	// If persistOpenCh is
 	// true - it will persist open channels, close the session and return the list of channels persisted.
 	// false - it will close the session if no open channels, will err otherwise.
@@ -99,24 +99,26 @@ func (s *Session) GetPayChs() []PayChState {
 	panic("not implemented") // TODO: Implement
 }
 
-func (s *Session) SubPayChProposals(notifier PayChProposalNotify) (subID string) {
+func (s *Session) SubPayChProposals(notifier PayChProposalNotify) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	subID = fmt.Sprintf("%d", len(s.PayChProposalNotify)+1)
-	s.PayChProposalNotify[subID] = notifier
-	return subID
+	if s.PayChProposalNotify != nil {
+		return errors.New("already subscribed")
+	}
+	s.PayChProposalNotify = notifier
+	return nil
 }
 
 // Errors for unknown subscription id.
-func (s *Session) UnsubPayChProposals(subID string) error {
+func (s *Session) UnsubPayChProposals() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if _, ok := s.PayChProposalNotify[subID]; !ok {
-		return errors.New("unknown subscription id")
+	if s.PayChProposalNotify == nil {
+		return errors.New("not subscribed")
 	}
-	delete(s.PayChProposalNotify, subID)
+	s.PayChProposalNotify = nil
 	return nil
 }
 
@@ -147,24 +149,26 @@ func (s *Session) RespondToPayChProposalNotif(proposalID string, accept bool) er
 	return nil
 }
 
-func (s *Session) SubPayChClose(notifier PayChCloseNotify) (subID string) {
+func (s *Session) SubPayChClose(notifier PayChCloseNotify) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	subID = fmt.Sprintf("%d", len(s.PayChCloseNotify)+1)
-	s.PayChCloseNotify[subID] = notifier
-	return subID
+	if s.PayChCloseNotify != nil {
+		return errors.New("already subscribed")
+	}
+	s.PayChCloseNotify = notifier
+	return nil
 }
 
 // Errors for unknown subscription id.
-func (s *Session) UnsubPayChClose(subID string) error {
+func (s *Session) UnsubPayChClose() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if _, ok := s.PayChCloseNotify[subID]; !ok {
-		return errors.New("unknown subscription id")
+	if s.PayChCloseNotify == nil {
+		return errors.New("not subscribed")
 	}
-	delete(s.PayChCloseNotify, subID)
+	s.PayChCloseNotify = nil
 	return nil
 }
 

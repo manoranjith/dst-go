@@ -9,6 +9,7 @@ import (
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"perun.network/go-perun/client"
 )
 
@@ -52,31 +53,28 @@ func Test_Session_OpenPayCh(t *testing.T) {
 
 func Test_Session_SubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		ch := session.Session{
-			PayChProposalNotify: make(map[string]session.PayChProposalNotify),
-		}
-		subID_1 := ch.SubPayChProposals(&ProposalNotifier{})
-		assert.NotZero(t, subID_1)
-		subID_2 := ch.SubPayChProposals(&ProposalNotifier{})
-		assert.NotZero(t, subID_2)
+		ch := session.Session{}
+		assert.NoError(t, ch.SubPayChProposals(&ProposalNotifier{}))
+	})
+	t.Run("error_already_subscribed", func(t *testing.T) {
+		ch := session.Session{}
+		assert.NoError(t, ch.SubPayChProposals(&ProposalNotifier{}))
+		err := ch.SubPayChProposals(&ProposalNotifier{})
+		assert.Error(t, err)
+		t.Log(err)
 	})
 }
 
 func Test_Session_Sub_UnsubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		ch := session.Session{
-			PayChProposalNotify: make(map[string]session.PayChProposalNotify),
-		}
-		subID := ch.SubPayChProposals(&ProposalNotifier{})
-		assert.NoError(t, ch.UnsubPayChProposals(subID))
+		ch := session.Session{}
+		require.NoError(t, ch.SubPayChProposals(&ProposalNotifier{}))
+		assert.NoError(t, ch.UnsubPayChProposals())
 	})
 
-	t.Run("error_unknown_sub", func(t *testing.T) {
-		ch := session.Session{
-			PayChProposalNotify: make(map[string]session.PayChProposalNotify),
-		}
-		subID := "random-subID"
-		err := ch.UnsubPayChProposals(subID)
+	t.Run("error_not_subscribed", func(t *testing.T) {
+		ch := session.Session{}
+		err := ch.UnsubPayChProposals()
 		assert.Error(t, err)
 	})
 }
@@ -154,31 +152,28 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 
 func Test_Session_SubPayChClose(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		ch := session.Session{
-			PayChCloseNotify: make(map[string]session.PayChCloseNotify),
-		}
-		subID_1 := ch.SubPayChClose(&CloseNotifier{})
-		assert.NotZero(t, subID_1)
-		subID_2 := ch.SubPayChClose(&CloseNotifier{})
-		assert.NotZero(t, subID_2)
+		ch := session.Session{}
+		assert.NoError(t, ch.SubPayChClose(&CloseNotifier{}))
+	})
+	t.Run("error_already_subscribed", func(t *testing.T) {
+		ch := session.Session{}
+		assert.NoError(t, ch.SubPayChClose(&CloseNotifier{}))
+		err := ch.SubPayChClose(&CloseNotifier{})
+		assert.Error(t, err)
+		t.Log(err)
 	})
 }
 
 func Test_Session_Sub_UnsubPayChClose(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		ch := session.Session{
-			PayChCloseNotify: make(map[string]session.PayChCloseNotify),
-		}
-		subID := ch.SubPayChClose(&CloseNotifier{})
-		assert.NoError(t, ch.UnsubPayChClose(subID))
+		ch := session.Session{}
+		require.NoError(t, ch.SubPayChClose(&CloseNotifier{}))
+		assert.NoError(t, ch.UnsubPayChClose())
 	})
 
-	t.Run("error_unknown_sub", func(t *testing.T) {
-		ch := session.Session{
-			PayChCloseNotify: make(map[string]session.PayChCloseNotify),
-		}
-		subID := "random-subID"
-		err := ch.UnsubPayChClose(subID)
+	t.Run("error_not_subscribed", func(t *testing.T) {
+		ch := session.Session{}
+		err := ch.UnsubPayChClose()
 		assert.Error(t, err)
 		t.Log(err)
 	})
