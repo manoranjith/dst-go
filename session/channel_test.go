@@ -10,10 +10,15 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type UpdateNotifier struct{}
+
+func (un *UpdateNotifier) PayChUpdateNotify(alias string, bals session.BalInfo, ChannelgeDurSecs uint64) {
+}
+
 func Test_Channel_HasActiveSub(t *testing.T) {
 	t.Run("true", func(t *testing.T) {
 		ch := session.Channel{
-			UpdateNotify: func(proposalID string, alias string, initBals session.BalInfo, ChannelgeDurSecs uint64) {},
+			UpdateNotify: &UpdateNotifier{},
 		}
 		assert.True(t, ch.HasActiveSub())
 	})
@@ -48,23 +53,18 @@ func Test_Channel_SendPayChUpdate(t *testing.T) {
 func Test_Channel_SubPayChUpdates(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		ch := session.Channel{}
-		notifyFunc := func(proposalID string, alias string, initBals session.BalInfo, ChannelgeDurSecs uint64) {}
 		assert.False(t, ch.HasActiveSub())
-		assert.NoError(t, ch.SubPayChUpdates(notifyFunc))
+		assert.NoError(t, ch.SubPayChUpdates(&UpdateNotifier{}))
 		assert.True(t, ch.HasActiveSub())
 	})
 
 	t.Run("error_multiple_calls", func(t *testing.T) {
-		chId := "test-channel-id"
-		ch := session.Channel{
-			ID: chId,
-		}
-		notifyFunc := func(proposalID string, alias string, initBals session.BalInfo, ChannelgeDurSecs uint64) {}
+		ch := session.Channel{}
 		assert.False(t, ch.HasActiveSub())
-		assert.NoError(t, ch.SubPayChUpdates(notifyFunc))
+		assert.NoError(t, ch.SubPayChUpdates(&UpdateNotifier{}))
 		assert.True(t, ch.HasActiveSub())
 
-		err := ch.SubPayChUpdates(notifyFunc)
+		err := ch.SubPayChUpdates(&UpdateNotifier{})
 		assert.Error(t, err)
 		t.Log(err)
 		assert.True(t, ch.HasActiveSub())
@@ -74,9 +74,8 @@ func Test_Channel_SubPayChUpdates(t *testing.T) {
 func Test_Channel_Sub_UnsubPayChUpdates(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		ch := session.Channel{}
-		notifyFunc := func(proposalID string, alias string, initBals session.BalInfo, ChannelgeDurSecs uint64) {}
 		assert.False(t, ch.HasActiveSub())
-		assert.NoError(t, ch.SubPayChUpdates(notifyFunc))
+		assert.NoError(t, ch.SubPayChUpdates(&UpdateNotifier{}))
 		assert.True(t, ch.HasActiveSub())
 
 		assert.NoError(t, ch.UnsubPayChUpdates())
@@ -133,7 +132,7 @@ func Test_Channel_Sub_RespondToPayChUpdateNotif(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("happy_reject", func(t *testing.T) {
+	t.Run("error_reject", func(t *testing.T) {
 		updateResponder := &mocks.UpdateResponder{}
 		// TODO: Check if first argument is a not nil context.
 		updateResponder.On("Reject", mock.Anything, mock.AnythingOfType("string")).Return(errors.New("test error"))

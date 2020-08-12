@@ -12,13 +12,13 @@ import (
 type ChannelLockState string
 
 const (
-	ChannelLocked    ChannelLockState = "Locked"
+	ChannelOpen      ChannelLockState = "Open"
 	ChannelFinalized ChannelLockState = "Finalized"
 	ChannelClosed    ChannelLockState = "Closed"
 )
 
 type Channel struct {
-	ID         string // Stringified channel ID. In Actual the type should implement a stringer. But work around now.
+	ID         string
 	Controller perun.Channel
 	LockState  ChannelLockState
 	// send notification.
@@ -92,7 +92,9 @@ func (ch *Channel) BalInfo() BalInfo {
 	return BalInfo{}
 }
 
-type PayChUpdateNotify func(alias string, amount string)
+type PayChUpdateNotify interface {
+	PayChUpdateNotify(alias string, bals BalInfo, ChannelgeDurSecs uint64)
+}
 
 type PayChState struct {
 	channelID string

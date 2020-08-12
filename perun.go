@@ -73,6 +73,13 @@ type CommBackend interface {
 	NewDialer() net.Dialer
 }
 
+//go:generate mockery -name Registerer -output ./internal/mocks
+
+// Registerer defines the is used to register the off-chain communication address of the peer with the sdk.
+type Registerer interface {
+	Register(addr wire.Address, address string)
+}
+
 // Credential represents the parameters required to access the keys and make signatures for a given address.
 type Credential struct {
 	Addr     wallet.Address
@@ -144,6 +151,14 @@ type Channel interface {
 	UpdateBy(context.Context, func(*channel.State)) error
 	Settle(context.Context) error
 	Close() error
+}
+
+//go:generate mockery -name ProposalResponder -output ./internal/mocks
+
+// Proposal Responder defines the methods on proposal responder that will be used by the node.
+type ProposalResponder interface {
+	Accept(context.Context, client.ProposalAcc) (Channel, error)
+	Reject(ctx context.Context, reason string) error
 }
 
 //go:generate mockery -name UpdateResponder -output ./internal/mocks

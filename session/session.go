@@ -1,8 +1,12 @@
 package session
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+
 	"github.com/hyperledger-labs/perun-node"
-	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
 
@@ -10,25 +14,31 @@ import (
 // Or replace it with an interface, that is accessible by the node ???
 // Do after full implementation....
 type Session struct {
-	chClient perun.ChannelClient  // Perun Channel client.... Used for making calls.
-	User     perun.User           // User of this session.... Move user inside session ?.. Wallet are attached to user.
-	Contacts perun.Contacts       // Contact provider for this session.
-	channels map[string][]Channel // Map of channel IDs to channels in the Session.
+	mutex    sync.RWMutex
+	ChClient perun.ChannelClient // Perun Channel client.... Used for making calls.
+	User     perun.User          // User of this session.... Move user inside session ?.. Wallet are attached to user.
+	Contacts perun.Contacts      // Contact provider for this session.
+	Channels map[string]*Channel // Map of channel IDs to channels in the Session.
 
-	// send notification.
-	// Mechanism to create subscription ID ?.... What is it unique of... ?
-	// This subscription is for a session, but any number of subscriptions can be made and all are identical.
-	// So use SessionID as the subscription ID. Later this can be changed.
-	PayChProposalNotify PayChProposalNotify                      // Handler for sending notifications
-	PayChResponders     map[channel.ID]*client.ProposalResponder // Map of proposalIDs to ProposalResponders.
+	Dialer perun.Registerer // instance for dialer for registering contacts with the sdk.
 
-	PayChProposalsCache []*client.ChannelProposal // Cached proposals due to missing subscription.
-	PayChCloseCache     map[string]PayChCloseInfo // Cached channel close events due to missing subscription.
+	// The purpose of sub id is to enable the client refer to it and unsubscribe.
+	// So each subscription should have a unique id. For now, id is simple the count of existing subscriptions + 1
+	PayChProposalNotify map[string]PayChProposalNotify     // Map of subIDs to notifiers
+	PayChProposalsCache []*client.ChannelProposal          // Cached proposals due to missing subscription.
+	PayChResponders     map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
+
+	PayChCloseNotify map[string]PayChCloseNotify // Map of subIDs to notifiers
+	PayChCloseCache  []*PayChCloseInfo           // Cached channel close events due to missing subscription.
 }
 
 // To use type func | interface method, decide later... For now type func.
-type PayChProposalNotify func(proposalID string, alias string, initBals BalInfo, ChDurSecs uint64)
-type PayChCloseNotify func(finalBals BalInfo, _ error)
+type PayChProposalNotify interface {
+	PayChProposalNotify(proposalID string, alias string, initBals BalInfo, ChallengeDurSecs uint64)
+}
+type PayChCloseNotify interface {
+	PayChCloseNotify(finalBals BalInfo, _ error)
+}
 
 type PayChCloseInfo struct {
 	finalBals BalInfo
@@ -51,7 +61,9 @@ type SessionAPI interface {
 	// Clear the callback
 	UnsubPayChProposals() error // Err if there is no subscription.
 	RespondToPayChProposalNotif(proposalID string, accept bool) error
-	SubPayChClose()
+	// Subscribe to payment channel close events
+	SubPayChClose(PayChCloseNotify) (subID string)
+	UnsubPayChClose() error // Err if there is no subscription.
 	// If persistOpenCh is
 	// true - it will persist open channels, close the session and return the list of channels persisted.
 	// false - it will close the session if no open channels, will err otherwise.
@@ -60,8 +72,8 @@ type SessionAPI interface {
 
 func NewSession() {}
 
-func (s *Session) ContainsPayCh(id channel.ID) bool {
-	for _, ch := range s.channels {
+func (s *Session) ContainsPayCh(id string) bool {
+	for _, ch := range s.Channels {
 		if ch.ID == id {
 			return true
 		}
@@ -69,8 +81,103 @@ func (s *Session) ContainsPayCh(id channel.ID) bool {
 	return false
 }
 
+func (s *Session) AddContact(contact perun.Peer) error {
+	panic("not implemented") // TODO: Implement
+}
+
+func (s *Session) GetContacts() ([]perun.Peer, error) {
+	panic("not implemented") // TODO: Implement
+}
+
+func (s *Session) OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) (PayChState, error) {
+	ch, err := s.ChClient.ProposeChannel(nil, &client.ChannelProposal{})
+	_ = ch
+	return PayChState{}, err
+}
+
+func (s *Session) GetPayChs() []PayChState {
+	panic("not implemented") // TODO: Implement
+}
+
+func (s *Session) SubPayChProposals(notifier PayChProposalNotify) (subID string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	subID = fmt.Sprintf("%d", len(s.PayChProposalNotify)+1)
+	s.PayChProposalNotify[subID] = notifier
+	return subID
+}
+
+// Errors for unknown subscription id.
+func (s *Session) UnsubPayChProposals(subID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if _, ok := s.PayChProposalNotify[subID]; !ok {
+		return errors.New("unknown subscription id")
+	}
+	delete(s.PayChProposalNotify, subID)
+	return nil
+}
+
+func (s *Session) RespondToPayChProposalNotif(proposalID string, accept bool) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	responder, ok := s.PayChResponders[proposalID]
+	if !ok {
+		return errors.New("unknown proposal id")
+	}
+	if !accept {
+		return responder.Reject(context.TODO(), "rejected by user")
+	}
+	sdkCh, err := responder.Accept(context.TODO(), client.ProposalAcc{})
+	if err != nil {
+		return err
+	}
+
+	chIDArr := sdkCh.ID()
+	chID := BytesToHex(chIDArr[:])
+	ch := &Channel{
+		ID:         chID,
+		Controller: sdkCh,
+		LockState:  ChannelOpen,
+	}
+	s.Channels[chID] = ch
+	return nil
+}
+
+func (s *Session) SubPayChClose(notifier PayChCloseNotify) (subID string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	subID = fmt.Sprintf("%d", len(s.PayChCloseNotify)+1)
+	s.PayChCloseNotify[subID] = notifier
+	return subID
+}
+
+// Errors for unknown subscription id.
+func (s *Session) UnsubPayChClose(subID string) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if _, ok := s.PayChCloseNotify[subID]; !ok {
+		return errors.New("unknown subscription id")
+	}
+	delete(s.PayChCloseNotify, subID)
+	return nil
+}
+
+// If persistOpenCh is
+// true - it will persist open channels, close the session and return the list of channels persisted.
+// false - it will close the session if no open channels, will err otherwise.
+func (s *Session) CloseSession(persistOpenCh bool) (openPayChs []Channel, _ error) {
+	panic("not implemented") // TODO: Implement
+}
+
 func (s *Session) HandleProposal(_ *client.ChannelProposal, _ *client.ProposalResponder) {
 }
+
 func (s *Session) HandleUpdate(update client.ChannelUpdate, responder *client.UpdateResponder) {
 	//if !s.ContainsPayCh(update.State.ID) {
 	//	//Log the channel ID
@@ -91,4 +198,8 @@ func (s *Session) HandleUpdate(update client.ChannelUpdate, responder *client.Up
 	//amount := "as" // retrieve  amount
 
 	// s.channels[string(update.State.ID)].PayChUpdateNotify(alias string, amount string)
+}
+
+func BytesToHex(b []byte) string {
+	return fmt.Sprintf("0x%x", b)
 }
