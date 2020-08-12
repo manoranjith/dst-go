@@ -77,7 +77,7 @@ type CommBackend interface {
 
 // Registerer defines the is used to register the off-chain communication address of the peer with the sdk.
 type Registerer interface {
-	Register(addr wire.Address, address string)
+	Register(offChainAddr wire.Address, commAddr string)
 }
 
 // Credential represents the parameters required to access the keys and make signatures for a given address.

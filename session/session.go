@@ -2,11 +2,11 @@ package session
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/hyperledger-labs/perun-node"
+	"github.com/pkg/errors"
 	"perun.network/go-perun/client"
 )
 
@@ -46,8 +46,8 @@ type PayChCloseInfo struct {
 
 type SessionAPI interface {
 	AddContact(contact perun.Peer) error
-	GetContacts() ([]perun.Peer, error)
-	OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) (PayChState, error)
+	GetContact(alias string) (perun.Peer, error)
+	OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) error
 	GetPayChs() []PayChState
 	// The gRPC adapter should provide the concrete function to send notifications.
 	// It should take the given parameters and send it to the user.
@@ -81,18 +81,33 @@ func (s *Session) ContainsPayCh(id string) bool {
 	return false
 }
 
-func (s *Session) AddContact(contact perun.Peer) error {
-	panic("not implemented") // TODO: Implement
+func (s *Session) AddContact(peer perun.Peer) error {
+	return s.Contacts.Write(peer.Alias, peer)
 }
 
-func (s *Session) GetContacts() ([]perun.Peer, error) {
-	panic("not implemented") // TODO: Implement
+func (s *Session) GetContact(alias string) (perun.Peer, error) {
+	peer, isPresent := s.Contacts.ReadByAlias(alias)
+	if !isPresent {
+		return perun.Peer{}, errors.New("peer not found")
+	}
+	return peer, nil
 }
 
-func (s *Session) OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) (PayChState, error) {
+func (s *Session) OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) error {
+	peer, isPresent := s.Contacts.ReadByAlias(alias)
+	if !isPresent {
+		return errors.New("peer not found in contacts")
+	}
+	s.Dialer.Register(peer.OffChainAddr, peer.CommAddr)
 	ch, err := s.ChClient.ProposeChannel(nil, &client.ChannelProposal{})
-	_ = ch
-	return PayChState{}, err
+	if err != nil {
+		return errors.Wrap(err, "proposing channel")
+	}
+	// chID := ch.ID()
+	// TODO: Use NewChannel function
+	// s.Channels[BytesToHex(chID[:])] = &Channel{Controller: ch}
+	s.Channels["testID"] = &Channel{Controller: ch}
+	return nil
 }
 
 func (s *Session) GetPayChs() []PayChState {
@@ -131,15 +146,16 @@ func (s *Session) RespondToPayChProposalNotif(proposalID string, accept bool) er
 		return errors.New("unknown proposal id")
 	}
 	if !accept {
-		return responder.Reject(context.TODO(), "rejected by user")
+		return errors.WithMessage(responder.Reject(context.TODO(), "rejected by user"), "rejecting channel proposal")
 	}
-	sdkCh, err := responder.Accept(context.TODO(), client.ProposalAcc{})
+	sdkCh, err := responder.Accept(context.TODO(), client.ProposalAcc{Participant: s.User.OffChainAddr})
 	if err != nil {
-		return err
+		return errors.Wrap(err, "accepting channel proposal")
 	}
 
 	chIDArr := sdkCh.ID()
 	chID := BytesToHex(chIDArr[:])
+	// TODO: Use new channel here
 	ch := &Channel{
 		ID:         chID,
 		Controller: sdkCh,

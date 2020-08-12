@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/contacts/contactstest"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/stretchr/testify/assert"
@@ -30,22 +31,34 @@ func Test_Interface_SessionAPI(t *testing.T) {
 func Test_Session_OpenPayCh(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}
+		contacts, err := contactstest.NewProvider(1, contactstest.WalletBackend)
+		require.NoError(t, err)
+		registerer := &mocks.Registerer{}
 		sess := session.Session{
 			ChClient: chClient,
+			Contacts: contacts,
+			Dialer:   registerer,
+			Channels: make(map[string]*session.Channel),
 		}
+		registerer.On("Register", mock.Anything, mock.Anything).Return()
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(&client.Channel{}, nil)
-		ch, err := sess.OpenPayCh("", session.BalInfo{}, 0)
-		assert.NoError(t, err)
-		assert.NotNil(t, ch)
+		assert.NoError(t, sess.OpenPayCh("1", session.BalInfo{}, 0))
 	})
 
 	t.Run("error_proposeChannel", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}
+		contacts, err := contactstest.NewProvider(1, contactstest.WalletBackend)
+		require.NoError(t, err)
+		registerer := &mocks.Registerer{}
 		sess := session.Session{
 			ChClient: chClient,
+			Contacts: contacts,
+			Dialer:   registerer,
+			Channels: make(map[string]*session.Channel),
 		}
+		registerer.On("Register", mock.Anything, mock.Anything).Return()
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(nil, errors.New("test-error"))
-		_, err := sess.OpenPayCh("", session.BalInfo{}, 0)
+		err = sess.OpenPayCh("1", session.BalInfo{}, 0)
 		assert.Error(t, err)
 		t.Log(err)
 	})
