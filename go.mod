@@ -9,5 +9,5 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.6.0
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
-	perun.network/go-perun v0.4.1-0.20200811110629-ec71652b1f98
+	perun.network/go-perun v0.4.1-0.20200813132952-f0fe0e9fcd54
 )
