@@ -23,7 +23,7 @@ type Session struct {
 	Dialer perun.Registerer // instance for dialer for registering contacts with the sdk.
 
 	// Only one subscription is allowed. Cache and deliver works only then
-	PayChProposalNotify PayChProposalNotify                // Map of subIDs to notifiers
+	PayChProposalNotify PayChProposalNotifier              // Map of subIDs to notifiers
 	PayChProposalsCache []*client.ChannelProposal          // Cached proposals due to missing subscription.
 	PayChResponders     map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
 
@@ -32,7 +32,7 @@ type Session struct {
 }
 
 // To use type func | interface method, decide later... For now type func.
-type PayChProposalNotify interface {
+type PayChProposalNotifier interface {
 	PayChProposalNotify(proposalID string, alias string, initBals BalInfo, ChallengeDurSecs uint64)
 }
 type PayChCloseNotify interface {
@@ -56,7 +56,7 @@ type SessionAPI interface {
 	// This function registers the call back and returns the subscription id which is constant for a session.
 	// For now, only one subscription per session (by the user of session) is allowed.
 	// Errors when sub exists
-	SubPayChProposals(PayChProposalNotify) error
+	SubPayChProposals(PayChProposalNotifier) error
 	// Clear the callback
 	// Errors when no sub exists
 	UnsubPayChProposals() error // Err if there is no subscription.
@@ -82,13 +82,16 @@ func (s *Session) ContainsPayCh(id string) bool {
 }
 
 func (s *Session) AddContact(peer perun.Peer) error {
+	// Write returns only typed errors, to be reviewed.
+	// It is more correct to say i/p to contacts does str -> addr (read) & addr -> str (write) ?
+	// Makes a cleaner approach and easier error handling here ?
 	return s.Contacts.Write(peer.Alias, peer)
 }
 
 func (s *Session) GetContact(alias string) (perun.Peer, error) {
 	peer, isPresent := s.Contacts.ReadByAlias(alias)
 	if !isPresent {
-		return perun.Peer{}, errors.New("peer not found")
+		return perun.Peer{}, perun.NewAPIError(perun.ErrUnknownAlias, nil)
 	}
 	return peer, nil
 }
@@ -96,16 +99,15 @@ func (s *Session) GetContact(alias string) (perun.Peer, error) {
 func (s *Session) OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) error {
 	peer, isPresent := s.Contacts.ReadByAlias(alias)
 	if !isPresent {
-		return errors.New("peer not found in contacts")
+		return perun.NewAPIError(perun.ErrUnknownAlias, nil)
 	}
 	s.Dialer.Register(peer.OffChainAddr, peer.CommAddr)
+	// Use proposal maker hook from payment app.
 	ch, err := s.ChClient.ProposeChannel(nil, &client.ChannelProposal{})
 	if err != nil {
-		return errors.Wrap(err, "proposing channel")
+		return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Proposing Channel"))
 	}
-	// chID := ch.ID()
-	// TODO: Use NewChannel function
-	// s.Channels[BytesToHex(chID[:])] = &Channel{Controller: ch}
+	// TODO: Use NewChannel function to prepare other factors
 	s.Channels["testID"] = &Channel{Controller: ch}
 	return nil
 }
@@ -114,12 +116,12 @@ func (s *Session) GetPayChs() []PayChState {
 	panic("not implemented") // TODO: Implement
 }
 
-func (s *Session) SubPayChProposals(notifier PayChProposalNotify) error {
+func (s *Session) SubPayChProposals(notifier PayChProposalNotifier) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
 	if s.PayChProposalNotify != nil {
-		return errors.New("already subscribed")
+		return perun.NewAPIError(perun.ErrSubAlreadyExists, nil)
 	}
 	s.PayChProposalNotify = notifier
 	return nil
@@ -131,7 +133,7 @@ func (s *Session) UnsubPayChProposals() error {
 	defer s.mutex.Unlock()
 
 	if s.PayChProposalNotify == nil {
-		return errors.New("not subscribed")
+		return perun.NewAPIError(perun.ErrNoActiveSub, nil)
 	}
 	s.PayChProposalNotify = nil
 	return nil
@@ -143,25 +145,31 @@ func (s *Session) RespondToPayChProposalNotif(proposalID string, accept bool) er
 
 	responder, ok := s.PayChResponders[proposalID]
 	if !ok {
-		return errors.New("unknown proposal id")
+		return perun.NewAPIError(perun.ErrUnknownProposalID, nil)
 	}
-	if !accept {
-		return errors.WithMessage(responder.Reject(context.TODO(), "rejected by user"), "rejecting channel proposal")
-	}
-	sdkCh, err := responder.Accept(context.TODO(), client.ProposalAcc{Participant: s.User.OffChainAddr})
-	if err != nil {
-		return errors.Wrap(err, "accepting channel proposal")
-	}
+	switch accept {
+	case true:
+		sdkCh, err := responder.Accept(context.TODO(), client.ProposalAcc{Participant: s.User.OffChainAddr})
+		if err != nil {
+			return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Accepting channel proposal"))
+		}
 
-	chIDArr := sdkCh.ID()
-	chID := BytesToHex(chIDArr[:])
-	// TODO: Use new channel here
-	ch := &Channel{
-		ID:         chID,
-		Controller: sdkCh,
-		LockState:  ChannelOpen,
+		chIDArr := sdkCh.ID()
+		chID := BytesToHex(chIDArr[:])
+		// TODO: Use new channel here
+		ch := &Channel{
+			ID:         chID,
+			Controller: sdkCh,
+			LockState:  ChannelOpen,
+		}
+		s.Channels[chID] = ch
+
+	case false:
+		err := responder.Reject(context.TODO(), "rejected by user")
+		if err != nil {
+			return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Rejecting channel proposal"))
+		}
 	}
-	s.Channels[chID] = ch
 	return nil
 }
 
@@ -170,7 +178,7 @@ func (s *Session) SubPayChClose(notifier PayChCloseNotify) error {
 	defer s.mutex.Unlock()
 
 	if s.PayChCloseNotify != nil {
-		return errors.New("already subscribed")
+		return perun.NewAPIError(perun.ErrSubAlreadyExists, nil)
 	}
 	s.PayChCloseNotify = notifier
 	return nil
@@ -182,7 +190,7 @@ func (s *Session) UnsubPayChClose() error {
 	defer s.mutex.Unlock()
 
 	if s.PayChCloseNotify == nil {
-		return errors.New("not subscribed")
+		return perun.NewAPIError(perun.ErrNoActiveSub, nil)
 	}
 	s.PayChCloseNotify = nil
 	return nil

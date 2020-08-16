@@ -64,3 +64,37 @@ type ChainConfig struct {
 	// ConnTimeout is the timeout used when dialing for new connections to the on-chain node.
 	ConnTimeout time.Duration
 }
+
+type ConfigTimeout struct {
+	onChainTx    time.Duration
+	response     time.Duration
+	challengeDur time.Duration
+}
+
+func (c ConfigTimeout) OpenCh() time.Duration {
+	return 3*c.response + 2*c.onChainTx + 1*c.challengeDur
+}
+
+func (c ConfigTimeout) RespChProposalAcc() time.Duration {
+	return c.OpenCh()
+}
+
+func (c ConfigTimeout) RespChProposalRej() time.Duration {
+	return c.response
+}
+
+func (c ConfigTimeout) SendUpdate() time.Duration {
+	return c.response
+}
+
+func (c ConfigTimeout) RespStateUpdateAcc() time.Duration {
+	return c.response
+}
+
+func (c ConfigTimeout) RespStateUpdateRej() time.Duration {
+	return c.RespStateUpdateAcc()
+}
+
+func (c ConfigTimeout) CloseChannel() time.Duration {
+	return 1*c.response + 3*c.onChainTx + 1*c.challengeDur
+}

@@ -85,15 +85,15 @@ func (c *contactsCache) Write(alias string, p perun.Peer) error {
 
 	if oldPeer, ok := c.peersByAlias[alias]; ok {
 		if PeerEqual(oldPeer, p) {
-			return errors.New("peer already present in contacts")
+			return perun.NewAPIError(perun.ErrPeerExists, nil)
 		}
-		return errors.New("alias already used by another peer in contacts")
+		return perun.NewAPIError(perun.ErrPeerAliasInUse, nil)
 	}
 
 	var err error
 	p.OffChainAddr, err = c.walletBackend.ParseAddr(p.OffChainAddrString)
 	if err != nil {
-		return err
+		return perun.NewAPIError(perun.ErrInvalidOffChainAddr, err)
 	}
 	c.peersByAlias[alias] = p
 	c.aliasByAddr[p.OffChainAddrString] = alias

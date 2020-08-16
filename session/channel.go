@@ -2,9 +2,9 @@ package session
 
 import (
 	"context"
-	"errors"
 
 	"github.com/hyperledger-labs/perun-node"
+	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 )
@@ -36,12 +36,16 @@ func (c *Channel) HasActiveSub() bool {
 }
 
 func (c *Channel) SendPayChUpdate(alias string, amount string) error {
-	return c.Controller.UpdateBy(nil, func(_ *channel.State) {})
+	err := c.Controller.UpdateBy(nil, func(_ *channel.State) {})
+	if err != nil {
+		return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Sending state update"))
+	}
+	return nil
 }
 
 func (c *Channel) SubPayChUpdates(f PayChUpdateNotify) error {
 	if c.UpdateNotify != nil {
-		return errors.New("already subscribed")
+		return perun.NewAPIError(perun.ErrSubAlreadyExists, nil)
 	}
 	c.UpdateNotify = f
 	return nil
@@ -49,7 +53,7 @@ func (c *Channel) SubPayChUpdates(f PayChUpdateNotify) error {
 
 func (c *Channel) UnsubPayChUpdates() error {
 	if c.UpdateNotify == nil {
-		return errors.New("no active subscription")
+		return perun.NewAPIError(perun.ErrNoActiveSub, nil)
 	}
 	c.UpdateNotify = nil
 	return nil
@@ -59,10 +63,19 @@ func (c *Channel) RespondToPayChUpdateNotif(accept bool) error {
 	if c.UpdateResponders == nil {
 		return errors.New("no response expected")
 	}
-	if !accept {
-		return c.UpdateResponders.Reject(context.TODO(), "rejected by user")
+	switch accept {
+	case true:
+		err := c.UpdateResponders.Accept(context.TODO())
+		if err != nil {
+			return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Accepting state update"))
+		}
+	case false:
+		err := c.UpdateResponders.Reject(context.TODO(), "rejected by user")
+		if err != nil {
+			return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Rejecting state update"))
+		}
 	}
-	return c.UpdateResponders.Accept(context.TODO())
+	return nil
 }
 
 func (c *Channel) GetBalance() BalInfo {
@@ -79,7 +92,7 @@ func (c *Channel) ClosePayCh() (finalBals BalInfo, _ error) {
 	}
 	err := c.Controller.Settle(nil)
 	if cerr := c.Controller.Close(); err != nil {
-		return finalBals, err
+		return finalBals, perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Closing channel controller"))
 	} else if cerr != nil {
 		_ = cerr
 		// log cerr
