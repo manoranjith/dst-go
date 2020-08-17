@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/pkg/errors"
 	_ "perun.network/go-perun/backend/ethereum" // backend init
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
-
-	"github.com/hyperledger-labs/perun-node"
 )
 
 // Remove the session defined in root level package ??
@@ -30,11 +30,16 @@ type Session struct {
 
 	// Only one subscription is allowed. Cache and deliver works only then
 	PayChProposalNotify ProposalDecoder                    // Map of subIDs to notifiers
-	PayChProposalsCache []*client.ChannelProposal          // Cached proposals due to missing subscription.
+	PayChProposalsCache []*ProposalNotification            // Cached proposals due to missing subscription.
 	PayChResponders     map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
 
 	PayChCloseNotify PayChCloseNotify  // Map of subIDs to notifiers
 	PayChCloseCache  []*PayChCloseInfo // Cached channel close events due to missing subscription.
+}
+
+type ProposalNotification struct {
+	proposal *client.ChannelProposal
+	expiry   int64
 }
 
 // To use type func | interface method, decide later... For now type func.
@@ -140,7 +145,9 @@ func (s *Session) OpenCh(peerAlias string, initBals BalInfo, app App, ChDurSecs 
 		PeerAddrs: []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr},
 	}
 
-	ch, err := s.ChClient.ProposeChannel(nil, proposal)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ch, err := s.ChClient.ProposeChannel(ctx, proposal)
 	if err != nil {
 		return nil, perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Proposing Channel"))
 	}
@@ -206,7 +213,9 @@ func (s *Session) RespondToChProposalNotif(proposalID string, accept bool) error
 	}
 	switch accept {
 	case true:
-		sdkCh, err := responder.Accept(context.TODO(), client.ProposalAcc{Participant: s.User.OffChainAddr})
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		sdkCh, err := responder.Accept(ctx, client.ProposalAcc{Participant: s.User.OffChainAddr})
 		if err != nil {
 			return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Accepting channel proposal"))
 		}
@@ -222,7 +231,9 @@ func (s *Session) RespondToChProposalNotif(proposalID string, accept bool) error
 		s.Channels[chID] = ch
 
 	case false:
-		err := responder.Reject(context.TODO(), "rejected by user")
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		err := responder.Reject(ctx, "rejected by user")
 		if err != nil {
 			return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Rejecting channel proposal"))
 		}
@@ -261,29 +272,41 @@ func (s *Session) CloseSession(persistOpenCh bool) (openPayChs []Channel, _ erro
 }
 
 func (s *Session) HandleProposal(prop *client.ChannelProposal, resp *client.ProposalResponder) {
+	expiry := time.Now().Add(5 * time.Minute).UTC().Unix() // add proper calculation
 
+	proposalID := prop.ProposalID()
+	proposalIDStr := BytesToHex(proposalID[:])
+	_ = proposalIDStr
+	// s.PayChResponders[proposalIDStr] = resp
+
+	// TODO: check if proposer in contacts, else reject it and log .
+
+	if s.PayChProposalNotify == nil {
+		s.PayChProposalsCache = append(s.PayChProposalsCache, &ProposalNotification{prop, expiry})
+	} else {
+		s.PayChProposalNotify(prop, expiry)
+	}
 }
 
 func (s *Session) HandleUpdate(update client.ChannelUpdate, responder *client.UpdateResponder) {
-	//if !s.ContainsPayCh(update.State.ID) {
-	//	//Log the channel ID
-	//	return
-	//}
-	//// As per v0.4.0 of go-perun SDK, a node can send only one update at a time.
-	//// Since only two parties exists, there can be only one active responder at a time.
-	//s.channels[update.State.ID].UpdateResponders = responder
-	//if update.State.IsFinal {
-	//	s.channels[update.State.ID].LockState = ChannelFinalized
-	//	// TODO: Start settle timer.
-	//}
-	//if !s.channels[update.State.ID].HasActiveSub() {
-	//	s.channels[update.State.ID].UpdateCache = update
-	//}
-	//// StateID during proposal is proposal id
-	//alias := "as"  // retrieve peer index, address and get alias from contact
-	//amount := "as" // retrieve  amount
+	expiry := time.Now().Add(5 * time.Minute).UTC().Unix() // add proper calculation
 
-	// s.channels[string(update.State.ID)].PayChUpdateNotify(alias string, amount string)
+	channelID := BytesToHex(update.State.ID[:])
+	if !s.ContainsCh(channelID) {
+		// Log the channel and reject it. Unknown channel.
+	}
+
+	// As per v0.4.0 of go-perun SDK, a node can send only one update at a time.
+	// Since only two parties exists, there can be only one active responder at a time.
+	s.Channels[channelID].UpdateResponders = responder
+	if update.State.IsFinal {
+		s.Channels[channelID].LockState = ChannelFinalized
+		// Call settle if accepted, waiting for two blockcs is implemented in go-perun now.
+	}
+	if !s.Channels[channelID].HasActiveSub() {
+		// s.Channels[channelID].UpdateCache = update
+	}
+	s.Channels[channelID].UpdateNotify(update.State, expiry)
 }
 
 func BytesToHex(b []byte) string {

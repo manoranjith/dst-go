@@ -13,7 +13,7 @@ type Registerer struct {
 	mock.Mock
 }
 
-// Register provides a mock function with given fields: addr, address
-func (_m *Registerer) Register(addr wallet.Address, address string) {
-	_m.Called(addr, address)
+// Register provides a mock function with given fields: offChainAddr, commAddr
+func (_m *Registerer) Register(offChainAddr wallet.Address, commAddr string) {
+	_m.Called(offChainAddr, commAddr)
 }

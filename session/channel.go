@@ -41,6 +41,10 @@ type ChannelAPI interface {
 	GetState() *channel.State
 	CloseCh() (*channel.State, error)
 }
+type UpdateNotification struct {
+	proposal *client.ChannelUpdate
+	expiry   int64
+}
 
 func (c *Channel) HasActiveSub() bool {
 	return c.UpdateNotify != nil
@@ -124,7 +128,7 @@ func (ch *Channel) BalInfo() BalInfo {
 	return BalInfo{}
 }
 
-type UpdateNotifier func(s channel.State)
+type UpdateNotifier func(s channel.State, expiry int64)
 
 // How to link functions defined here to Handlers registered in client.New ???
 // Those handlers should passon the function to client.

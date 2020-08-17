@@ -4,15 +4,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/client"
-
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/contacts/contactstest"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 	"github.com/hyperledger-labs/perun-node/session"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"perun.network/go-perun/client"
 )
 
 type ProposalNotifier struct{}
