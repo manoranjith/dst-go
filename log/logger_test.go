@@ -19,13 +19,14 @@ package log_test
 import (
 	"testing"
 
-	"github.com/hyperledger-labs/perun-node/log"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/hyperledger-labs/perun-node/log"
 )
 
 func Test_Loggger_Supported_LogLevels(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		for _, level := range []string{"error", "info"} {
+		for _, level := range []string{"error", "info", "debug"} {
 			l, err := log.NewLogger(level, "")
 			assert.NoError(t, err)
 			assert.NotNil(t, l)
@@ -33,7 +34,7 @@ func Test_Loggger_Supported_LogLevels(t *testing.T) {
 	})
 
 	t.Run("invalid levels", func(t *testing.T) {
-		for _, level := range []string{"panic", "fatal", "warn", "debug"} {
+		for _, level := range []string{"panic", "fatal", "warn"} {
 			l, err := log.NewLogger(level, "")
 			assert.Error(t, err)
 			assert.Nil(t, l)

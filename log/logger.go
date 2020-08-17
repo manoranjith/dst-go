@@ -24,16 +24,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Logger is a for now, a type alias of Logrus.Logger.
-type Logger = logrus.Logger
+// Logger is a for now, a type alias of Logrus.FieldLogger that accecpts both logrus.Entry & logrus.Logger.
+type Logger = logrus.FieldLogger
 
 // NewLogger returns a logger set to the given level and log file.
 // Supported log levels are "error" and "info".
 // Logs to stdout if logFile is an empty string.
-func NewLogger(levelStr, logFile string) (*Logger, error) {
+func NewLogger(levelStr, logFile string) (Logger, error) {
 	logger := logrus.New()
 
-	if levelStr != "info" && levelStr != "error" {
+	if levelStr != "info" && levelStr != "error" && levelStr != "debug" {
 		return nil, errors.New("Unsupported log level, use info or error")
 	}
 	level, err := logrus.ParseLevel(levelStr)
