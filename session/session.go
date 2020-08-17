@@ -29,12 +29,12 @@ type Session struct {
 	Dialer perun.Registerer // instance for dialer for registering contacts with the sdk.
 
 	// Only one subscription is allowed. Cache and deliver works only then
-	PayChProposalNotify ProposalDecoder                    // Map of subIDs to notifiers
-	PayChProposalsCache []*ProposalNotification            // Cached proposals due to missing subscription.
-	PayChResponders     map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
+	ProposalNotifier ProposalNotifier                   // Map of subIDs to notifiers
+	ProposalsCache   []*ProposalNotification            // Cached proposals due to missing subscription.
+	PayChResponders  map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
 
-	PayChCloseNotify PayChCloseNotify  // Map of subIDs to notifiers
-	PayChCloseCache  []*PayChCloseInfo // Cached channel close events due to missing subscription.
+	ChCloseNotifier ChCloseNotifier // Map of subIDs to notifiers
+	ChClosesCache   []*ChCloseInfo  // Cached channel close events due to missing subscription.
 }
 
 type ProposalNotification struct {
@@ -46,11 +46,11 @@ type ProposalNotification struct {
 type PayChProposalNotifier interface {
 	PayChProposalNotify(proposalID string, peerAlias string, initBals BalInfo, ChallengeDurSecs uint64, expiry int64)
 }
-type PayChCloseNotify interface {
+type ChCloseNotifier interface {
 	PayChCloseNotify(finalBals BalInfo, _ error)
 }
 
-type PayChCloseInfo struct {
+type ChCloseInfo struct {
 	finalBals BalInfo
 	err       error
 }
@@ -67,13 +67,13 @@ type SessionAPI interface {
 	// This function registers the call back and returns the subscription id which is constant for a session.
 	// For now, only one subscription per session (by the user of session) is allowed.
 	// Errors when sub exists
-	SubChProposals(ProposalDecoder) error
+	SubChProposals(ProposalNotifier) error
 	// Clear the callback
 	// Errors when no sub exists
 	UnsubChProposals() error // Err if there is no subscription.
 	RespondToChProposalNotif(proposalID string, accept bool) error
 	// Subscribe to payment channel close events
-	SubPayChClose(PayChCloseNotify) error
+	SubPayChClose(ChCloseNotifier) error
 	UnsubPayChClose() error // Err if there is no subscription.
 	// If persistOpenCh is
 	// true - it will persist open channels, close the session and return the list of channels persisted.
@@ -180,14 +180,14 @@ func (s *Session) GetChs() []Channel {
 	return chs
 }
 
-func (s *Session) SubChProposals(notifier ProposalDecoder) error {
+func (s *Session) SubChProposals(notifier ProposalNotifier) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if s.PayChProposalNotify != nil {
+	if s.ProposalNotifier != nil {
 		return perun.NewAPIError(perun.ErrSubAlreadyExists, nil)
 	}
-	s.PayChProposalNotify = notifier
+	s.ProposalNotifier = notifier
 	return nil
 }
 
@@ -196,10 +196,10 @@ func (s *Session) UnsubChProposals() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if s.PayChProposalNotify == nil {
+	if s.ProposalNotifier == nil {
 		return perun.NewAPIError(perun.ErrNoActiveSub, nil)
 	}
-	s.PayChProposalNotify = nil
+	s.ProposalNotifier = nil
 	return nil
 }
 
@@ -241,14 +241,14 @@ func (s *Session) RespondToChProposalNotif(proposalID string, accept bool) error
 	return nil
 }
 
-func (s *Session) SubPayChClose(notifier PayChCloseNotify) error {
+func (s *Session) SubPayChClose(notifier ChCloseNotifier) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if s.PayChCloseNotify != nil {
+	if s.ChCloseNotifier != nil {
 		return perun.NewAPIError(perun.ErrSubAlreadyExists, nil)
 	}
-	s.PayChCloseNotify = notifier
+	s.ChCloseNotifier = notifier
 	return nil
 }
 
@@ -257,10 +257,10 @@ func (s *Session) UnsubPayChClose() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	if s.PayChCloseNotify == nil {
+	if s.ChCloseNotifier == nil {
 		return perun.NewAPIError(perun.ErrNoActiveSub, nil)
 	}
-	s.PayChCloseNotify = nil
+	s.ChCloseNotifier = nil
 	return nil
 }
 
@@ -281,10 +281,10 @@ func (s *Session) HandleProposal(prop *client.ChannelProposal, resp *client.Prop
 
 	// TODO: check if proposer in contacts, else reject it and log .
 
-	if s.PayChProposalNotify == nil {
-		s.PayChProposalsCache = append(s.PayChProposalsCache, &ProposalNotification{prop, expiry})
+	if s.ProposalNotifier == nil {
+		s.ProposalsCache = append(s.ProposalsCache, &ProposalNotification{prop, expiry})
 	} else {
-		s.PayChProposalNotify(prop, expiry)
+		s.ProposalNotifier(prop, expiry)
 	}
 }
 

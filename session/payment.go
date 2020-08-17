@@ -151,7 +151,7 @@ func OpenPayCh(s *Session, peerAlias string, openingBals BalInfo, ChDurSecs uint
 	}, nil
 }
 
-type ProposalDecoder func(_ *client.ChannelProposal, expiry int64)
+type ProposalNotifier func(_ *client.ChannelProposal, expiry int64)
 
 // func SubPayChProposals
 
