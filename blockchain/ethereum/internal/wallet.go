@@ -39,6 +39,9 @@ const (
 	WeakScryptP     = 1
 )
 
+// Length of a hex representation (excluding '0x' prefix) of a valid address in canonical form.
+const addressLengthHex = 40
+
 // WalletBackend provides ethereum specific wallet backend functionality.
 type WalletBackend struct {
 	EncParams ScryptParams
@@ -75,13 +78,22 @@ func (wb *WalletBackend) UnlockAccount(w wallet.Wallet, addr wallet.Address) (wa
 func (wb *WalletBackend) ParseAddr(str string) (wallet.Address, error) {
 	addr := ethwallet.AsWalletAddr(common.HexToAddress(str))
 
+	// common.HexToAddress parses even strings that are larger than required length by truncating the result.
+	// So return an error if string is longer than required length and is truncated.
+	if (!strings.HasPrefix(str, "0x") && !strings.HasPrefix(str, "0X") && len(str) > addressLengthHex) ||
+		len(str) > addressLengthHex+2 {
+		if str != addr.String() {
+			return nil, errors.New("hex string too long, should be <= 40 chars")
+		}
+	}
+
 	// common.HexToAddress parses even invalid strings to zero value of the address type.
 	// So return an error when addr has zero value and the input string is not a valid
 	// zero value representation of the address type. Valid zero value representations are
 	// "", "0x", "0x00000" (any number of zeros) or the canonical form of forty zeros.
 	zeroValue := ethwallet.Address{}
 	if addr.Equals(&zeroValue) && !strings.Contains(zeroValue.String(), str) {
-		return nil, errors.New("parsing address")
+		return nil, errors.New("cannot parse invalid string")
 	}
 	return addr, nil
 }
