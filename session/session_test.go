@@ -108,10 +108,10 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		proposalResponder.On("Accept", mock.Anything, mock.Anything).Return(ch, nil)
 		sess := session.Session{
 			Channels:        make(map[string]*session.Channel),
-			PayChResponders: make(map[string]perun.ProposalResponder),
+			ProposalResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
-		sess.PayChResponders[proposalID] = proposalResponder
+		sess.ProposalResponders[proposalID] = proposalResponder
 		assert.NoError(t, sess.RespondToChProposalNotif(proposalID, true))
 	})
 
@@ -119,16 +119,16 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		proposalResponder := &mocks.ProposalResponder{}
 		proposalResponder.On("Reject", mock.Anything, mock.Anything).Return(nil)
 		sess := session.Session{
-			PayChResponders: make(map[string]perun.ProposalResponder),
+			ProposalResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
-		sess.PayChResponders[proposalID] = proposalResponder
+		sess.ProposalResponders[proposalID] = proposalResponder
 		assert.NoError(t, sess.RespondToChProposalNotif(proposalID, false))
 	})
 
 	t.Run("error_accept_no_responder", func(t *testing.T) {
 		sess := session.Session{
-			PayChResponders: make(map[string]perun.ProposalResponder),
+			ProposalResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
 		err := sess.RespondToChProposalNotif(proposalID, true)
@@ -137,7 +137,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 
 	t.Run("error_reject_no_responder", func(t *testing.T) {
 		sess := session.Session{
-			PayChResponders: make(map[string]perun.ProposalResponder),
+			ProposalResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
 		err := sess.RespondToChProposalNotif(proposalID, false)
@@ -148,10 +148,10 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		proposalResponder := &mocks.ProposalResponder{}
 		proposalResponder.On("Accept", mock.Anything, mock.Anything).Return(nil, errors.New("test-error"))
 		sess := session.Session{
-			PayChResponders: make(map[string]perun.ProposalResponder),
+			ProposalResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
-		sess.PayChResponders[proposalID] = proposalResponder
+		sess.ProposalResponders[proposalID] = proposalResponder
 		err := sess.RespondToChProposalNotif(proposalID, true)
 		assert.Error(t, err)
 	})
@@ -160,10 +160,10 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		proposalResponder := &mocks.ProposalResponder{}
 		proposalResponder.On("Reject", mock.Anything, mock.Anything).Return(errors.New("test-error"))
 		sess := session.Session{
-			PayChResponders: make(map[string]perun.ProposalResponder),
+			ProposalResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
-		sess.PayChResponders[proposalID] = proposalResponder
+		sess.ProposalResponders[proposalID] = proposalResponder
 		err := sess.RespondToChProposalNotif(proposalID, false)
 		assert.Error(t, err)
 		t.Log(err)

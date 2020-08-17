@@ -31,7 +31,7 @@ type Session struct {
 	// Only one subscription is allowed. Cache and deliver works only then
 	ProposalNotifier ProposalNotifier                   // Map of subIDs to notifiers
 	ProposalsCache   []*ProposalNotification            // Cached proposals due to missing subscription.
-	PayChResponders  map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
+	ProposalResponders  map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
 
 	ChCloseNotifier ChCloseNotifier // Map of subIDs to notifiers
 	ChClosesCache   []*ChCloseInfo  // Cached channel close events due to missing subscription.
@@ -207,7 +207,7 @@ func (s *Session) RespondToChProposalNotif(proposalID string, accept bool) error
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	responder, ok := s.PayChResponders[proposalID]
+	responder, ok := s.ProposalResponders[proposalID]
 	if !ok {
 		return perun.NewAPIError(perun.ErrUnknownProposalID, nil)
 	}
@@ -277,7 +277,7 @@ func (s *Session) HandleProposal(prop *client.ChannelProposal, resp *client.Prop
 	proposalID := prop.ProposalID()
 	proposalIDStr := BytesToHex(proposalID[:])
 	_ = proposalIDStr
-	// s.PayChResponders[proposalIDStr] = resp
+	// s.ProposalResponders[proposalIDStr] = resp
 
 	// TODO: check if proposer in contacts, else reject it and log .
 
