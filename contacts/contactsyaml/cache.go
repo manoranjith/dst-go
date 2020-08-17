@@ -17,12 +17,22 @@
 package contactsyaml
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
 	"perun.network/go-perun/wire"
 
 	"github.com/hyperledger-labs/perun-node"
+)
+
+// OwnAlias is a reserved keyword for the user of the node.
+const OwnAlias = "self"
+
+// Setinal error constants.
+var (
+	ErrPeerExists           = fmt.Errorf("peer already present in contacts")
+	ErrPeerAliasUnavailable = fmt.Errorf("alias already used by another peer in contacts")
 )
 
 // contactsCache represents a cached list of contacts indexed by both alias and off-chain address.
@@ -87,9 +97,9 @@ func (c *contactsCache) Write(alias string, p perun.Peer) error {
 
 	if oldPeer, ok := c.peersByAlias[alias]; ok {
 		if PeerEqual(oldPeer, p) {
-			return errors.New("peer already present in contacts")
+			return errors.WithStack(ErrPeerExists)
 		}
-		return errors.New("alias already used by another peer in contacts")
+		return errors.WithStack(ErrPeerAliasUnavailable)
 	}
 
 	var err error
