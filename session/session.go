@@ -2,12 +2,18 @@ package session
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"sync"
 
-	"github.com/hyperledger-labs/perun-node"
 	"github.com/pkg/errors"
+	_ "perun.network/go-perun/backend/ethereum" // backend init
+	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
+	"perun.network/go-perun/wallet"
+
+	"github.com/hyperledger-labs/perun-node"
 )
 
 // Remove the session defined in root level package ??
@@ -23,7 +29,7 @@ type Session struct {
 	Dialer perun.Registerer // instance for dialer for registering contacts with the sdk.
 
 	// Only one subscription is allowed. Cache and deliver works only then
-	PayChProposalNotify PayChProposalNotifier              // Map of subIDs to notifiers
+	PayChProposalNotify ProposalDecoder                    // Map of subIDs to notifiers
 	PayChProposalsCache []*client.ChannelProposal          // Cached proposals due to missing subscription.
 	PayChResponders     map[string]perun.ProposalResponder // Map of proposalIDs (as hex string) to ProposalResponders.
 
@@ -33,7 +39,7 @@ type Session struct {
 
 // To use type func | interface method, decide later... For now type func.
 type PayChProposalNotifier interface {
-	PayChProposalNotify(proposalID string, alias string, initBals BalInfo, ChallengeDurSecs uint64)
+	PayChProposalNotify(proposalID string, peerAlias string, initBals BalInfo, ChallengeDurSecs uint64, expiry int64)
 }
 type PayChCloseNotify interface {
 	PayChCloseNotify(finalBals BalInfo, _ error)
@@ -47,8 +53,8 @@ type PayChCloseInfo struct {
 type SessionAPI interface {
 	AddContact(contact perun.Peer) error
 	GetContact(alias string) (perun.Peer, error)
-	OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) error
-	GetPayChs() []PayChState
+	OpenCh(alias string, initBals BalInfo, app App, ChDurSecs uint64) (*Channel, error)
+	GetChs() []Channel
 	// The gRPC adapter should provide the concrete function to send notifications.
 	// It should take the given parameters and send it to the user.
 	// Session adopts fire and forget model for calling this function and hence does not care about error.
@@ -56,11 +62,11 @@ type SessionAPI interface {
 	// This function registers the call back and returns the subscription id which is constant for a session.
 	// For now, only one subscription per session (by the user of session) is allowed.
 	// Errors when sub exists
-	SubPayChProposals(PayChProposalNotifier) error
+	SubChProposals(ProposalDecoder) error
 	// Clear the callback
 	// Errors when no sub exists
-	UnsubPayChProposals() error // Err if there is no subscription.
-	RespondToPayChProposalNotif(proposalID string, accept bool) error
+	UnsubChProposals() error // Err if there is no subscription.
+	RespondToChProposalNotif(proposalID string, accept bool) error
 	// Subscribe to payment channel close events
 	SubPayChClose(PayChCloseNotify) error
 	UnsubPayChClose() error // Err if there is no subscription.
@@ -72,7 +78,7 @@ type SessionAPI interface {
 
 func NewSession() {}
 
-func (s *Session) ContainsPayCh(id string) bool {
+func (s *Session) ContainsCh(id string) bool {
 	for _, ch := range s.Channels {
 		if ch.ID == id {
 			return true
@@ -96,27 +102,78 @@ func (s *Session) GetContact(alias string) (perun.Peer, error) {
 	return peer, nil
 }
 
-func (s *Session) OpenPayCh(alias string, initBals BalInfo, ChDurSecs uint64) error {
-	peer, isPresent := s.Contacts.ReadByAlias(alias)
+type App struct {
+	Def  wallet.Address
+	Data channel.Data
+}
+
+func (s *Session) OpenCh(peerAlias string, initBals BalInfo, app App, ChDurSecs uint64) (*Channel, error) {
+	peer, isPresent := s.Contacts.ReadByAlias(peerAlias)
 	if !isPresent {
-		return perun.NewAPIError(perun.ErrUnknownAlias, nil)
+		return nil, perun.NewAPIError(perun.ErrUnknownAlias, nil)
 	}
 	s.Dialer.Register(peer.OffChainAddr, peer.CommAddr)
-	// Use proposal maker hook from payment app.
-	ch, err := s.ChClient.ProposeChannel(nil, &client.ChannelProposal{})
+
+	if !Exists(initBals.Currency) {
+		return nil, perun.NewAPIError(perun.ErrUnknownCurrency, errors.New(initBals.Currency))
+	}
+	currencyParser := NewParser(initBals.Currency)
+	selfBal, err := currencyParser.Parse(initBals.Bals["self"])
 	if err != nil {
-		return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Proposing Channel"))
+		return nil, perun.NewAPIError(perun.ErrInvalidAmount, errors.New("for self"))
+	}
+	peerBal, err := currencyParser.Parse(initBals.Bals[peerAlias])
+	if err != nil {
+		return nil, perun.NewAPIError(perun.ErrInvalidAmount, errors.New("for peer"))
+	}
+
+	proposal := &client.ChannelProposal{
+		ChallengeDuration: ChDurSecs,
+		Nonce:             nonce(),
+		ParticipantAddr:   s.User.OffChainAddr,
+		AppDef:            app.Def,
+		InitData:          app.Data,
+		InitBals: &channel.Allocation{
+			Assets:   []channel.Asset{}, // TODO: Set this asset properly
+			Balances: [][]*big.Int{{selfBal, peerBal}},
+		},
+		PeerAddrs: []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr},
+	}
+
+	ch, err := s.ChClient.ProposeChannel(nil, proposal)
+	if err != nil {
+		return nil, perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Proposing Channel"))
 	}
 	// TODO: Use NewChannel function to prepare other factors
-	s.Channels["testID"] = &Channel{Controller: ch}
-	return nil
+	// chID := ch.ID()
+	// s.Channels[BytesToHex(chID[:])] = &Channel{Controller: ch}
+	// s.Channels[BytesToHex(chID[:])].AppParams[currency] = initBals.Currency
+	// return s.Channels[BytesToHex(chID[:])], nil
+	_ = ch
+	return &Channel{}, nil
 }
 
-func (s *Session) GetPayChs() []PayChState {
-	panic("not implemented") // TODO: Implement
+func nonce() *big.Int {
+	max := new(big.Int)
+	max.Exp(big.NewInt(2), big.NewInt(256), nil).Sub(max, big.NewInt(1))
+
+	val, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		_ = err
+		// log.Panic("Could not create nonce")
+	}
+	return val
 }
 
-func (s *Session) SubPayChProposals(notifier PayChProposalNotifier) error {
+func (s *Session) GetChs() []Channel {
+	chs := make([]Channel, len(s.Channels))
+	for _, val := range s.Channels {
+		chs = append(chs, *val)
+	}
+	return chs
+}
+
+func (s *Session) SubChProposals(notifier ProposalDecoder) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -128,7 +185,7 @@ func (s *Session) SubPayChProposals(notifier PayChProposalNotifier) error {
 }
 
 // Errors for unknown subscription id.
-func (s *Session) UnsubPayChProposals() error {
+func (s *Session) UnsubChProposals() error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -139,7 +196,7 @@ func (s *Session) UnsubPayChProposals() error {
 	return nil
 }
 
-func (s *Session) RespondToPayChProposalNotif(proposalID string, accept bool) error {
+func (s *Session) RespondToChProposalNotif(proposalID string, accept bool) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -203,7 +260,8 @@ func (s *Session) CloseSession(persistOpenCh bool) (openPayChs []Channel, _ erro
 	panic("not implemented") // TODO: Implement
 }
 
-func (s *Session) HandleProposal(_ *client.ChannelProposal, _ *client.ProposalResponder) {
+func (s *Session) HandleProposal(prop *client.ChannelProposal, resp *client.ProposalResponder) {
+
 }
 
 func (s *Session) HandleUpdate(update client.ChannelUpdate, responder *client.UpdateResponder) {

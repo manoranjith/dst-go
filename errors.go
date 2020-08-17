@@ -28,7 +28,9 @@ var (
 	ErrUnknownChannelID  = "No payment channel corresponding to the specified ID."
 	ErrUnknownAlias      = "Peer corresponding to the specified ID not found in contacts provider." // Used
 	ErrUnknownVersionID  = "No pending payment request with the specified version of state."
+	ErrUnknownCurrency   = "Currency not supported by this node instance."
 
+	ErrInsufficientBal     = "Insufficient balance in sender account."
 	ErrInvalidAmount       = "Invalid amount string."
 	ErrInvalidBalance      = "Unknown currency or invalid amount string."
 	ErrInvalidConfig       = "Invalid configuration detected."

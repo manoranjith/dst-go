@@ -21,29 +21,48 @@ type Channel struct {
 	ID         string
 	Controller perun.Channel
 	LockState  ChannelLockState
+	peers      []string
 	// send notification.
 	// Mechanism to create subscription ID ?.... What is it unique of... ?
 	// This subscription is for a session, but any number of subscriptions can be made and all are identical.
 	// So use channel ID  as the subscription ID. Later this can be changed.
-	UpdateNotify     PayChUpdateNotify     // Handler for sending notifications
+	UpdateNotify     StateDecoder          // Handler for sending notifications
 	UpdateResponders perun.UpdateResponder // Map of proposalIDs to ProposalResponders.
 
 	UpdateCache *client.ChannelUpdate // There will be only one active update at a time... Document this clearly in the diagram.
+	App         string                // App that runs in the channel
+	AppParams   map[string]string     // App specific parameters
+}
+type ChannelAPI interface {
+	SendChUpdate(f StateUpdater) error
+	SubChUpdates(f StateDecoder) error // Err if subscription exists.
+	UnsubChUpdates() error             // Err if there is no subscription.
+	RespondToChUpdateNotif(accept bool) error
+	GetState() *channel.State
+	CloseCh() (*channel.State, error)
 }
 
 func (c *Channel) HasActiveSub() bool {
 	return c.UpdateNotify != nil
 }
 
-func (c *Channel) SendPayChUpdate(alias string, amount string) error {
-	err := c.Controller.UpdateBy(nil, func(_ *channel.State) {})
+// func (c *Channel) SendPayChUpdate(alias string, amount string) error {
+// 	err := c.Controller.UpdateBy(nil, func(_ *channel.State) {})
+// 	if err != nil {
+// 		return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Sending state update"))
+// 	}
+// 	return nil
+// }
+
+func (c *Channel) SendChUpdate(f StateUpdater) error {
+	err := c.Controller.UpdateBy(nil, f)
 	if err != nil {
 		return perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Sending state update"))
 	}
 	return nil
 }
 
-func (c *Channel) SubPayChUpdates(f PayChUpdateNotify) error {
+func (c *Channel) SubChUpdates(f StateDecoder) error {
 	if c.UpdateNotify != nil {
 		return perun.NewAPIError(perun.ErrSubAlreadyExists, nil)
 	}
@@ -51,7 +70,7 @@ func (c *Channel) SubPayChUpdates(f PayChUpdateNotify) error {
 	return nil
 }
 
-func (c *Channel) UnsubPayChUpdates() error {
+func (c *Channel) UnsubChUpdates() error {
 	if c.UpdateNotify == nil {
 		return perun.NewAPIError(perun.ErrNoActiveSub, nil)
 	}
@@ -59,7 +78,7 @@ func (c *Channel) UnsubPayChUpdates() error {
 	return nil
 }
 
-func (c *Channel) RespondToPayChUpdateNotif(accept bool) error {
+func (c *Channel) RespondToChUpdateNotif(accept bool) error {
 	if c.UpdateResponders == nil {
 		return errors.New("no response expected")
 	}
@@ -78,11 +97,11 @@ func (c *Channel) RespondToPayChUpdateNotif(accept bool) error {
 	return nil
 }
 
-func (c *Channel) GetBalance() BalInfo {
-	panic("not implemented")
+func (c *Channel) GetState() *channel.State {
+	return c.Controller.State()
 }
 
-func (c *Channel) ClosePayCh() (finalBals BalInfo, _ error) {
+func (c *Channel) CloseCh() (*channel.State, error) {
 	// Try to finalize state, so that channel can be settled collaboratively.
 	// If this fails, channel will be settled non-collaboratively.
 	// Non-Collaborative takes more on-chain txns and time.
@@ -92,12 +111,12 @@ func (c *Channel) ClosePayCh() (finalBals BalInfo, _ error) {
 	}
 	err := c.Controller.Settle(nil)
 	if cerr := c.Controller.Close(); err != nil {
-		return finalBals, perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Closing channel controller"))
+		return nil, perun.NewAPIError(perun.ErrInternalServer, errors.Wrap(err, "Closing channel controller"))
 	} else if cerr != nil {
 		_ = cerr
 		// log cerr
 	}
-	return finalBals, nil
+	return c.Controller.State(), nil
 
 }
 
@@ -105,38 +124,7 @@ func (ch *Channel) BalInfo() BalInfo {
 	return BalInfo{}
 }
 
-type PayChUpdateNotify interface {
-	PayChUpdateNotify(alias string, bals BalInfo, ChannelgeDurSecs uint64)
-}
-
-type PayChState struct {
-	channelID string
-	BalInfo   BalInfo
-	Version   string
-}
-
-type Currency string
-
-const (
-	CurrencyETH Currency = "ETH"
-)
-
-type BalInfo struct {
-	Currency string
-	bals     map[string]string // Map of alias to balance.
-}
-
-type ChannelAPI interface {
-	SendPayChUpdate(alias string, amount string) error
-	SubPayChUpdates(PayChUpdateNotify) error // Err if subscription exists.
-	// SendPayChNotif(
-	UnsubPayChUpdates() error // Err if there is no subscription.
-	RespondToPayChUpdateNotif(accept bool) error
-	GetBalance() BalInfo
-	ClosePayCh() (finalBals BalInfo, _ error)
-}
-
-func NewChannel() {}
+type UpdateNotifier func(s channel.State)
 
 // How to link functions defined here to Handlers registered in client.New ???
 // Those handlers should passon the function to client.

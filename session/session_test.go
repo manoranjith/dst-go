@@ -4,14 +4,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/contacts/contactstest"
-	"github.com/hyperledger-labs/perun-node/internal/mocks"
-	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"perun.network/go-perun/client"
+
+	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/contacts/contactstest"
+	"github.com/hyperledger-labs/perun-node/internal/mocks"
+	"github.com/hyperledger-labs/perun-node/session"
 )
 
 type ProposalNotifier struct{}
@@ -42,7 +43,11 @@ func Test_Session_OpenPayCh(t *testing.T) {
 		}
 		registerer.On("Register", mock.Anything, mock.Anything).Return()
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(&client.Channel{}, nil)
-		assert.NoError(t, sess.OpenPayCh("1", session.BalInfo{}, 0))
+		testBalInfo := session.BalInfo{Currency: session.ETH, Bals: make(map[string]string)}
+		testBalInfo.Bals["self"] = "5"
+		testBalInfo.Bals["1"] = "10"
+		_, err = sess.OpenCh("1", testBalInfo, session.App{}, 0)
+		assert.NoError(t, err)
 	})
 
 	t.Run("error_proposeChannel", func(t *testing.T) {
@@ -58,7 +63,10 @@ func Test_Session_OpenPayCh(t *testing.T) {
 		}
 		registerer.On("Register", mock.Anything, mock.Anything).Return()
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(nil, errors.New("test-error"))
-		err = sess.OpenPayCh("1", session.BalInfo{}, 0)
+		testBalInfo := session.BalInfo{Currency: session.ETH, Bals: make(map[string]string)}
+		testBalInfo.Bals["self"] = "5"
+		testBalInfo.Bals["1"] = "10"
+		_, err = sess.OpenCh("1", testBalInfo, session.App{}, 0)
 		assert.Error(t, err)
 		t.Log(err)
 	})
@@ -67,12 +75,12 @@ func Test_Session_OpenPayCh(t *testing.T) {
 func Test_Session_SubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		ch := session.Session{}
-		assert.NoError(t, ch.SubPayChProposals(&ProposalNotifier{}))
+		assert.NoError(t, ch.SubChProposals(func(*client.ChannelProposal, int64) {}))
 	})
 	t.Run("error_already_subscribed", func(t *testing.T) {
 		ch := session.Session{}
-		assert.NoError(t, ch.SubPayChProposals(&ProposalNotifier{}))
-		err := ch.SubPayChProposals(&ProposalNotifier{})
+		assert.NoError(t, ch.SubChProposals(func(*client.ChannelProposal, int64) {}))
+		err := ch.SubChProposals(func(*client.ChannelProposal, int64) {})
 		assert.Error(t, err)
 		t.Log(err)
 	})
@@ -81,13 +89,13 @@ func Test_Session_SubPayChProposals(t *testing.T) {
 func Test_Session_Sub_UnsubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		ch := session.Session{}
-		require.NoError(t, ch.SubPayChProposals(&ProposalNotifier{}))
-		assert.NoError(t, ch.UnsubPayChProposals())
+		require.NoError(t, ch.SubChProposals(func(*client.ChannelProposal, int64) {}))
+		assert.NoError(t, ch.UnsubChProposals())
 	})
 
 	t.Run("error_not_subscribed", func(t *testing.T) {
 		ch := session.Session{}
-		err := ch.UnsubPayChProposals()
+		err := ch.UnsubChProposals()
 		assert.Error(t, err)
 	})
 }
@@ -105,7 +113,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		}
 		proposalID := "prop-1"
 		sess.PayChResponders[proposalID] = proposalResponder
-		assert.NoError(t, sess.RespondToPayChProposalNotif(proposalID, true))
+		assert.NoError(t, sess.RespondToChProposalNotif(proposalID, true))
 	})
 
 	t.Run("happy_reject", func(t *testing.T) {
@@ -116,7 +124,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		}
 		proposalID := "prop-1"
 		sess.PayChResponders[proposalID] = proposalResponder
-		assert.NoError(t, sess.RespondToPayChProposalNotif(proposalID, false))
+		assert.NoError(t, sess.RespondToChProposalNotif(proposalID, false))
 	})
 
 	t.Run("error_accept_no_responder", func(t *testing.T) {
@@ -124,7 +132,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 			PayChResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
-		err := sess.RespondToPayChProposalNotif(proposalID, true)
+		err := sess.RespondToChProposalNotif(proposalID, true)
 		assert.Error(t, err)
 	})
 
@@ -133,7 +141,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 			PayChResponders: make(map[string]perun.ProposalResponder),
 		}
 		proposalID := "prop-1"
-		err := sess.RespondToPayChProposalNotif(proposalID, false)
+		err := sess.RespondToChProposalNotif(proposalID, false)
 		assert.Error(t, err)
 	})
 
@@ -145,7 +153,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		}
 		proposalID := "prop-1"
 		sess.PayChResponders[proposalID] = proposalResponder
-		err := sess.RespondToPayChProposalNotif(proposalID, true)
+		err := sess.RespondToChProposalNotif(proposalID, true)
 		assert.Error(t, err)
 	})
 
@@ -157,7 +165,7 @@ func Test_Session_Sub_RespondToPayChProposalNotif(t *testing.T) {
 		}
 		proposalID := "prop-1"
 		sess.PayChResponders[proposalID] = proposalResponder
-		err := sess.RespondToPayChProposalNotif(proposalID, false)
+		err := sess.RespondToChProposalNotif(proposalID, false)
 		assert.Error(t, err)
 		t.Log(err)
 	})
