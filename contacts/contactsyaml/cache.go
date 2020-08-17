@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
+	"perun.network/go-perun/wire"
 
 	"github.com/hyperledger-labs/perun-node"
 )
@@ -66,11 +67,12 @@ func (c *contactsCache) readByAlias(alias string) (_ perun.Peer, isPresent bool)
 }
 
 // ReadByOffChainAddr returns the peer corresponding to given off-chain address from the cache.
-func (c *contactsCache) ReadByOffChainAddr(offChainAddr string) (_ perun.Peer, isPresent bool) {
+// This API assumes the given offChainAddr is a non nil value. Call to this function panics if it is nil.
+func (c *contactsCache) ReadByOffChainAddr(offChainAddr wire.Address) (_ perun.Peer, isPresent bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	var alias string
-	alias, isPresent = c.aliasByAddr[offChainAddr]
+	alias, isPresent = c.aliasByAddr[offChainAddr.String()]
 	if !isPresent {
 		return perun.Peer{}, false
 	}
