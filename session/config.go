@@ -37,3 +37,15 @@ type UserConfig struct {
 	CommAddr string
 	CommType string
 }
+
+// Config defines the parameters required to configure a session.
+type Config struct {
+	User UserConfig
+
+	ContactsType       string // Type of contacts provider.
+	ContactsURL        string // URL for accessing the contacts provider.
+	ChainURL           string // URL of the blockchain node.
+	Asset, Adjudicator string // Address of the Asset and Adjudicator contracts.
+
+	DatabaseDir string // Path to directory containing persistence database.
+}
