@@ -33,10 +33,11 @@ type (
 		ChClient perun.ChannelClient
 		Contacts perun.Contacts
 
-		Channels            map[string]*Channel
-		proposalNotifier    ProposalNotifier
-		proposalNotifsCache []ProposalNotification
-		proposalResponders  map[string]ProposalResponder
+		Channels map[string]*Channel
+
+		chProposalNotifier    ChProposalNotifier
+		chProposalNotifsCache []ChProposalNotification
+		chProposalResponders  map[string]ChProposalResponder
 
 		chCloseNotifier    ChCloseNotifier
 		chCloseNotifsCache []ChCloseNotification
@@ -44,17 +45,17 @@ type (
 		sync.RWMutex
 	}
 
-	ProposalNotification struct {
+	ChProposalNotification struct {
 		proposal *pclient.ChannelProposal
 		expiry   int64
 	}
 
-	ProposalNotifier func(ProposalNotification)
+	ChProposalNotifier func(ChProposalNotification)
 
 	//go:generate mockery -name ProposalResponder -output ./internal/mocks
 
 	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
-	ProposalResponder interface {
+	ChProposalResponder interface {
 		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
 		Reject(ctx context.Context, reason string) error
 	}
@@ -207,43 +208,43 @@ func nonce() *big.Int {
 	return val
 }
 
-func (s *Session) SubChProposals(notifier ProposalNotifier) error {
+func (s *Session) SubChProposals(notifier ChProposalNotifier) error {
 	s.Logger.Debug("Received request: session.SubChProposals")
 	s.Lock()
 	defer s.Unlock()
 
-	if s.proposalNotifier != nil {
+	if s.chProposalNotifier != nil {
 		return errors.New("")
 	}
-	s.proposalNotifier = notifier
+	s.chProposalNotifier = notifier
 
 	// Send all cached notifications
-	for i := len(s.proposalNotifsCache) - 1; i >= 0; i-- {
-		s.proposalNotifier(s.proposalNotifsCache[0])
-		s.proposalNotifsCache = s.proposalNotifsCache[1 : i+1]
+	for i := len(s.chProposalNotifsCache) - 1; i >= 0; i-- {
+		s.chProposalNotifier(s.chProposalNotifsCache[0])
+		s.chProposalNotifsCache = s.chProposalNotifsCache[1 : i+1]
 	}
 
 	return nil
 }
 
-func (s *Session) UnsubChProposals(notifier ProposalNotifier) error {
+func (s *Session) UnsubChProposals(notifier ChProposalNotifier) error {
 	s.Logger.Debug("Received request: session.UnsubChProposals")
 	s.Lock()
 	defer s.Unlock()
 
-	if s.proposalNotifier == nil {
+	if s.chProposalNotifier == nil {
 		return errors.New("")
 	}
-	s.proposalNotifier = nil
+	s.chProposalNotifier = nil
 	return nil
 }
 
-func (s *Session) RespondChProposal(proposalID string, accept bool) error {
+func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 	s.Logger.Debug("Received request: session.RespondChProposal")
 	s.Lock()
 	defer s.Unlock()
 
-	responder, ok := s.proposalResponders[proposalID]
+	responder, ok := s.chProposalResponders[chProposalID]
 	if !ok {
 		return errors.New("")
 	}
