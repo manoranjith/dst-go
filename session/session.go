@@ -38,6 +38,9 @@ type (
 		proposalNotifsCache []ProposalNotification
 		proposalResponders  map[string]ProposalResponder
 
+		chCloseNotifier    ChCloseNotifier
+		chCloseNotifsCache []ChCloseNotification
+
 		sync.RWMutex
 	}
 
@@ -55,6 +58,13 @@ type (
 		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
 		Reject(ctx context.Context, reason string) error
 	}
+
+	ChCloseNotification struct {
+		ChState *channel.State
+		Expiry  int64
+	}
+
+	ChCloseNotifier func(ChCloseNotification)
 )
 
 func New(cfg Config) (*Session, error) {
@@ -254,6 +264,25 @@ func (s *Session) RespondChProposal(proposalID string, accept bool) error {
 			return errors.New("")
 		}
 	}
+	return nil
+}
+
+func (s *Session) SubChCloses(notifier ChCloseNotifier) error {
+	s.Logger.Debug("Received request: session.SubChCloses")
+	s.Lock()
+	defer s.Unlock()
+
+	if s.chCloseNotifier != nil {
+		return errors.New("")
+	}
+	s.chCloseNotifier = notifier
+
+	// Send all cached notifications
+	for i := len(s.chCloseNotifsCache); i > 0; i-- {
+		s.chCloseNotifier(s.chCloseNotifsCache[0])
+		s.chCloseNotifsCache = s.chCloseNotifsCache[1:i]
+	}
+
 	return nil
 }
 
