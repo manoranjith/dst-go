@@ -26,9 +26,6 @@ import (
 	"github.com/hyperledger-labs/perun-node"
 )
 
-// OwnAlias is a reserved keyword for the user of the node.
-const OwnAlias = "self"
-
 // Setinal error constants.
 var (
 	ErrPeerExists           = fmt.Errorf("peer already present in contacts")

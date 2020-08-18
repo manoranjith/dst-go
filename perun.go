@@ -46,6 +46,10 @@ type Peer struct {
 	CommType string `yaml:"comm_type"`
 }
 
+// OwnAlias is the alias for the entry of the users own peer details.
+// It will be used when traslating addresses in incoming messages / proposals to aliases.
+const OwnAlias = "self"
+
 // ContactsReader represents a read only cached list of contacts.
 type ContactsReader interface {
 	ReadByAlias(alias string) (p Peer, contains bool)

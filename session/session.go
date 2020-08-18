@@ -116,7 +116,7 @@ func New(cfg Config) (*Session, error) {
 	}, nil
 }
 
-func initContacts(contactsType, contactsURL string, wb perun.WalletBackend, self perun.Peer) (perun.Contacts, error) {
+func initContacts(contactsType, contactsURL string, wb perun.WalletBackend, ownInfo perun.Peer) (perun.Contacts, error) {
 	if contactsType != "yaml" {
 		return nil, errors.New("unsupported contacts provider type, use only yaml")
 	}
@@ -126,7 +126,7 @@ func initContacts(contactsType, contactsURL string, wb perun.WalletBackend, self
 	}
 
 	// user.Peer.Alias = contactsyaml.OwnAlias
-	err = contacts.Write(contactsyaml.OwnAlias, self)
+	err = contacts.Write(perun.OwnAlias, ownInfo)
 	if err != nil && !errors.Is(err, contactsyaml.ErrPeerExists) {
 		return nil, errors.Wrap(err, "registering own user in contacts")
 	}
@@ -187,7 +187,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 		return ChannelInfo{}, err
 	}
 	partAddrs := []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr}
-	parts := []string{"self", peerAlias}
+	parts := []string{perun.OwnAlias, peer.Alias}
 	proposal := &pclient.ChannelProposal{
 		ChallengeDuration: challengeDurSecs,
 		Nonce:             nonce(),
@@ -236,11 +236,20 @@ func (s *Session) GetChannels() []ChannelInfo {
 // It arranges balances in this order: own, peer.
 // PeerAddrs in channel also should be in the same order.
 func makeAllocation(bals BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
-	ownBal, err := currency.NewParser(bals.Currency).Parse("self")
+	ownBalAmount, ok := bals.Bals[perun.OwnAlias]
+	if !ok {
+		return nil, errors.New("") // no entry for self in bals
+	}
+	peerBalAmount, ok := bals.Bals[peerAlias]
+	if !ok {
+		return nil, errors.New("") // no entry for peer in bals
+	}
+
+	ownBal, err := currency.NewParser(bals.Currency).Parse(ownBalAmount)
 	if err != nil {
 		return nil, errors.WithMessage(err, "own balance")
 	}
-	peerBal, err := currency.NewParser(bals.Currency).Parse(peerAlias)
+	peerBal, err := currency.NewParser(bals.Currency).Parse(peerBalAmount)
 	if err != nil {
 		return nil, errors.WithMessage(err, "peer balance")
 	}
