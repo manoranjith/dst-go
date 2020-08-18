@@ -277,7 +277,7 @@ func (s *Session) SubChProposals(notifier ChProposalNotifier) error {
 	return nil
 }
 
-func (s *Session) UnsubChProposals(notifier ChProposalNotifier) error {
+func (s *Session) UnsubChProposals() error {
 	s.Logger.Debug("Received request: session.UnsubChProposals")
 	s.Lock()
 	defer s.Unlock()
@@ -338,6 +338,18 @@ func (s *Session) SubChCloses(notifier ChCloseNotifier) error {
 		s.chCloseNotifsCache = s.chCloseNotifsCache[1:i]
 	}
 
+	return nil
+}
+
+func (s *Session) UnsubChCloses() error {
+	s.Logger.Debug("Received request: session.UnsubChCloses")
+	s.Lock()
+	defer s.Unlock()
+
+	if s.chCloseNotifier == nil {
+		return errors.New("")
+	}
+	s.chCloseNotifier = nil
 	return nil
 }
 
