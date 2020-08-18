@@ -38,6 +38,15 @@ func SendPayChUpdate(ch *session.Channel, payee, amount string) error {
 	return ch.SendChUpdate(f)
 }
 
+func RespondToPayChUpdate(ch *session.Channel, updateID string, accept bool) error {
+	return ch.RespondChUpdate(updateID, accept)
+}
+
+func GetBalance(ch *session.Channel) session.BalInfo {
+	chInfo := ch.GetInfo()
+	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
+}
+
 func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amount string) (session.StateUpdater, error) {
 	parsedAmount, err := currency.NewParser(chCurrency).Parse(amount)
 	if err != nil {
@@ -80,6 +89,10 @@ func SubPayChUpdates(ch *session.Channel, notifier PayChUpdateNotifier) error {
 			Timeout:      notif.Expiry,
 		})
 	})
+}
+
+func UnSubPayChUpdates(ch *session.Channel) error {
+	return ch.UnsubChUpdates()
 }
 
 // TODO: Add a hook
