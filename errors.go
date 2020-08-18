@@ -37,6 +37,7 @@ var (
 	ErrInvalidAmount       = APIError("Invalid amount string")
 	ErrInvalidConfig       = APIError("Invalid configuration detected.")
 	ErrInvalidOffChainAddr = APIError("Invalid off-chain address string.")
+	ErrInvalidPayee        = APIError("Invalid payee, no such participant in the channel.")
 
 	ErrNoActiveSub      = APIError("No active subscription was found.")
 	ErrSubAlreadyExists = APIError("A subscription for this context already exists.")
