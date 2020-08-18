@@ -43,9 +43,12 @@ type (
 	ChUpdateNotifier func(ChUpdateNotif)
 
 	ChUpdateNotif struct {
-		UpdateID string
-		Update   *pclient.ChannelUpdate
-		Expiry   int64
+		UpdateID  string
+		Currency  string
+		CurrState *channel.State
+		Update    *pclient.ChannelUpdate
+		Parts     []string
+		Expiry    int64
 	}
 
 	ChUpdateResponderEntry struct {
