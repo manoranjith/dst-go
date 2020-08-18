@@ -16,6 +16,12 @@
 
 package session
 
+import (
+	"path/filepath"
+
+	"github.com/spf13/viper"
+)
+
 // WalletConfig defines the parameters required to configure a wallet.
 type WalletConfig struct {
 	KeystorePath string
@@ -48,4 +54,16 @@ type Config struct {
 	Asset, Adjudicator string // Address of the Asset and Adjudicator contracts.
 
 	DatabaseDir string // Path to directory containing persistence database.
+}
+
+func ParseConfig(configFile string) (Config, error) {
+	v := viper.New()
+	v.SetConfigFile(filepath.Clean(configFile))
+
+	var cfg Config
+	err := v.ReadInConfig()
+	if err != nil {
+		return Config{}, err
+	}
+	return cfg, v.Unmarshal(&cfg)
 }
