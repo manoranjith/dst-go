@@ -28,7 +28,7 @@ type (
 		Channel   *client.Channel
 		LockState ChannelLockState
 		Currency  string
-		Peers     []string
+		Parts     []string
 
 		chUpdateNotifier   ChUpdateNotifier
 		chUpdateNotifCache []ChUpdateNotif
@@ -86,7 +86,7 @@ func NewChannel(pch *client.Channel, currency string, parts []string) *Channel {
 		Channel:   pch,
 		LockState: ChannelOpen,
 		Currency:  currency,
-		Peers:     parts,
+		Parts:     parts,
 	}
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.ID)
 	return ch
@@ -169,11 +169,15 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	return nil
 }
 
-func (ch *Channel) GetState() *channel.State {
+func (ch *Channel) GetInfo() ChannelInfo {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.RLock()
 	defer ch.RUnlock()
-	return ch.GetState().Clone()
+	return ChannelInfo{
+		Currency: ch.Currency,
+		State:    ch.Channel.State().Clone(),
+		Parts:    ch.Parts,
+	}
 }
 
 func (ch *Channel) Close() (*channel.State, error) {
