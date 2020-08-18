@@ -23,19 +23,30 @@ import (
 	"github.com/hyperledger-labs/perun-node/log"
 )
 
-// Session ...
-type Session struct {
-	log.Logger
+type (
+	// Session ...
+	Session struct {
+		log.Logger
 
-	ID       string
-	User     perun.User
-	ChClient perun.ChannelClient
-	Contacts perun.Contacts
+		ID       string
+		User     perun.User
+		ChClient perun.ChannelClient
+		Contacts perun.Contacts
 
-	Channels map[string]*Channel
+		Channels            map[string]*Channel
+		proposalNotifier    ProposalNotifier
+		proposalNotifsCache []ProposalNotification
 
-	sync.RWMutex
-}
+		sync.RWMutex
+	}
+
+	ProposalNotification struct {
+		proposal *pclient.ChannelProposal
+		expiry   int64
+	}
+
+	ProposalNotifier func(ProposalNotification)
+)
 
 func New(cfg Config) (*Session, error) {
 	wb := ethereum.NewWalletBackend()
@@ -175,6 +186,25 @@ func nonce() *big.Int {
 		// log.Panic("Could not create nonce")
 	}
 	return val
+}
+
+func (s *Session) SubChProposals(notifier ProposalNotifier) error {
+	s.Logger.Debug("Received request: session.SubChProposals")
+	s.Lock()
+	defer s.Unlock()
+
+	if s.proposalNotifier != nil {
+		return errors.New("")
+	}
+	s.proposalNotifier = notifier
+
+	// Send all cached notifications
+	for i := len(s.proposalNotifsCache) - 1; i >= 0; i-- {
+		s.proposalNotifier(s.proposalNotifsCache[0])
+		s.proposalNotifsCache = s.proposalNotifsCache[1 : i+1]
+	}
+
+	return nil
 }
 
 func BytesToHex(b []byte) string {
