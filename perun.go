@@ -70,7 +70,22 @@ type CommBackend interface {
 
 	// Returns a dialer that can dial for new outgoing connections.
 	// If timeout is zero, program will use no timeout, but standard OS timeouts may still apply.
-	NewDialer() net.Dialer
+	NewDialer() Dialer
+}
+
+//go:generate mockery -name Dialer -output ./internal/mocks
+
+// Dialer extends net.Dialer with Registerer interface.
+type Dialer interface {
+	net.Dialer
+	Registerer
+}
+
+//go:generate mockery -name Registerer -output ./internal/mocks
+
+// Registerer is used to register the commAddr corresponding to an offChainAddr to the wire.Bus in runtime.
+type Registerer interface {
+	Register(offChainAddr wire.Address, commAddr string)
 }
 
 // Credential represents the parameters required to access the keys and make signatures for a given address.
@@ -117,6 +132,7 @@ type Session struct {
 // with a wrong state when the channel client was not running.
 // Hence it is highly recommended not to stop the channel client if there are open channels.
 type ChannelClient interface {
+	Registerer
 	ProposeChannel(context.Context, *client.ChannelProposal) (*client.Channel, error)
 	Handle(client.ProposalHandler, client.UpdateHandler)
 	Channel(channel.ID) (*client.Channel, error)
