@@ -184,7 +184,8 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	if err != nil {
 		return nil, err
 	}
-
+	partAddrs := []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr}
+	parts := []string{"self", peerAlias}
 	proposal := &pclient.ChannelProposal{
 		ChallengeDuration: challengeDurSecs,
 		Nonce:             nonce(),
@@ -192,18 +193,20 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 		AppDef:            app.Def,
 		InitData:          app.Data,
 		InitBals:          allocations,
-		PeerAddrs:         []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr},
+		PeerAddrs:         partAddrs,
 	}
 	pch, err := s.ChClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		return nil, err
 	}
 
-	ch := NewChannel(pch)
+	ch := NewChannel(pch, openingBals.Currency, parts)
 	s.Channels[ch.ID] = ch
 
 	return ch, nil
 }
+
+func (s *Session) GetChannels() []*channel.State
 
 // makeAllocation makes an allocation or the given BalInfo and channel asset.
 // It errors, if the amounts in the balInfo are invalid.
