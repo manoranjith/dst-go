@@ -207,6 +207,18 @@ func (s *Session) SubChProposals(notifier ProposalNotifier) error {
 	return nil
 }
 
+func (s *Session) UnsubChProposals(notifier ProposalNotifier) error {
+	s.Logger.Debug("Received request: session.UnsubChProposals")
+	s.Lock()
+	defer s.Unlock()
+
+	if s.proposalNotifier == nil {
+		return errors.New("")
+	}
+	s.proposalNotifier = nil
+	return nil
+}
+
 func BytesToHex(b []byte) string {
 	return fmt.Sprintf("0x%x", b)
 }
