@@ -36,6 +36,7 @@ type (
 		Channels            map[string]*Channel
 		proposalNotifier    ProposalNotifier
 		proposalNotifsCache []ProposalNotification
+		proposalResponders  map[string]ProposalResponder
 
 		sync.RWMutex
 	}
@@ -46,6 +47,14 @@ type (
 	}
 
 	ProposalNotifier func(ProposalNotification)
+
+	//go:generate mockery -name ProposalResponder -output ./internal/mocks
+
+	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
+	ProposalResponder interface {
+		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
+		Reject(ctx context.Context, reason string) error
+	}
 )
 
 func New(cfg Config) (*Session, error) {
@@ -216,6 +225,35 @@ func (s *Session) UnsubChProposals(notifier ProposalNotifier) error {
 		return errors.New("")
 	}
 	s.proposalNotifier = nil
+	return nil
+}
+
+func (s *Session) RespondChProposal(proposalID string, accept bool) error {
+	s.Logger.Debug("Received request: session.RespondChProposal")
+	s.Lock()
+	defer s.Unlock()
+
+	responder, ok := s.proposalResponders[proposalID]
+	if !ok {
+		return errors.New("")
+	}
+
+	switch accept {
+	case true:
+		pch, err := responder.Accept(context.TODO(), pclient.ProposalAcc{Participant: s.User.OffChainAddr})
+		if err != nil {
+			return errors.New("")
+		}
+
+		ch := NewChannel(pch)
+		s.Channels[ch.ID] = ch
+
+	case false:
+		err := responder.Reject(context.TODO(), "rejected by user")
+		if err != nil {
+			return errors.New("")
+		}
+	}
 	return nil
 }
 
