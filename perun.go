@@ -159,3 +159,10 @@ type WalletBackend interface {
 	NewWallet(keystore string, password string) (wallet.Wallet, error)
 	UnlockAccount(wallet.Wallet, wallet.Address) (wallet.Account, error)
 } // nolint:gofumpt // unknown error, maybe a false positive
+
+type NodeAPI interface {
+	Time() int64
+	GetConfig() map[string]string
+	Help() []string
+	OpenSession(configFile string) (ID string, _ error)
+}

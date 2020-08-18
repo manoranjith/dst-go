@@ -65,6 +65,8 @@ func (n *Node) Time() int64 {
 	return time.Now().UTC().Unix()
 }
 
+// TODO: Change return type to map. Or is it easier to store a map and directly return it everytime
+// ?
 func (n *Node) GetConfig() Config {
 	n.Logger.Debug("Received request: node.GetConfig")
 	return n.cfg
