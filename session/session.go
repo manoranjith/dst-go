@@ -46,8 +46,9 @@ type (
 	}
 
 	ChProposalNotif struct {
-		Proposal *pclient.ChannelProposal
-		Expiry   int64
+		ProposalID string
+		Proposal   *pclient.ChannelProposal
+		Expiry     int64
 	}
 
 	ChProposalNotifier func(ChProposalNotif)
@@ -236,19 +237,20 @@ func nonce() *big.Int {
 }
 
 func (s *Session) HandleProposal(req *pclient.ChannelProposal, res *pclient.ProposalResponder) {
-	s.Logger.Debug("Callback: HandleProposal")
+	s.Logger.Debug("SDK Callback: HandleProposal")
 	s.Lock()
 	defer s.Unlock()
 	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
 
 	proposalID := req.SessID()
+	proposalIDStr := BytesToHex(proposalID[:])
 	entry := ChProposalResponderEntry{
 		chProposalResponder: res,
 		Expiry:              expiry,
 	}
-	s.chProposalResponders[BytesToHex(proposalID[:])] = entry
+	s.chProposalResponders[proposalIDStr] = entry
 
-	notif := ChProposalNotif{req, expiry}
+	notif := ChProposalNotif{proposalIDStr, req, expiry}
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
 	} else {
