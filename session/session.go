@@ -50,11 +50,13 @@ type (
 	ChProposalNotif struct {
 		ProposalID string
 		Proposal   *pclient.ChannelProposal
+		Parts      []string
 		Expiry     int64
 	}
 
 	ChProposalResponderEntry struct {
 		chProposalResponder ChProposalResponder
+		Parts               []string
 		Expiry              int64
 	}
 
@@ -206,7 +208,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	return ch, nil
 }
 
-func (s *Session) GetChannels() []*channel.State
+// func (s *Session) GetChannels() []*channel.State
 
 // makeAllocation makes an allocation or the given BalInfo and channel asset.
 // It errors, if the amounts in the balInfo are invalid.
@@ -275,15 +277,25 @@ func (s *Session) HandleProposal(req *pclient.ChannelProposal, res *pclient.Prop
 	defer s.Unlock()
 	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
 
+	parts := make([]string, len(req.PeerAddrs))
+	for i := range req.PeerAddrs {
+		p, ok := s.Contacts.ReadByOffChainAddr(req.PeerAddrs[i])
+		if !ok {
+			// reject proposal
+		}
+		parts[i] = p.Alias
+	}
+
 	proposalID := req.SessID()
 	proposalIDStr := BytesToHex(proposalID[:])
 	entry := ChProposalResponderEntry{
 		chProposalResponder: res,
+		Parts:               parts,
 		Expiry:              expiry,
 	}
 	s.chProposalResponders[proposalIDStr] = entry
 
-	notif := ChProposalNotif{proposalIDStr, req, expiry}
+	notif := ChProposalNotif{proposalIDStr, req, parts, expiry}
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
 	} else {
@@ -344,7 +356,9 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 			return errors.New("")
 		}
 
-		ch := NewChannel(pch)
+		// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
+		// Currently assume ETH as the currency for incoming channel.
+		ch := NewChannel(pch, currency.ETH, entry.Parts)
 		s.Channels[ch.ID] = ch
 
 	case false:
