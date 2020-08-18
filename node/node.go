@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"perun.network/go-perun/pkg/sync"
 	"perun.network/go-perun/wallet"
 
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
@@ -19,6 +20,8 @@ type Node struct {
 
 	Adjudicator, AssetHolder wallet.Address
 	Sessions                 map[string]*session.Session // Map of session ID to session instances.
+
+	sync.Mutex
 }
 
 func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node, error) {
@@ -79,6 +82,8 @@ func (n *Node) Help() []string {
 // The node also initializes a logger for the generated session that logs along with its session id.
 func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 	n.Logger.Debug("Received request: node.OpenSession")
+	n.Lock()
+	defer n.Unlock()
 
 	sessionCfg, err := session.ParseConfig(configFile)
 	if err != nil {
