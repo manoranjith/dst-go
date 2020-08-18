@@ -2,6 +2,9 @@ package node
 
 // Config represents the configuratio parameters for the node.
 type Config struct {
+	LogLevel string
+	LogFile  string
+
 	ChainAddr       string   // Address of the default blockchain node used by the perun node.
 	AdjudicatorAddr string   // Address of the default Adjudicator contract used by the perun node.
 	AssetAddr       string   // Address of the default Asset Holder contract used by the perun node.
