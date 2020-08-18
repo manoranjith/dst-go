@@ -22,6 +22,8 @@ import (
 	"github.com/pkg/errors"
 	"perun.network/go-perun/wire/net"
 	"perun.network/go-perun/wire/net/simple"
+
+	"github.com/hyperledger-labs/perun-node"
 )
 
 // Backend is an off-chain communication backend that implements `CommBackend` for
@@ -44,7 +46,7 @@ func (b Backend) NewListener(addr string) (net.Listener, error) {
 // It uses the dial timeout configured during backend initialization.
 // If the duration was set to zero, this program will not use any timeout.
 // However default timeouts based on the operating system will still apply.
-func (b Backend) NewDialer() net.Dialer {
+func (b Backend) NewDialer() perun.Dialer {
 	return simple.NewTCPDialer(b.dialerTimeout)
 }
 
