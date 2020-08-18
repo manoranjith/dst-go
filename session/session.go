@@ -1,6 +1,8 @@
 package session
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -59,9 +61,20 @@ func New(cfg Config) (*Session, error) {
 	}
 
 	return &Session{
-		// A mechanism for session id. user offchain address + time.
-		ID:       user.OffChainAddrString,
+		ID:       calcSessionID(user.OffChainAddr.Bytes()),
 		ChClient: chClient,
 		Contacts: contacts,
 	}, nil
+}
+
+// calcSessionID calculates the sessionID as sha256 hash over the off-chain address of the user and
+// the current UTC time.
+//
+// A time dependant parameter is required to ensure the same user is able to open multiple sessions
+// with the same node and have unique session id for each.
+func calcSessionID(userOffChainAddr []byte) string {
+	h := sha256.New()
+	h.Write(userOffChainAddr)
+	h.Write([]byte(time.Now().UTC().String()))
+	return fmt.Sprintf("%x", h.Sum(nil))
 }
