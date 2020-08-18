@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
@@ -125,9 +126,32 @@ func (ch *Channel) UnsubChUpdates() error {
 	return nil
 }
 
-// func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
-// 	ch.Logger.Debug("Received request channel.RespondChUpdate")
-// 	ch.Lock()
-// 	defer ch.Unlock()
+func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
+	ch.Logger.Debug("Received request channel.RespondChUpdate")
+	ch.Lock()
+	defer ch.Unlock()
 
-// }
+	entry, ok := ch.chUpdateResponders[chUpdateID]
+	delete(ch.chUpdateResponders, chUpdateID)
+	if !ok {
+		return errors.New("")
+	}
+	if entry.Expiry > time.Now().UTC().Unix() {
+		return errors.New("")
+	}
+
+	switch accept {
+	case true:
+		err := entry.chUpdateResponder.Accept(context.TODO())
+		if err != nil {
+			return errors.New("")
+		}
+
+	case false:
+		err := entry.chUpdateResponder.Reject(context.TODO(), "rejected by user")
+		if err != nil {
+			return errors.New("")
+		}
+	}
+	return nil
+}
