@@ -137,6 +137,28 @@ func calcSessionID(userOffChainAddr []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
+func (s *Session) AddContact(peer perun.Peer) error {
+	s.Logger.Debug("Received request: session.AddContact")
+	s.Lock()
+	defer s.Unlock()
+
+	err := s.Contacts.Write(peer.Alias, peer)
+	// TODO, check and name errors.
+	return err
+}
+
+func (s *Session) GetContact(alias string) (perun.Peer, error) {
+	s.Logger.Debug("Received request: session.GetContact")
+	s.RLock()
+	defer s.RUnlock()
+
+	peer, isPresent := s.Contacts.ReadByAlias(alias)
+	if !isPresent {
+		return perun.Peer{}, errors.New("")
+	}
+	return peer, nil
+}
+
 func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (*Channel, error) {
 	s.Logger.Debug("Received request: session.OpenCh")
 	s.Lock()
