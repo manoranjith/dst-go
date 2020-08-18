@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"perun.network/go-perun/pkg/sync"
 	"perun.network/go-perun/wallet"
 
@@ -25,7 +24,7 @@ type Node struct {
 }
 
 func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node, error) {
-	logger, err := log.NewLogger(logLevel, logFile)
+	err := log.InitLogger(logLevel, logFile)
 	if err != nil {
 		return nil, errors.WithMessage(err, "initializing logger for node")
 	}
@@ -42,7 +41,7 @@ func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node
 	}
 
 	return &Node{
-		Logger: logger,
+		Logger: log.NewLoggerWithField("node", 1), // ID of the node is always 1.
 		cfg: Config{
 			LogLevel: logLevel,
 			LogFile:  logFile,
@@ -96,14 +95,6 @@ func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 	if err != nil {
 		return "", err
 	}
-
-	// TODO: (mano) Add func in log module to preserve log level when deriving logger with field.
-	// Ignore error from ParseLevel as the log level was already used to init node logger without errors.
-	level, _ := logrus.ParseLevel(n.cfg.LogFile)
-	sessionLogger := n.Logger.WithField("session", s.ID)
-	sessionLogger.Level = level
-	s.Logger = sessionLogger
-
 	n.Sessions[s.ID] = s
 	return s.ID, nil
 }

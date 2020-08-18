@@ -57,9 +57,10 @@ func New(cfg Config) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	sessionID := calcSessionID(user.OffChainAddr.Bytes())
 	return &Session{
-		ID:       calcSessionID(user.OffChainAddr.Bytes()),
+		Logger:   log.NewLoggerWithField("session-id", sessionID),
+		ID:       sessionID,
 		ChClient: chClient,
 		Contacts: contacts,
 	}, nil
