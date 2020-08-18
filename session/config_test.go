@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/session"
 )
 
@@ -32,7 +33,7 @@ var (
 	// ${PROJECT_ROOT}/testdata/session/valid.yaml
 	testCfg = session.Config{
 		User: session.UserConfig{
-			Alias:       "self",
+			Alias:       perun.OwnAlias,
 			OnChainAddr: "0x9282681723920798983380581376586951466585",
 			OnChainWallet: session.WalletConfig{
 				KeystorePath: "./test-keystore-on-chain",
