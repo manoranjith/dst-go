@@ -49,6 +49,7 @@ type (
 
 	ChProposalNotif struct {
 		ProposalID string
+		Currency   string
 		Proposal   *pclient.ChannelProposal
 		Parts      []string
 		Expiry     int64
@@ -71,8 +72,11 @@ type (
 	ChCloseNotifier func(ChCloseNotif)
 
 	ChCloseNotif struct {
-		ChState *channel.State
-		Expiry  int64
+		ChannelID string
+		Currency  string
+		ChState   *channel.State
+		Parts     []string
+		Error     string
 	}
 )
 
@@ -215,9 +219,10 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	s.Channels[ch.ID] = ch
 
 	return ChannelInfo{
-		Currency: openingBals.Currency,
-		State:    pch.State().Clone(),
-		Parts:    parts,
+		ChannelID: ch.ID,
+		Currency:  openingBals.Currency,
+		State:     pch.State().Clone(),
+		Parts:     parts,
 	}, nil
 }
 
@@ -260,7 +265,7 @@ func nonce() *big.Int {
 	return val
 }
 
-func (s *Session) GetChannels() []ChannelInfo {
+func (s *Session) GetChs() []ChannelInfo {
 	s.Logger.Debug("Received request: session.GetChannels")
 	s.Lock()
 	defer s.Unlock()
@@ -269,9 +274,10 @@ func (s *Session) GetChannels() []ChannelInfo {
 	i := 0
 	for _, ch := range s.Channels {
 		chInfos[i] = ChannelInfo{
-			Currency: ch.Currency,
-			State:    ch.Channel.State().Clone(),
-			Parts:    ch.Parts,
+			ChannelID: ch.ID,
+			Currency:  ch.Currency,
+			State:     ch.Channel.State().Clone(),
+			Parts:     ch.Parts,
 		}
 		i++
 	}
@@ -343,7 +349,15 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 	s.chProposalResponders[proposalIDStr] = entry
 
-	notif := ChProposalNotif{proposalIDStr, chProposal, parts, expiry}
+	// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
+	// Currently assume ETH as the currency for incoming channel.
+	notif := ChProposalNotif{
+		ProposalID: proposalIDStr,
+		Currency:   currency.ETH,
+		Proposal:   chProposal,
+		Parts:      parts,
+		Expiry:     expiry,
+	}
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
 	} else {

@@ -67,9 +67,10 @@ type (
 	}
 
 	ChannelInfo struct {
-		Currency string
-		State    *channel.State
-		Parts    []string // List of Alias of channel participants.
+		ChannelID string
+		Currency  string
+		State     *channel.State
+		Parts     []string // List of Alias of channel participants.
 	}
 
 	BalInfo struct {
@@ -180,9 +181,10 @@ func (ch *Channel) GetInfo() ChannelInfo {
 	ch.RLock()
 	defer ch.RUnlock()
 	return ChannelInfo{
-		Currency: ch.Currency,
-		State:    ch.Channel.State().Clone(),
-		Parts:    ch.Parts,
+		ChannelID: ch.ID,
+		Currency:  ch.Currency,
+		State:     ch.Channel.State().Clone(),
+		Parts:     ch.Parts,
 	}
 }
 

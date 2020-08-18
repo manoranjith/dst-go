@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"perun.network/go-perun/apps/payment"
 	"perun.network/go-perun/pkg/sync"
 	"perun.network/go-perun/wallet"
 
@@ -30,16 +31,23 @@ func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node
 		return nil, errors.WithMessage(err, "initializing logger for node")
 	}
 
-	// TODO: Currently, credentials are required to initialize a chain backend
+	// TODO: (mano) Currently, credentials are required to initialize a chain backend
 	// for connecting to node and validating contracts. So store the config.
-	adjudicator, err := ethereum.NewWalletBackend().ParseAddr(adjudicatorAddr)
+	wb := ethereum.NewWalletBackend()
+	adjudicator, err := wb.ParseAddr(adjudicatorAddr)
 	if err != nil {
 		return nil, errors.WithMessage(err, "default adjudicator addres")
 	}
-	asset, err := ethereum.NewWalletBackend().ParseAddr(assetAddr)
+	asset, err := wb.ParseAddr(assetAddr)
 	if err != nil {
 		return nil, errors.WithMessage(err, "default adjudicator addres")
 	}
+
+	emptyAddr, err := wb.ParseAddr("0x0")
+	if err != nil {
+		return nil, errors.WithMessage(err, "parsing empty address for app def")
+	}
+	payment.SetAppDef(emptyAddr) // dummy app def.
 
 	return &Node{
 		Logger: log.NewLoggerWithField("node", 1), // ID of the node is always 1.
