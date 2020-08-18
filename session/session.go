@@ -248,6 +248,9 @@ func (s *Session) HandleUpdate(update pclient.ChannelUpdate, resp *pclient.Updat
 	if !ok {
 		// reject as unknown channel
 	}
+	if update.State.IsFinal {
+		ch.LockState = ChannelFinalized
+	}
 
 	entry := ChUpdateResponderEntry{
 		chUpdateResponder: resp,

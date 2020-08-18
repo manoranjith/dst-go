@@ -153,5 +153,9 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 			return errors.New("")
 		}
 	}
+
+	if ch.LockState == ChannelFinalized {
+		// Init close, wait to see how to do this.
+	}
 	return nil
 }
