@@ -3,6 +3,7 @@ package session
 import (
 	"crypto/sha256"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -18,17 +19,22 @@ import (
 // Session ...
 type Session struct {
 	log.Logger
+
 	ID       string
 	ChClient perun.ChannelClient
 	Contacts perun.Contacts
+
+	sync.RWMutex
 }
 
 func New(cfg Config) (*Session, error) {
 	wb := ethereum.NewWalletBackend()
+
 	user, err := NewUnlockedUser(wb, cfg.User)
 	if err != nil {
 		return nil, err
 	}
+
 	if cfg.User.CommType != "tcp" {
 		return nil, errors.New("unsupported comm type, use only tcp")
 	}
