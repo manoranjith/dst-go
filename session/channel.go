@@ -11,6 +11,7 @@ import (
 	pclient "perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/log"
 )
 
@@ -99,7 +100,8 @@ func (ch *Channel) SendChUpdate(stateUpdater StateUpdater) error {
 
 	err := ch.Channel.UpdateBy(context.TODO(), stateUpdater)
 	if err != nil {
-		return errors.Wrap(err, "")
+		ch.Logger.Error("Sending channel update:", err)
+		return perun.GetAPIError(err)
 	}
 	return nil
 }
@@ -110,7 +112,7 @@ func (ch *Channel) SubChUpdates(notifier ChUpdateNotifier) error {
 	defer ch.Unlock()
 
 	if ch.chUpdateNotifier != nil {
-		return errors.New("")
+		return perun.ErrSubAlreadyExists
 	}
 	ch.chUpdateNotifier = notifier
 
@@ -129,7 +131,7 @@ func (ch *Channel) UnsubChUpdates() error {
 	defer ch.Unlock()
 
 	if ch.chUpdateNotifier == nil {
-		return errors.New("")
+		return perun.ErrNoActiveSub
 	}
 	ch.chUpdateNotifier = nil
 	return nil
@@ -141,12 +143,15 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	defer ch.Unlock()
 
 	entry, ok := ch.chUpdateResponders[chUpdateID]
-	delete(ch.chUpdateResponders, chUpdateID)
 	if !ok {
-		return errors.New("")
+		ch.Logger.Error(perun.ErrUnknownUpdateID, chUpdateID)
+		return perun.ErrUnknownChannelID
 	}
+	// TODO: Check if delete or defer delete
+	delete(ch.chUpdateResponders, chUpdateID)
 	if entry.Expiry > time.Now().UTC().Unix() {
-		return errors.New("")
+		ch.Logger.Error(perun.ErrRespTimeoutExpired)
+		return perun.ErrRespTimeoutExpired
 	}
 
 	switch accept {
@@ -159,7 +164,8 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	case false:
 		err := entry.chUpdateResponder.Reject(context.TODO(), "rejected by user")
 		if err != nil {
-			return errors.New("")
+			ch.Logger.Error("Accepting channe update", err)
+			return perun.GetAPIError(err)
 		}
 	}
 
@@ -194,10 +200,10 @@ func (ch *Channel) Close() (*channel.State, error) {
 	}
 	err := ch.Channel.Settle(context.TODO())
 	if cerr := ch.Channel.Close(); err != nil {
-		return nil, errors.New("")
+		ch.Logger.Error("Settling channel", err)
+		return nil, perun.GetAPIError(err)
 	} else if cerr != nil {
-		_ = cerr
-		ch.Logger.Error("Closing channel:", err.Error())
+		ch.Logger.Error("Closing channel", cerr)
 	}
 	return ch.Channel.State(), nil
 }
