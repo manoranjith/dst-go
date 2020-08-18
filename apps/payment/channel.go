@@ -23,26 +23,25 @@ type (
 )
 
 func SendPayChUpdate(ch *session.Channel, payee, amount string) error {
-
-	f, err := newPayChStateUpdater(ch, ch.Currency, payee, amount)
+	chInfo := ch.GetInfo()
+	f, err := newUpdater(chInfo.State, chInfo.Currency, chInfo.Parts, payee, amount)
 	if err != nil {
 		return err
 	}
 	return ch.SendChUpdate(f)
 }
 
-func newPayChStateUpdater(ch *session.Channel, chCurrency, payee, amount string) (session.StateUpdater, error) {
+func newUpdater(currState *channel.State, chCurrency, parts []string, payee, amount string) (session.StateUpdater, error) {
 	parsedAmount, err := currency.NewParser(chCurrency).Parse(amount)
 	if err != nil {
-		ch.Logger.Error("Parsing amount", err)
 		return nil, perun.ErrInvalidAmount
 	}
 
 	// find index
 	var payerIdx, payeeIdx int
-	if ch.Parts[0] == payee {
+	if parts[0] == payee {
 		payeeIdx = 0
-	} else if ch.Parts[1] == payee {
+	} else if parts[1] == payee {
 		payeeIdx = 1
 	} else {
 		return nil, perun.ErrInvalidPayee
@@ -50,7 +49,7 @@ func newPayChStateUpdater(ch *session.Channel, chCurrency, payee, amount string)
 	payerIdx = payeeIdx ^ 1
 
 	// check sufficient balance
-	bals := ch.Channel.State().Allocation.Clone().Balances[0]
+	bals := currState.Allocation.Clone().Balances[0]
 	bals[payerIdx].Sub(bals[payerIdx], parsedAmount)
 	bals[payeeIdx].Add((bals[payeeIdx]), parsedAmount)
 	if bals[payerIdx].Sign() == -1 {
