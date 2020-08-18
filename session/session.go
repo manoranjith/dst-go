@@ -85,7 +85,7 @@ func New(cfg Config) (*Session, error) {
 	}
 
 	if cfg.User.CommType != "tcp" {
-		return nil, errors.New("unsupported comm type, use only tcp")
+		return nil, perun.ErrUnsupportedCommType
 	}
 	commBackend := tcp.NewTCPBackend(30 * time.Second)
 
@@ -118,16 +118,16 @@ func New(cfg Config) (*Session, error) {
 
 func initContacts(contactsType, contactsURL string, wb perun.WalletBackend, ownInfo perun.Peer) (perun.Contacts, error) {
 	if contactsType != "yaml" {
-		return nil, errors.New("unsupported contacts provider type, use only yaml")
+		return nil, perun.ErrUnsupportedContactsType
 	}
 	contacts, err := contactsyaml.New(contactsURL, wb)
 	if err != nil {
 		return nil, err
 	}
 
-	// user.Peer.Alias = contactsyaml.OwnAlias
+	ownInfo.Alias = perun.OwnAlias
 	err = contacts.Write(perun.OwnAlias, ownInfo)
-	if err != nil && !errors.Is(err, contactsyaml.ErrPeerExists) {
+	if err != nil && !errors.Is(err, perun.ErrPeerExists) {
 		return nil, errors.Wrap(err, "registering own user in contacts")
 	}
 	return contacts, nil
@@ -151,8 +151,10 @@ func (s *Session) AddContact(peer perun.Peer) error {
 	defer s.Unlock()
 
 	err := s.Contacts.Write(peer.Alias, peer)
-	// TODO, check and name errors.
-	return err
+	if err != nil {
+		s.Logger.Error(err)
+	}
+	return perun.GetAPIError(err)
 }
 
 func (s *Session) GetContact(alias string) (perun.Peer, error) {
@@ -162,11 +164,14 @@ func (s *Session) GetContact(alias string) (perun.Peer, error) {
 
 	peer, isPresent := s.Contacts.ReadByAlias(alias)
 	if !isPresent {
-		return perun.Peer{}, errors.New("")
+		s.Logger.Error(perun.ErrUnknownAlias)
+		return perun.Peer{}, perun.ErrUnknownAlias
 	}
 	return peer, nil
 }
 
+// OpenCh
+// Panics if the random number generator doesn't return a valid nonce.
 func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error) {
 	s.Logger.Debug("Received request: session.OpenCh")
 	s.Lock()
@@ -174,17 +179,20 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 
 	peer, isPresent := s.Contacts.ReadByAlias(peerAlias)
 	if !isPresent {
-		return ChannelInfo{}, errors.New("") // return error.... to add known errors.
+		s.Logger.Error(perun.ErrUnknownAlias)
+		return ChannelInfo{}, perun.ErrUnknownAlias
 	}
 	s.ChClient.Register(peer.OffChainAddr, peer.CommAddr)
 
 	if !currency.IsSupported(openingBals.Currency) {
-		return ChannelInfo{}, errors.New("") // return error.... to add known errors.
+		s.Logger.Error(perun.ErrUnsupportedCurrency.Error)
+		return ChannelInfo{}, perun.ErrUnsupportedCurrency
 	}
 
 	allocations, err := makeAllocation(openingBals, peerAlias, nil) // Pass a proper asset.
 	if err != nil {
-		return ChannelInfo{}, err
+		s.Logger.Error(err)
+		return ChannelInfo{}, perun.GetAPIError(err)
 	}
 	partAddrs := []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr}
 	parts := []string{perun.OwnAlias, peer.Alias}
@@ -199,7 +207,8 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	}
 	pch, err := s.ChClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
-		return ChannelInfo{}, err
+		s.Logger.Error(err)
+		return ChannelInfo{}, perun.GetAPIError(err)
 	}
 
 	ch := NewChannel(pch, openingBals.Currency, parts)
@@ -210,6 +219,45 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 		State:    pch.State().Clone(),
 		Parts:    parts,
 	}, nil
+}
+
+// makeAllocation makes an allocation or the given BalInfo and channel asset.
+// It errors, if the amounts in the balInfo are invalid.
+// It arranges balances in this order: own, peer.
+// PeerAddrs in channel also should be in the same order.
+func makeAllocation(bals BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
+	ownBalAmount, ok := bals.Bals[perun.OwnAlias]
+	if !ok {
+		return nil, errors.Wrap(perun.ErrInvalidAmount, "for self")
+	}
+	peerBalAmount, ok := bals.Bals[peerAlias]
+	if !ok {
+		return nil, errors.Wrap(perun.ErrInvalidAmount, "for peer")
+	}
+
+	ownBal, err := currency.NewParser(bals.Currency).Parse(ownBalAmount)
+	if err != nil {
+		return nil, errors.WithMessage(perun.ErrInvalidAmount, "for self"+err.Error())
+	}
+	peerBal, err := currency.NewParser(bals.Currency).Parse(peerBalAmount)
+	if err != nil {
+		return nil, errors.WithMessage(perun.ErrInvalidAmount, "for peer"+err.Error())
+	}
+	return &channel.Allocation{
+		Assets:   []channel.Asset{chAsset},
+		Balances: [][]*big.Int{{ownBal, peerBal}},
+	}, nil
+}
+
+func nonce() *big.Int {
+	max := new(big.Int)
+	max.Exp(big.NewInt(2), big.NewInt(256), nil).Sub(max, big.NewInt(1))
+
+	val, err := rand.Int(rand.Reader, max)
+	if err != nil {
+		panic(err)
+	}
+	return val
 }
 
 func (s *Session) GetChannels() []ChannelInfo {
@@ -228,47 +276,6 @@ func (s *Session) GetChannels() []ChannelInfo {
 		i++
 	}
 	return chInfos
-
-}
-
-// makeAllocation makes an allocation or the given BalInfo and channel asset.
-// It errors, if the amounts in the balInfo are invalid.
-// It arranges balances in this order: own, peer.
-// PeerAddrs in channel also should be in the same order.
-func makeAllocation(bals BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
-	ownBalAmount, ok := bals.Bals[perun.OwnAlias]
-	if !ok {
-		return nil, errors.New("") // no entry for self in bals
-	}
-	peerBalAmount, ok := bals.Bals[peerAlias]
-	if !ok {
-		return nil, errors.New("") // no entry for peer in bals
-	}
-
-	ownBal, err := currency.NewParser(bals.Currency).Parse(ownBalAmount)
-	if err != nil {
-		return nil, errors.WithMessage(err, "own balance")
-	}
-	peerBal, err := currency.NewParser(bals.Currency).Parse(peerBalAmount)
-	if err != nil {
-		return nil, errors.WithMessage(err, "peer balance")
-	}
-	return &channel.Allocation{
-		Assets:   []channel.Asset{chAsset},
-		Balances: [][]*big.Int{{ownBal, peerBal}},
-	}, nil
-}
-
-func nonce() *big.Int {
-	max := new(big.Int)
-	max.Exp(big.NewInt(2), big.NewInt(256), nil).Sub(max, big.NewInt(1))
-
-	val, err := rand.Int(rand.Reader, max)
-	if err != nil {
-		_ = err
-		// log.Panic("Could not create nonce")
-	}
-	return val
 }
 
 func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
@@ -279,11 +286,18 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 
 	channelID := chUpdate.State.ID
 	channelIDStr := fmt.Sprintf("%s_%d", BytesToHex(channelID[:]), chUpdate.State.Version)
+
 	ch, ok := s.Channels[channelIDStr]
 	if !ok {
-		// reject as unknown channel
+		s.Logger.Info("Received update for unknown channel", channelIDStr)
+		err := responder.Reject(context.TODO(), "unknown channel")
+		if err != nil {
+			s.Logger.Error("Rejecting update for unknown channel", err)
+		}
 	}
+
 	if chUpdate.State.IsFinal {
+		ch.Logger.Info("Received final update, channel is finalized.")
 		ch.LockState = ChannelFinalized
 	}
 
@@ -311,7 +325,11 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	for i := range chProposal.PeerAddrs {
 		p, ok := s.Contacts.ReadByOffChainAddr(chProposal.PeerAddrs[i])
 		if !ok {
-			// reject proposal
+			s.Logger.Info("Received channel proposal from unknonwn peer", chProposal.PeerAddrs[i].String())
+			err := responder.Reject(context.TODO(), "unknonwn peer")
+			if err != nil {
+				s.Logger.Error("Rejecting channel proposal from unknown peer", err)
+			}
 		}
 		parts[i] = p.Alias
 	}
@@ -339,7 +357,7 @@ func (s *Session) SubChProposals(notifier ChProposalNotifier) error {
 	defer s.Unlock()
 
 	if s.chProposalNotifier != nil {
-		return errors.New("")
+		return perun.ErrSubAlreadyExists
 	}
 	s.chProposalNotifier = notifier
 
@@ -359,7 +377,7 @@ func (s *Session) UnsubChProposals() error {
 	defer s.Unlock()
 
 	if s.chProposalNotifier == nil {
-		return errors.New("")
+		return perun.ErrNoActiveSub
 	}
 	s.chProposalNotifier = nil
 	return nil
@@ -371,19 +389,20 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 	defer s.Unlock()
 
 	entry, ok := s.chProposalResponders[chProposalID]
-	delete(s.chProposalResponders, chProposalID)
 	if !ok {
-		return errors.New("")
+		return perun.ErrUnknownProposalID
 	}
+	delete(s.chProposalResponders, chProposalID)
 	if entry.Expiry > time.Now().UTC().Unix() {
-		return errors.New("")
+		return perun.ErrRespTimeoutExpired
 	}
 
 	switch accept {
 	case true:
 		pch, err := entry.chProposalResponder.Accept(context.TODO(), pclient.ProposalAcc{Participant: s.User.OffChainAddr})
 		if err != nil {
-			return errors.New("")
+			s.Logger.Error("Accepting channel proposal", err)
+			return perun.GetAPIError(err)
 		}
 
 		// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
@@ -394,7 +413,8 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 	case false:
 		err := entry.chProposalResponder.Reject(context.TODO(), "rejected by user")
 		if err != nil {
-			return errors.New("")
+			s.Logger.Error("Rejecting channel proposal", err)
+			return perun.GetAPIError(err)
 		}
 	}
 	return nil
@@ -406,7 +426,7 @@ func (s *Session) SubChCloses(notifier ChCloseNotifier) error {
 	defer s.Unlock()
 
 	if s.chCloseNotifier != nil {
-		return errors.New("")
+		return perun.ErrSubAlreadyExists
 	}
 	s.chCloseNotifier = notifier
 
@@ -426,7 +446,7 @@ func (s *Session) UnsubChCloses() error {
 	defer s.Unlock()
 
 	if s.chCloseNotifier == nil {
-		return errors.New("")
+		return perun.ErrNoActiveSub
 	}
 	s.chCloseNotifier = nil
 	return nil

@@ -1,6 +1,8 @@
 package perun
 
-import "errors"
+import (
+	"errors"
+)
 
 // APIError represents the errors that will communicated via the user API.
 type APIError string
@@ -32,7 +34,7 @@ var (
 	ErrUnsupportedCommType     = APIError("Communication protocol not supported by this node instance.")
 
 	ErrInsufficientBal     = APIError("Insufficient balance in sender account.")
-	ErrInvalidAmount       = APIError("Invalid amount string.")
+	ErrInvalidAmount       = APIError("Invalid amount string")
 	ErrInvalidConfig       = APIError("Invalid configuration detected.")
 	ErrInvalidOffChainAddr = APIError("Invalid off-chain address string.")
 

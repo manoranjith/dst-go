@@ -7,6 +7,7 @@ import (
 	"perun.network/go-perun/pkg/sync"
 	"perun.network/go-perun/wallet"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
 	"github.com/hyperledger-labs/perun-node/log"
 	"github.com/hyperledger-labs/perun-node/session"
@@ -88,7 +89,8 @@ func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 
 	sessionCfg, err := session.ParseConfig(configFile)
 	if err != nil {
-		return "", err
+		n.Logger.Error(err)
+		return "", perun.ErrInvalidConfig
 	}
 	n.fillInSessionConfig(&sessionCfg)
 	s, err := session.New(sessionCfg)
