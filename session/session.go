@@ -167,24 +167,24 @@ func (s *Session) GetContact(alias string) (perun.Peer, error) {
 	return peer, nil
 }
 
-func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (*Channel, error) {
+func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error) {
 	s.Logger.Debug("Received request: session.OpenCh")
 	s.Lock()
 	defer s.Unlock()
 
 	peer, isPresent := s.Contacts.ReadByAlias(peerAlias)
 	if !isPresent {
-		return nil, errors.New("") // return error.... to add known errors.
+		return ChannelInfo{}, errors.New("") // return error.... to add known errors.
 	}
 	s.ChClient.Register(peer.OffChainAddr, peer.CommAddr)
 
 	if !currency.IsSupported(openingBals.Currency) {
-		return nil, errors.New("") // return error.... to add known errors.
+		return ChannelInfo{}, errors.New("") // return error.... to add known errors.
 	}
 
 	allocations, err := makeAllocation(openingBals, peerAlias, nil) // Pass a proper asset.
 	if err != nil {
-		return nil, err
+		return ChannelInfo{}, err
 	}
 	partAddrs := []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr}
 	parts := []string{"self", peerAlias}
@@ -199,16 +199,37 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	}
 	pch, err := s.ChClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
-		return nil, err
+		return ChannelInfo{}, err
 	}
 
 	ch := NewChannel(pch, openingBals.Currency, parts)
 	s.Channels[ch.ID] = ch
 
-	return ch, nil
+	return ChannelInfo{
+		Currency: openingBals.Currency,
+		State:    pch.State().Clone(),
+		Parts:    parts,
+	}, nil
 }
 
-// func (s *Session) GetChannels() []*channel.State
+func (s *Session) GetChannels() []ChannelInfo {
+	s.Logger.Debug("Received request: session.GetChannels")
+	s.Lock()
+	defer s.Unlock()
+
+	chInfos := make([]ChannelInfo, len(s.Channels))
+	i := 0
+	for _, ch := range s.Channels {
+		chInfos[i] = ChannelInfo{
+			Currency: ch.Currency,
+			State:    ch.Channel.State().Clone(),
+			Parts:    ch.Parts,
+		}
+		i++
+	}
+	return chInfos
+
+}
 
 // makeAllocation makes an allocation or the given BalInfo and channel asset.
 // It errors, if the amounts in the balInfo are invalid.
@@ -241,29 +262,29 @@ func nonce() *big.Int {
 	return val
 }
 
-func (s *Session) HandleUpdate(update pclient.ChannelUpdate, resp *pclient.UpdateResponder) {
+func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
 	s.Logger.Debug("SDK Callback: HandleUpdate")
 	s.Lock()
 	defer s.Unlock()
 	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
 
-	channelID := update.State.ID
-	channelIDStr := fmt.Sprintf("%s_%d", BytesToHex(channelID[:]), update.State.Version)
+	channelID := chUpdate.State.ID
+	channelIDStr := fmt.Sprintf("%s_%d", BytesToHex(channelID[:]), chUpdate.State.Version)
 	ch, ok := s.Channels[channelIDStr]
 	if !ok {
 		// reject as unknown channel
 	}
-	if update.State.IsFinal {
+	if chUpdate.State.IsFinal {
 		ch.LockState = ChannelFinalized
 	}
 
 	entry := ChUpdateResponderEntry{
-		chUpdateResponder: resp,
+		chUpdateResponder: responder,
 		Expiry:            expiry,
 	}
 	ch.chUpdateResponders[channelIDStr] = entry
 
-	notif := ChUpdateNotif{channelIDStr, &update, expiry}
+	notif := ChUpdateNotif{channelIDStr, &chUpdate, expiry}
 	if ch.chUpdateNotifier == nil {
 		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
 	} else {
@@ -271,31 +292,31 @@ func (s *Session) HandleUpdate(update pclient.ChannelUpdate, resp *pclient.Updat
 	}
 }
 
-func (s *Session) HandleProposal(req *pclient.ChannelProposal, res *pclient.ProposalResponder) {
+func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder) {
 	s.Logger.Debug("SDK Callback: HandleProposal")
 	s.Lock()
 	defer s.Unlock()
 	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
 
-	parts := make([]string, len(req.PeerAddrs))
-	for i := range req.PeerAddrs {
-		p, ok := s.Contacts.ReadByOffChainAddr(req.PeerAddrs[i])
+	parts := make([]string, len(chProposal.PeerAddrs))
+	for i := range chProposal.PeerAddrs {
+		p, ok := s.Contacts.ReadByOffChainAddr(chProposal.PeerAddrs[i])
 		if !ok {
 			// reject proposal
 		}
 		parts[i] = p.Alias
 	}
 
-	proposalID := req.SessID()
+	proposalID := chProposal.SessID()
 	proposalIDStr := BytesToHex(proposalID[:])
 	entry := ChProposalResponderEntry{
-		chProposalResponder: res,
+		chProposalResponder: responder,
 		Parts:               parts,
 		Expiry:              expiry,
 	}
 	s.chProposalResponders[proposalIDStr] = entry
 
-	notif := ChProposalNotif{proposalIDStr, req, parts, expiry}
+	notif := ChProposalNotif{proposalIDStr, chProposal, parts, expiry}
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
 	} else {
