@@ -45,7 +45,7 @@ func NewLogger(levelStr, logFile string) (Logger, error) {
 	if logFile == "" {
 		logger.SetOutput(os.Stdout)
 	} else {
-		f, err := os.OpenFile(filepath.Clean(logFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0600)
+		f, err := os.OpenFile(filepath.Clean(logFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -58,7 +58,6 @@ func NewLogger(levelStr, logFile string) (Logger, error) {
 		DisableLevelTruncation: true,
 	}})
 	return logger, nil
-
 }
 
 // customTextFormatter is defined to override default formating options for log entry.
