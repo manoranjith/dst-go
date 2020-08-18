@@ -24,40 +24,55 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Logger is a for now, a type alias of Logrus.FieldLogger that accecpts both logrus.Entry & logrus.Logger.
+var logger *logrus.Logger = nil
+
+// Logger is a for now, a type alias of Logrus.FieldLogger that defines broad interface for logging.
 type Logger = logrus.FieldLogger
 
-// NewLogger returns a logger set to the given level and log file.
-// Supported log levels are "error" and "info".
+// InitLogger sets the internal logger the given level and log file.
+// This function should be called exactly once and subsequent calls return an error.
 // Logs to stdout if logFile is an empty string.
-func NewLogger(levelStr, logFile string) (Logger, error) {
-	logger := logrus.New()
-
-	if levelStr != "info" && levelStr != "error" && levelStr != "debug" {
-		return nil, errors.New("Unsupported log level, use info or error")
+func InitLogger(levelStr, logFile string) error {
+	if logger != nil {
+		return errors.New("logger already initialized")
 	}
+
+	newLogger := logrus.New()
 	level, err := logrus.ParseLevel(levelStr)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
-	logger.SetLevel(level)
-
+	newLogger.SetLevel(level)
 	if logFile == "" {
-		logger.SetOutput(os.Stdout)
+		newLogger.SetOutput(os.Stdout)
 	} else {
 		f, err := os.OpenFile(filepath.Clean(logFile), os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
 		if err != nil {
-			return nil, errors.WithStack(err)
+			return errors.WithStack(err)
 		}
-		logger.SetOutput(f)
+		newLogger.SetOutput(f)
 	}
 
-	logger.SetFormatter(&customTextFormatter{logrus.TextFormatter{
+	newLogger.SetFormatter(&customTextFormatter{logrus.TextFormatter{
 		FullTimestamp:          true,
 		TimestampFormat:        "2006-01-02 15:04:05 Z0700",
 		DisableLevelTruncation: true,
 	}})
-	return logger, nil
+	logger = newLogger
+	return nil
+}
+
+// NewLoggerWithField returns a logger that logs with the given fields.
+// It is derived from the internal logger instance of this package and uses the same log level and log file.
+//
+// If the internal logger instance is not initialized before this call, it is initialized to "debug" level
+// and logs to the standard output (stdout).
+func NewLoggerWithField(key string, value interface{}) Logger {
+	if logger == nil {
+		InitLogger("debug", "") // nolint: errcheck, gosec	// err will always be nil in this case.
+	}
+	l := logger.WithField(key, value)
+	return l
 }
 
 // customTextFormatter is defined to override default formating options for log entry.
