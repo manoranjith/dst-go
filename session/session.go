@@ -45,20 +45,12 @@ type (
 		sync.RWMutex
 	}
 
+	ChProposalNotifier func(ChProposalNotif)
+
 	ChProposalNotif struct {
 		ProposalID string
 		Proposal   *pclient.ChannelProposal
 		Expiry     int64
-	}
-
-	ChProposalNotifier func(ChProposalNotif)
-
-	//go:generate mockery -name ProposalResponder -output ./internal/mocks
-
-	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
-	ChProposalResponder interface {
-		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
-		Reject(ctx context.Context, reason string) error
 	}
 
 	ChProposalResponderEntry struct {
@@ -66,12 +58,20 @@ type (
 		Expiry              int64
 	}
 
+	//go:generate mockery -name ProposalResponder -output ../internal/mocks
+
+	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
+	ChProposalResponder interface {
+		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
+		Reject(ctx context.Context, reason string) error
+	}
+
+	ChCloseNotifier func(ChCloseNotif)
+
 	ChCloseNotif struct {
 		ChState *channel.State
 		Expiry  int64
 	}
-
-	ChCloseNotifier func(ChCloseNotif)
 )
 
 func New(cfg Config) (*Session, error) {
@@ -236,6 +236,33 @@ func nonce() *big.Int {
 	return val
 }
 
+func (s *Session) HandleUpdate(update pclient.ChannelUpdate, resp *pclient.UpdateResponder) {
+	s.Logger.Debug("SDK Callback: HandleUpdate")
+	s.Lock()
+	defer s.Unlock()
+	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
+
+	channelID := update.State.ID
+	channelIDStr := fmt.Sprintf("%s_%d", BytesToHex(channelID[:]), update.State.Version)
+	ch, ok := s.Channels[channelIDStr]
+	if !ok {
+		// reject as unknown channel
+	}
+
+	entry := ChUpdateResponderEntry{
+		chUpdateResponder: resp,
+		Expiry:            expiry,
+	}
+	ch.chUpdateResponders[channelIDStr] = entry
+
+	notif := ChUpdateNotif{channelIDStr, &update, expiry}
+	if ch.chUpdateNotifier == nil {
+		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
+	} else {
+		ch.chUpdateNotifier(notif)
+	}
+}
+
 func (s *Session) HandleProposal(req *pclient.ChannelProposal, res *pclient.ProposalResponder) {
 	s.Logger.Debug("SDK Callback: HandleProposal")
 	s.Lock()
@@ -269,6 +296,7 @@ func (s *Session) SubChProposals(notifier ChProposalNotifier) error {
 	s.chProposalNotifier = notifier
 
 	// Send all cached notifications
+	// TODO: (mano) This works for gRPC, but change to send in background.
 	for i := len(s.chProposalNotifsCache) - 1; i >= 0; i-- {
 		s.chProposalNotifier(s.chProposalNotifsCache[0])
 		s.chProposalNotifsCache = s.chProposalNotifsCache[1 : i+1]
@@ -332,6 +360,7 @@ func (s *Session) SubChCloses(notifier ChCloseNotifier) error {
 	}
 	s.chCloseNotifier = notifier
 
+	// TODO: (mano) This works for gRPC, but change to send in background.
 	// Send all cached notifications
 	for i := len(s.chCloseNotifsCache); i > 0; i-- {
 		s.chCloseNotifier(s.chCloseNotifsCache[0])
