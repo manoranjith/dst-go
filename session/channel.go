@@ -28,6 +28,7 @@ type (
 		Channel   *client.Channel
 		LockState ChannelLockState
 		Currency  string
+		Peers     []string
 
 		chUpdateNotifier   ChUpdateNotifier
 		chUpdateNotifCache []ChUpdateNotif
@@ -64,6 +65,12 @@ type (
 		Data channel.Data
 	}
 
+	ChannelInfo struct {
+		Currency string
+		State    *channel.State
+		Parts    []string // List of Alias of channel participants.
+	}
+
 	BalInfo struct {
 		Currency string
 		Bals     map[string]string // Map of alias to balance.
@@ -72,12 +79,14 @@ type (
 	StateUpdater func(*channel.State)
 )
 
-func NewChannel(pch *client.Channel) *Channel {
+func NewChannel(pch *client.Channel, currency string, parts []string) *Channel {
 	channelID := pch.ID()
 	ch := &Channel{
 		ID:        BytesToHex(channelID[:]),
 		Channel:   pch,
 		LockState: ChannelOpen,
+		Currency:  currency,
+		Peers:     parts,
 	}
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.ID)
 	return ch
@@ -158,4 +167,33 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 		// Init close, wait to see how to do this.
 	}
 	return nil
+}
+
+func (ch *Channel) GetState() *channel.State {
+	ch.Logger.Debug("Received request channel.RespondChUpdate")
+	ch.RLock()
+	defer ch.RUnlock()
+	return ch.GetState().Clone()
+}
+
+func (ch *Channel) Close() (*channel.State, error) {
+	ch.Logger.Debug("Received request channel.RespondChUpdate")
+	ch.Lock()
+	defer ch.Unlock()
+
+	// Try to finalize state, so that channel can be settled collaboratively.
+	// If this fails, channel will still be settled but by registering the state on-chain
+	// and waiting for challenge duration to expire.
+	if err := ch.Channel.UpdateBy(nil, func(_ *channel.State) {}); err != nil {
+		ch.Logger.Info("Error when trying to finalize state for closing:", err)
+		ch.Logger.Info("Opting for non collaborative close")
+	}
+	err := ch.Channel.Settle(context.TODO())
+	if cerr := ch.Channel.Close(); err != nil {
+		return nil, errors.New("")
+	} else if cerr != nil {
+		_ = cerr
+		ch.Logger.Error("Closing channel:", err.Error())
+	}
+	return ch.Channel.State(), nil
 }
