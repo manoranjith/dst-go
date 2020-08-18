@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"perun.network/go-perun/wallet"
 
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
@@ -40,6 +41,9 @@ func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node
 	return &Node{
 		Logger: logger,
 		cfg: Config{
+			LogLevel: logLevel,
+			LogFile:  logFile,
+
 			ChainAddr:       chainAddr,
 			AdjudicatorAddr: adjudicatorAddr,
 			AssetAddr:       assetAddr,
@@ -68,6 +72,11 @@ func (n *Node) Help() []string {
 	return []string{}
 }
 
+// OpenSession opens a new session based on the given configuration.
+// Parameters to connect to the chain (chainURL, asset & adjudicator addresses) are optional.
+// If missing default values from the node will be used.
+//
+// The node also initializes a logger for the generated session that logs along with its session id.
 func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 	n.Logger.Debug("Received request: node.OpenSession")
 
@@ -76,12 +85,18 @@ func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 		return "", err
 	}
 	n.fillInSessionConfig(&sessionCfg)
-
 	s, err := session.New(sessionCfg)
 	if err != nil {
 		return "", err
 	}
-	s.Logger = n.Logger.WithField("session", s.ID)
+
+	// TODO: (mano) Add func in log module to preserve log level when deriving logger with field.
+	// Ignore error from ParseLevel as the log level was already used to init node logger without errors.
+	level, _ := logrus.ParseLevel(n.cfg.LogFile)
+	sessionLogger := n.Logger.WithField("session", s.ID)
+	sessionLogger.Level = level
+	s.Logger = sessionLogger
+
 	n.Sessions[s.ID] = s
 	return s.ID, nil
 }
