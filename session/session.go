@@ -273,14 +273,9 @@ func (s *Session) GetChs() []ChannelInfo {
 	chInfos := make([]ChannelInfo, len(s.Channels))
 	i := 0
 	for _, ch := range s.Channels {
-		chInfos[i] = ChannelInfo{
-			ChannelID: ch.ID,
-			Currency:  ch.Currency,
-			State:     ch.Channel.State().Clone(),
-			Parts:     ch.Parts,
-		}
-		i++
+		chInfos[i] = ch.GetInfo()
 	}
+	i++
 	return chInfos
 }
 
@@ -302,6 +297,19 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 		}
 	}
 
+	ch.Lock()
+	defer ch.Unlock()
+	ch.Logger.Debug("SDK Callback: Start processing")
+
+	err := validateUpdate(ch.Channel.State().Clone(), chUpdate.State.Clone())
+	if err != nil {
+		ch.Logger.Info("Received invalid update")
+		err := responder.Reject(context.TODO(), "invalid update")
+		if err != nil {
+			s.Logger.Error("Rejecting invalid update", err)
+		}
+	}
+
 	if chUpdate.State.IsFinal {
 		ch.Logger.Info("Received final update, channel is finalized.")
 		ch.LockState = ChannelFinalized
@@ -313,12 +321,42 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 	ch.chUpdateResponders[channelIDStr] = entry
 
-	notif := ChUpdateNotif{channelIDStr, &chUpdate, expiry}
+	notif := ChUpdateNotif{
+		UpdateID:  channelIDStr,
+		Currency:  ch.Currency,
+		CurrState: ch.Channel.State().Clone(),
+		Update:    &chUpdate,
+		Parts:     ch.Parts,
+		Expiry:    expiry,
+	}
 	if ch.chUpdateNotifier == nil {
 		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
+		ch.Logger.Debug("SDK Callback: Notification sent")
 	} else {
 		ch.chUpdateNotifier(notif)
+		ch.Logger.Debug("SDK Callback: Notification cached")
 	}
+}
+
+// Temporarily treat all channels as payment channels.
+// TODO: (mano) Fix it once support is added in the sdk.
+func validateUpdate(current, proposed *channel.State) error {
+
+	// check 1:
+	var oldSum, newSum *big.Int
+	oldBals := current.Allocation.Balances[0]
+	oldSum.Add(oldBals[0], oldBals[1])
+	newBals := proposed.Allocation.Balances[0]
+	newSum.Add(newBals[0], newBals[1])
+
+	if newSum.Cmp(oldSum) != 0 {
+		return errors.New("invalid update: sum of balances is not constant")
+	}
+
+	if newBals[0].Sign() == -1 || newBals[1].Sign() == -1 {
+		return errors.New("this update results in negative balance, hence not allowed")
+	}
+	return nil
 }
 
 func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder) {
@@ -360,8 +398,10 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
+		s.Logger.Debug("SDK Callback: Notification sent")
 	} else {
 		s.chProposalNotifier(notif)
+		s.Logger.Debug("SDK Callback: Notification cached")
 	}
 }
 
@@ -449,8 +489,8 @@ func (s *Session) SubChCloses(notifier ChCloseNotifier) error {
 	for i := len(s.chCloseNotifsCache); i > 0; i-- {
 		s.chCloseNotifier(s.chCloseNotifsCache[0])
 		s.chCloseNotifsCache = s.chCloseNotifsCache[1:i]
-	}
 
+	}
 	return nil
 }
 
