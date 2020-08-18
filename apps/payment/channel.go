@@ -47,6 +47,14 @@ func GetBalance(ch *session.Channel) session.BalInfo {
 	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
 }
 
+func ClosePayCh(ch *session.Channel) (session.BalInfo, error) {
+	chInfo, err := ch.Close()
+	if err != nil {
+		return session.BalInfo{}, err
+	}
+	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts), nil
+}
+
 func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amount string) (session.StateUpdater, error) {
 	parsedAmount, err := currency.NewParser(chCurrency).Parse(amount)
 	if err != nil {
