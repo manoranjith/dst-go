@@ -18,6 +18,7 @@ package perun
 
 import (
 	"context"
+	"math/big"
 
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence"
@@ -119,6 +120,13 @@ type Session struct {
 	User User
 
 	ChannelClient ChannelClient
+}
+
+// Currency represents a parser than can convert between string represetation of a currency and
+// their equivalent value in base unit represented as a big interger.
+type Currency interface {
+	Parse(string) (*big.Int, error)
+	Print(*big.Int) string
 }
 
 //go:generate mockery -name ChannelClient -output ./internal/mocks
