@@ -36,21 +36,21 @@ type (
 		Channels map[string]*Channel
 
 		chProposalNotifier    ChProposalNotifier
-		chProposalNotifsCache []ChProposalNotification
-		chProposalResponders  map[string]ChProposalResponder
+		chProposalNotifsCache []ChProposalNotif
+		chProposalResponders  map[string]ChProposalResponderEntry
 
 		chCloseNotifier    ChCloseNotifier
-		chCloseNotifsCache []ChCloseNotification
+		chCloseNotifsCache []ChCloseNotif
 
 		sync.RWMutex
 	}
 
-	ChProposalNotification struct {
-		proposal *pclient.ChannelProposal
-		expiry   int64
+	ChProposalNotif struct {
+		Proposal *pclient.ChannelProposal
+		Expiry   int64
 	}
 
-	ChProposalNotifier func(ChProposalNotification)
+	ChProposalNotifier func(ChProposalNotif)
 
 	//go:generate mockery -name ProposalResponder -output ./internal/mocks
 
@@ -60,12 +60,17 @@ type (
 		Reject(ctx context.Context, reason string) error
 	}
 
-	ChCloseNotification struct {
+	ChProposalResponderEntry struct {
+		chProposalResponder ChProposalResponder
+		Expiry              int64
+	}
+
+	ChCloseNotif struct {
 		ChState *channel.State
 		Expiry  int64
 	}
 
-	ChCloseNotifier func(ChCloseNotification)
+	ChCloseNotifier func(ChCloseNotif)
 )
 
 func New(cfg Config) (*Session, error) {
@@ -230,6 +235,27 @@ func nonce() *big.Int {
 	return val
 }
 
+func (s *Session) HandleProposal(req *pclient.ChannelProposal, res *pclient.ProposalResponder) {
+	s.Logger.Debug("Callback: HandleProposal")
+	s.Lock()
+	defer s.Unlock()
+	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
+
+	proposalID := req.SessID()
+	entry := ChProposalResponderEntry{
+		chProposalResponder: res,
+		Expiry:              expiry,
+	}
+	s.chProposalResponders[BytesToHex(proposalID[:])] = entry
+
+	notif := ChProposalNotif{req, expiry}
+	if s.chProposalNotifier == nil {
+		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
+	} else {
+		s.chProposalNotifier(notif)
+	}
+}
+
 func (s *Session) SubChProposals(notifier ChProposalNotifier) error {
 	s.Logger.Debug("Received request: session.SubChProposals")
 	s.Lock()
@@ -266,14 +292,18 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 	s.Lock()
 	defer s.Unlock()
 
-	responder, ok := s.chProposalResponders[chProposalID]
+	entry, ok := s.chProposalResponders[chProposalID]
+	delete(s.chProposalResponders, chProposalID)
 	if !ok {
+		return errors.New("")
+	}
+	if entry.Expiry > time.Now().UTC().Unix() {
 		return errors.New("")
 	}
 
 	switch accept {
 	case true:
-		pch, err := responder.Accept(context.TODO(), pclient.ProposalAcc{Participant: s.User.OffChainAddr})
+		pch, err := entry.chProposalResponder.Accept(context.TODO(), pclient.ProposalAcc{Participant: s.User.OffChainAddr})
 		if err != nil {
 			return errors.New("")
 		}
@@ -282,7 +312,7 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 		s.Channels[ch.ID] = ch
 
 	case false:
-		err := responder.Reject(context.TODO(), "rejected by user")
+		err := entry.chProposalResponder.Reject(context.TODO(), "rejected by user")
 		if err != nil {
 			return errors.New("")
 		}
