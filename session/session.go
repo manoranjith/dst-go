@@ -47,17 +47,9 @@ func New(cfg Config) (*Session, error) {
 		return nil, err
 	}
 
-	if cfg.ContactsType != "yaml" {
-		return nil, errors.New("unsupported contacts provider type, use only yaml")
-	}
-	contacts, err := contactsyaml.New(cfg.ContactsURL, wb)
+	contacts, err := initContacts(cfg.ContactsType, cfg.ContactsURL, wb, user.Peer)
 	if err != nil {
 		return nil, err
-	}
-	user.Peer.Alias = contactsyaml.OwnAlias
-	err = contacts.Write(contactsyaml.OwnAlias, user.Peer)
-	if err != nil && !errors.Is(err, contactsyaml.ErrPeerExists) {
-		return nil, errors.Wrap(err, "registering own user in contacts")
 	}
 
 	return &Session{
@@ -65,6 +57,23 @@ func New(cfg Config) (*Session, error) {
 		ChClient: chClient,
 		Contacts: contacts,
 	}, nil
+}
+
+func initContacts(contactsType, contactsURL string, wb perun.WalletBackend, self perun.Peer) (perun.Contacts, error) {
+	if contactsType != "yaml" {
+		return nil, errors.New("unsupported contacts provider type, use only yaml")
+	}
+	contacts, err := contactsyaml.New(contactsURL, wb)
+	if err != nil {
+		return nil, err
+	}
+
+	// user.Peer.Alias = contactsyaml.OwnAlias
+	err = contacts.Write(contactsyaml.OwnAlias, self)
+	if err != nil && !errors.Is(err, contactsyaml.ErrPeerExists) {
+		return nil, errors.Wrap(err, "registering own user in contacts")
+	}
+	return contacts, nil
 }
 
 // calcSessionID calculates the sessionID as sha256 hash over the off-chain address of the user and
