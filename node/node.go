@@ -70,12 +70,32 @@ func (n *Node) Help() []string {
 
 func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 	n.Logger.Debug("Received request: node.OpenSession")
-	// TODO: Parse and prepare the configuration.
-	s, err := session.New(session.Config{})
+
+	sessionCfg, err := session.ParseConfig(configFile)
+	if err != nil {
+		return "", err
+	}
+	n.fillInSessionConfig(&sessionCfg)
+
+	s, err := session.New(sessionCfg)
 	if err != nil {
 		return "", err
 	}
 	s.Logger = n.Logger.WithField("session", s.ID)
 	n.Sessions[s.ID] = s
 	return s.ID, nil
+}
+
+// fillInSessionConfig fills in the missing values in session configuration
+// for those fields that have a default value in the node config.
+func (n *Node) fillInSessionConfig(cfg *session.Config) {
+	if cfg.ChainURL == "" {
+		cfg.ChainURL = n.cfg.ChainAddr
+	}
+	if cfg.Asset == "" {
+		cfg.Asset = n.cfg.AssetAddr
+	}
+	if cfg.Adjudicator == "" {
+		cfg.Adjudicator = n.cfg.AdjudicatorAddr
+	}
 }
