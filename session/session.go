@@ -218,12 +218,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	ch := NewChannel(pch, openingBals.Currency, parts)
 	s.Channels[ch.ID] = ch
 
-	return ChannelInfo{
-		ChannelID: ch.ID,
-		Currency:  openingBals.Currency,
-		State:     pch.State().Clone(),
-		Parts:     parts,
-	}, nil
+	return ch.GetInfo(), nil
 }
 
 // makeAllocation makes an allocation or the given BalInfo and channel asset.

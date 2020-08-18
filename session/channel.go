@@ -183,6 +183,11 @@ func (ch *Channel) GetInfo() ChannelInfo {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.RLock()
 	defer ch.RUnlock()
+	return ch.getChInfo()
+}
+
+// This function assumes that caller has already locked the channel.
+func (ch *Channel) getChInfo() ChannelInfo {
 	return ChannelInfo{
 		ChannelID: ch.ID,
 		Currency:  ch.Currency,
@@ -191,7 +196,7 @@ func (ch *Channel) GetInfo() ChannelInfo {
 	}
 }
 
-func (ch *Channel) Close() (*channel.State, error) {
+func (ch *Channel) Close() (ChannelInfo, error) {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -203,12 +208,14 @@ func (ch *Channel) Close() (*channel.State, error) {
 		ch.Logger.Info("Error when trying to finalize state for closing:", err)
 		ch.Logger.Info("Opting for non collaborative close")
 	}
+
 	err := ch.Channel.Settle(context.TODO())
+
 	if cerr := ch.Channel.Close(); err != nil {
 		ch.Logger.Error("Settling channel", err)
-		return nil, perun.GetAPIError(err)
+		return ChannelInfo{}, perun.GetAPIError(err)
 	} else if cerr != nil {
 		ch.Logger.Error("Closing channel", cerr)
 	}
-	return ch.Channel.State(), nil
+	return ch.getChInfo(), nil
 }
