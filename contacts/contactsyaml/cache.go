@@ -17,19 +17,12 @@
 package contactsyaml
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
 	"perun.network/go-perun/wire"
 
 	"github.com/hyperledger-labs/perun-node"
-)
-
-// Setinal error constants.
-var (
-	ErrPeerExists           = fmt.Errorf("peer already present in contacts")
-	ErrPeerAliasUnavailable = fmt.Errorf("alias already used by another peer in contacts")
 )
 
 // contactsCache represents a cached list of contacts indexed by both alias and off-chain address.
@@ -94,9 +87,9 @@ func (c *contactsCache) Write(alias string, p perun.Peer) error {
 
 	if oldPeer, ok := c.peersByAlias[alias]; ok {
 		if PeerEqual(oldPeer, p) {
-			return errors.WithStack(ErrPeerExists)
+			return errors.WithStack(perun.ErrPeerExists)
 		}
-		return errors.WithStack(ErrPeerAliasUnavailable)
+		return errors.WithStack(perun.ErrPeerAliasInUse)
 	}
 
 	var err error
