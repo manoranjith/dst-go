@@ -116,11 +116,11 @@ func Test_Integ_OpenCh(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("add alice contact to bob")
-	aliceContact.Alias = "1"
+	aliceContact.Alias = aliceAlias
 	require.NoError(t, bob.AddContact(aliceContact))
 
 	t.Log("add bob contact to alice")
-	bobContact.Alias = "2"
+	bobContact.Alias = bobAlias
 	require.NoError(t, alice.AddContact(bobContact))
 
 	t.Log("")
@@ -131,11 +131,11 @@ func Test_Integ_OpenCh(t *testing.T) {
 	go func() {
 		aliceProposedBals := make(map[string]string)
 		aliceProposedBals["self"] = "1"
-		aliceProposedBals["2"] = "2"
+		aliceProposedBals[bobAlias] = "2"
 		aliceProposedBalInfo := session.BalInfo{
 			Currency: "ETH",
 			Bals:     aliceProposedBals}
-		payChInfo, err = paymentAppLib.OpenPayCh(alice, "2", aliceProposedBalInfo, challengeDurSecs)
+		payChInfo, err = paymentAppLib.OpenPayCh(alice, bobAlias, aliceProposedBalInfo, challengeDurSecs)
 		require.NoError(t, err)
 		t.Log("Alice opened payment channel", payChInfo)
 	}()

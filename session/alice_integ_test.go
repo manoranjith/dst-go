@@ -33,9 +33,11 @@ func newSession(t *testing.T, role string) *session.Session {
 
 	switch role {
 	case aliceAlias:
-		return newTestSession(t, aliceUser)
+		alice := newTestSession(t, aliceUser)
+		return alice
 	case bobAlias:
-		return newTestSession(t, bobUser)
+		bob := newTestSession(t, bobUser)
+		return bob
 	}
 	return nil
 }
