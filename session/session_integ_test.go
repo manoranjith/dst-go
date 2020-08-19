@@ -153,8 +153,32 @@ func Test_Integ_OpenCh(t *testing.T) {
 	err = sess2.RespondChProposal(notifFrom1.ProposalID, true)
 	fmt.Println("err", err)
 	require.NoError(t, err)
-	time.Sleep(5 * time.Second)
 
+	// OpenCh: 2 proposes
+	go func() {
+		sess2Bals := make(map[string]string)
+		sess2Bals["self"] = "2"
+		sess2Bals["1"] = "1"
+		chInfo, err := sess2.OpenCh("1", session.BalInfo{
+			Currency: "ETH",
+			Bals:     sess2Bals}, paymentApp, 15)
+		fmt.Println("err", err)
+		require.NoError(t, err)
+		fmt.Printf("\nsess2 chInfo %+v\n", chInfo)
+	}()
+
+	// SubChProposals: 1 Subs
+	var notifFrom2 session.ChProposalNotif
+	chProposalNotifierReject := func(notif session.ChProposalNotif) {
+		fmt.Printf("\nNotification from 2: %+v\n", notif)
+		notifFrom2 = notif
+	}
+	sess1.SubChProposals(chProposalNotifierReject)
+	time.Sleep(1 * time.Second)
+	// Accept the notification
+	err = sess1.RespondChProposal(notifFrom2.ProposalID, false)
+	fmt.Println("err", err)
+	require.NoError(t, err)
 	// GetChannel ID
 
 }
