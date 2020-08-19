@@ -320,7 +320,7 @@ func nonce() *big.Int {
 }
 
 func (s *Session) GetCh(channelID string) (*Channel, error) {
-	s.Logger.Debug("Internal call to get channel instance.")
+	s.Logger.Debug("Internal call to get channel instance.", channelID, "--")
 	s.Lock()
 	defer s.Unlock()
 

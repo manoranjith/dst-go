@@ -226,27 +226,37 @@ func Test_Integ_Role_Bob(t *testing.T) {
 
 	wg.Wait()
 
-	// balInfo = paymentAppLib.GetBalance(ch1)
-	// fmt.Printf("\n%+v", balInfo)
+	balInfo = paymentAppLib.GetBalance(ch1)
+	fmt.Printf("\n%+v", balInfo)
 
-	// // 2 closes the channel
-	// closingBal, err := paymentAppLib.ClosePayCh(ch2)
-	// require.NoError(t, err)
-	// fmt.Printf("\n%+v\n", closingBal)
-	// fmt.Println("channel was closed")
+	// 2 closes the channel
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		closingBal, err := paymentAppLib.ClosePayCh(ch1)
+		require.NoError(t, err)
+		fmt.Printf("\n%+v\n", closingBal)
+		fmt.Println("channel was closed")
+	}()
 
-	// // 1 subs from chClose
-	// var closeNotifFrom2 paymentAppLib.PayChCloseNotif
-	// PayChCloseNotifier := func(notif paymentAppLib.PayChCloseNotif) {
-	// 	fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
-	// 	closeNotifFrom2 = notif
-	// }
-	// err = paymentAppLib.SubPayChCloses(alice, PayChCloseNotifier)
-	// require.NoError(t, err)
+	// accept final update
+	notif2 = <-updateNotifFrom1
+	err = paymentAppLib.RespondPayChUpdate(ch2, notif2.UpdateID, true)
+	require.NoError(t, err)
+	fmt.Println("Update was accepted")
 
-	// time.Sleep(3 * time.Second)
-	// fmt.Printf("\n%+v\n", closeNotifFrom2)
-	// fmt.Println("channel notification was received")
+	// 1 subs from chClose
+	var closeNotifFrom2 = make(chan paymentAppLib.PayChCloseNotif)
+	PayChCloseNotifier := func(notif paymentAppLib.PayChCloseNotif) {
+		fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
+		closeNotifFrom2 <- notif
+	}
+	err = paymentAppLib.SubPayChCloses(alice, PayChCloseNotifier)
+	require.NoError(t, err)
+
+	fmt.Printf("\n%+v\n", <-closeNotifFrom2)
+	fmt.Println("channel notification was received")
+	wg.Wait()
 }
 
 func newTestSession(t *testing.T, testUser perun.User) *session.Session {
