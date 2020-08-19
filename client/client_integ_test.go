@@ -38,15 +38,8 @@ import (
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
-// Currently the integration setup is a quick hack requiring the user to manually start ganache-cli node. Command:
-//
-// ganache-cli --account="0x1fedd636dbc7e8d41a0622a2040b86fea8842cef9d4aa4c582aad00465b7acff,10000000000000000000"
-//
-// The account in the command corresponds to on-chain account of user when seeding the rand source with 1729.
-// Hence DO NOT CHANGE THE RAND SEED for integration tests in this package.
-//
-// The contracts will be deployed only during the first run of tests and will be resused in subsequent runs. This
-// saves ~0.3s of setup time in each run. Hence when running tests on development machine, START THE NODE ONLY ONCE.
+// Currently the integration setup is a quick hack requiring the user to manually start ganache-cli node.
+// See clienttest/integ_setup.go for the command to start the ganache-cli node.
 
 func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))

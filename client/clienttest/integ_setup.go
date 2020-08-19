@@ -34,15 +34,39 @@ import (
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
 )
 
-var TestChainURL = "ws://127.0.0.1:8545"
+// Command to start the ganache-cli node:
+//
+// ganache-cli --account="0x1fedd636dbc7e8d41a0622a2040b86fea8842cef9d4aa4c582aad00465b7acff,10000000000000000000" \
+//  --account="0xb0309c60b4622d3071fad3e16c2ce4d0b1e7758316c187754f4dd0cfb44ceb33,10000000000000000000"
+//
+// Ethereum address corresponding the above accounts: 0x8450c0055cB180C7C37A25866132A740b812937B and
+// 0xc4bA4815c82727554e4c12A07a139b74c6742322.
+//
+// The account in the command corresponds to the on-chain account of first two users when seeding the rand source
+// with 1729 and passing numParts as 0. If numParts is not zero, then the on-chain account is funded only for the first user.
+// Hence DO NOT CHANGE THE RAND SEED for integration tests in this package.
+//
+// The contracts will be deployed only during the first run of tests and will be resused in subsequent runs. This
+// saves ~0.3s of setup time in each run. Hence when running tests on development machine, START THE NODE ONLY ONCE.
+var (
+	TestChainURL               = "ws://127.0.0.1:8545"
+	adjudicatorAddr, assetAddr wallet.Address
+)
 
 // setup checks if valid contracts are deployed in pre-computed addresses, if not it deployes them.
 // Address generation mechanism in ethereum is used to pre-compute the contract address.
 func NewChainSetup(t *testing.T, onChainCred perun.Credential, chainURL string) (adjudicator, asset wallet.Address) {
 	require.Truef(t, isBlockchainRunning(chainURL), "cannot connect to ganache-cli node at "+chainURL)
 
-	adjudicator = ethwallet.AsWalletAddr(crypto.CreateAddress(ethwallet.AsEthAddr(onChainCred.Addr), 0))
-	asset = ethwallet.AsWalletAddr(crypto.CreateAddress(ethwallet.AsEthAddr(onChainCred.Addr), 1))
+	if adjudicatorAddr == nil && assetAddr == nil {
+		adjudicator = ethwallet.AsWalletAddr(crypto.CreateAddress(ethwallet.AsEthAddr(onChainCred.Addr), 0))
+		asset = ethwallet.AsWalletAddr(crypto.CreateAddress(ethwallet.AsEthAddr(onChainCred.Addr), 1))
+		adjudicatorAddr = adjudicator
+		assetAddr = asset
+	} else {
+		adjudicator = adjudicatorAddr
+		asset = assetAddr
+	}
 
 	chain, err := ethereum.NewChainBackend(chainURL, 10*time.Second, onChainCred)
 	require.NoError(t, err)
