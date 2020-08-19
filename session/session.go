@@ -350,7 +350,8 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
 
 	channelID := chUpdate.State.ID
-	channelIDStr := fmt.Sprintf("%s_%d", BytesToHex(channelID[:]), chUpdate.State.Version)
+	channelIDStr := BytesToHex(channelID[:])
+	updateID := fmt.Sprintf("%s_%d", BytesToHex(channelID[:]), chUpdate.State.Version)
 
 	ch, ok := s.Channels[channelIDStr]
 	if !ok {
@@ -358,44 +359,49 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 		return
 	}
 
-	ch.Lock()
-	defer ch.Unlock()
+	s.Logger.Debug("Waiting for lock")
+	// ch.Lock()
+	// defer ch.Unlock()
 	ch.Logger.Debug("SDK Callback: Start processing")
 
-	err := validateUpdate(ch.Channel.State().Clone(), chUpdate.State.Clone())
-	if err != nil {
-		ch.Logger.Info("Received invalid update")
-		err := responder.Reject(context.TODO(), "invalid update")
-		if err != nil {
-			s.Logger.Error("Rejecting invalid update", err)
-		}
-	}
+	// err := validateUpdate(ch.Channel.State().Clone(), chUpdate.State.Clone())
+	// if err != nil {
+	// 	ch.Logger.Info("Received invalid update")
+	// 	err := responder.Reject(context.TODO(), "invalid update")
+	// 	if err != nil {
+	// 		s.Logger.Error("Rejecting invalid update", err)
+	// 	}
+	// }
 
 	if chUpdate.State.IsFinal {
 		ch.Logger.Info("Received final update, channel is finalized.")
 		ch.LockState = ChannelFinalized
 	}
+	ch.Logger.Info("Received non final update.")
 
 	entry := ChUpdateResponderEntry{
 		chUpdateResponder: responder,
 		Expiry:            expiry,
 	}
-	ch.chUpdateResponders[channelIDStr] = entry
+	ch.chUpdateResponders[updateID] = entry
 
+	ch.Logger.Info("Registereed responder.")
 	notif := ChUpdateNotif{
-		UpdateID:  channelIDStr,
-		Currency:  ch.Currency,
-		CurrState: ch.Channel.State().Clone(),
-		Update:    &chUpdate,
-		Parts:     ch.Parts,
-		Expiry:    expiry,
+		UpdateID: updateID,
+		Currency: ch.Currency,
+		// CurrState: ch.Channel.State().Clone(),
+		Update: &chUpdate,
+		Parts:  ch.Parts,
+		Expiry: expiry,
 	}
 	if ch.chUpdateNotifier == nil {
+		ch.Logger.Debug("going to cache")
 		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
-		ch.Logger.Debug("SDK Callback: Notification sent")
-	} else {
-		ch.chUpdateNotifier(notif)
 		ch.Logger.Debug("SDK Callback: Notification cached")
+	} else {
+		ch.Logger.Debug("going to send")
+		ch.chUpdateNotifier(notif)
+		ch.Logger.Debug("SDK Callback: Notification sent")
 	}
 }
 

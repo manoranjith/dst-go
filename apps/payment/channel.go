@@ -20,6 +20,7 @@ type (
 	PayChUpdateNotifier func(PayChUpdateNotif)
 
 	PayChUpdateNotif struct {
+		UpdateID     string
 		ProposedBals session.BalInfo
 		Version      string
 		Final        bool
@@ -91,6 +92,7 @@ func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amo
 func SubPayChUpdates(ch *session.Channel, notifier PayChUpdateNotifier) error {
 	return ch.SubChUpdates(func(notif session.ChUpdateNotif) {
 		notifier(PayChUpdateNotif{
+			UpdateID:     notif.UpdateID,
 			ProposedBals: balsFromState(notif.Currency, notif.Update.State, notif.Parts),
 			Version:      fmt.Sprintf("%d", notif.Update.State.Version),
 			Final:        notif.Update.State.IsFinal,
