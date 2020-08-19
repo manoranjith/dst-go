@@ -214,7 +214,7 @@ func Test_Integ_OpenCh(t *testing.T) {
 	err = paymentAppLib.SubPayChUpdates(ch2, PayChUpdateNotifAccept)
 	time.Sleep(1 * time.Second)
 
-	err = paymentAppLib.RespondToPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
+	err = paymentAppLib.RespondPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
 	require.NoError(t, err)
 	fmt.Println("Update was accepted")
 
