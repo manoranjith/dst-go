@@ -228,18 +228,34 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	return ch.GetInfo(), nil
 }
 
-// func (s *Session) HandleClose(chID string, err error) {
-// 	ch.Logger.Debug("SDK Callback: Channel watcher returned.")
+func (s *Session) HandleClose(chID string, err error) {
+	s.Logger.Debug("SDK Callback: Channel watcher returned.")
 
-// 	// Might be a mutex messup... check later.
-// 	ch := s.Channels[channelIDStr]
-// 	ch.Lock()
-// 	defer ch.Unlock()
+	// Might be a mutex messup... check later.
+	ch := s.Channels[chID]
+	ch.Lock()
+	defer ch.Unlock()
 
-// 	if ch.LockState != ChannelClosed {
-// 		/// Send close notification
-// 	}
-// }
+	chInfo := ch.getChInfo()
+	notif := ChCloseNotif{
+		ChannelID: chInfo.ChannelID,
+		Currency:  chInfo.Currency,
+		ChState:   chInfo.State,
+		Parts:     chInfo.Parts,
+		Error:     err.Error(),
+	}
+
+	if ch.LockState != ChannelClosed {
+		ch.LockState = ChannelClosed
+		if s.chCloseNotifier == nil {
+			s.chCloseNotifsCache = append(s.chCloseNotifsCache, notif)
+			s.Logger.Debug("SDK Callback: Notification sent")
+		} else {
+			s.chCloseNotifier(notif)
+			s.Logger.Debug("SDK Callback: Notification cached")
+		}
+	}
+}
 
 // makeAllocation makes an allocation or the given BalInfo and channel asset.
 // It errors, if the amounts in the balInfo are invalid.
@@ -353,11 +369,9 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 }
 
-// Temporarily treat all channels as payment channels.
+// For now, treat all channels as payment channels.
 // TODO: (mano) Fix it once support is added in the sdk.
 func validateUpdate(current, proposed *channel.State) error {
-
-	// check 1:
 	var oldSum, newSum *big.Int
 	oldBals := current.Allocation.Balances[0]
 	oldSum.Add(oldBals[0], oldBals[1])
