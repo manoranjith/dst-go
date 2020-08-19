@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -230,6 +231,10 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	pch, err := s.ChClient.ProposeChannel(context.TODO(), proposal)
 	if err != nil {
 		s.Logger.Error(err)
+		// TODO: (mano) Use errors.Is here once a sentinal error is defined in the sdk.
+		if strings.Contains(err.Error(), "channel proposal rejected") {
+			err = perun.ErrPeerRejected
+		}
 		return ChannelInfo{}, perun.GetAPIError(err)
 	}
 
@@ -280,11 +285,11 @@ func (s *Session) HandleClose(chID string, err error) {
 func makeAllocation(bals BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
 	ownBalAmount, ok := bals.Bals[perun.OwnAlias]
 	if !ok {
-		return nil, errors.Wrap(perun.ErrInvalidAmount, "for self")
+		return nil, errors.Wrap(perun.ErrMissingBalance, "for self")
 	}
 	peerBalAmount, ok := bals.Bals[peerAlias]
 	if !ok {
-		return nil, errors.Wrap(perun.ErrInvalidAmount, "for peer")
+		return nil, errors.Wrap(perun.ErrMissingBalance, "for peer")
 	}
 
 	ownBal, err := currency.NewParser(bals.Currency).Parse(ownBalAmount)
