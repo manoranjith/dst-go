@@ -19,6 +19,8 @@
 package clienttest
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -64,4 +66,15 @@ func deployContracts(t *testing.T, chain perun.ChainBackend) (adjudicator, asset
 	asset, err = chain.DeployAsset(adjudicator)
 	require.NoError(t, err)
 	return adjudicator, asset
+}
+
+func NewDatabaseDir(t *testing.T) (dir string) {
+	databaseDir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(databaseDir); err != nil {
+			t.Logf("Error in removing the file in test cleanup - %v", err)
+		}
+	})
+	return databaseDir
 }

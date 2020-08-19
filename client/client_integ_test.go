@@ -65,7 +65,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	// TODO: (mano) Test if handle and lister are running as expected.
 
 	t.Run("happy", func(t *testing.T) {
-		cfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		cfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		client, err := client.NewEthereumPaymentClient(cfg, user, tcp.NewTCPBackend(5*time.Second))
 		assert.NoError(t, err)
 		assert.NoError(t, client.Close())
@@ -73,7 +73,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 
 	t.Run("err_invalid_listener", func(t *testing.T) {
 		invalidCfg := cfg
-		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		invalidCfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 
 		commBackend := &mocks.CommBackend{}
 		commBackend.On("NewListener", mock.Anything).Return(nil, errors.New("error for test"))
@@ -85,7 +85,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 
 	t.Run("err_invalid_chain_url", func(t *testing.T) {
 		invalidCfg := cfg
-		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		invalidCfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		invalidCfg.Chain.URL = "invalid-url"
 
 		_, err := client.NewEthereumPaymentClient(invalidCfg, user, tcp.NewTCPBackend(5*time.Second))
@@ -95,7 +95,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 
 	t.Run("err_malformed_asset_addr", func(t *testing.T) {
 		invalidCfg := cfg
-		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		invalidCfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		invalidCfg.Chain.Asset = "invalid-addr"
 
 		_, err := client.NewEthereumPaymentClient(invalidCfg, user, tcp.NewTCPBackend(5*time.Second))
@@ -105,7 +105,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 
 	t.Run("err_malformed_adj_addr", func(t *testing.T) {
 		invalidCfg := cfg
-		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		invalidCfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		invalidCfg.Chain.Adjudicator = "invalid-addr"
 
 		_, err := client.NewEthereumPaymentClient(invalidCfg, user, tcp.NewTCPBackend(5*time.Second))
@@ -115,7 +115,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 
 	t.Run("err_invalid_adjudicator", func(t *testing.T) {
 		invalidCfg := cfg
-		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		invalidCfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		randomAddr := ethereumtest.NewRandomAddress(prng)
 		invalidCfg.Chain.Adjudicator = randomAddr.String()
 
@@ -126,7 +126,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 
 	t.Run("err_invalid_asset", func(t *testing.T) {
 		invalidCfg := cfg
-		invalidCfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		invalidCfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		randomAddr := ethereumtest.NewRandomAddress(prng)
 		invalidCfg.Chain.Asset = randomAddr.String()
 
@@ -136,7 +136,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	})
 
 	t.Run("err_invalid_on_chain_password", func(t *testing.T) {
-		cfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		cfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		invalidUser := user
 		ws := ethereumtest.NewWalletSetup(t, prng, 0)
 		invalidUser.OnChain.Wallet = ws.Wallet
@@ -148,7 +148,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	})
 
 	t.Run("err_invalid_off_chain_password", func(t *testing.T) {
-		cfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		cfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		invalidUser := user
 		ws := ethereumtest.NewWalletSetup(t, prng, 0)
 		invalidUser.OffChain.Wallet = ws.Wallet
@@ -160,7 +160,7 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	})
 
 	t.Run("err_invalid_comm_addr", func(t *testing.T) {
-		cfg.DatabaseDir = newDatabaseDir(t) // start with empty persistence dir each time.
+		cfg.DatabaseDir = clienttest.NewDatabaseDir(t) // start with empty persistence dir each time.
 		invalidUser := user
 		invalidUser.CommAddr = "invalid-addr"
 		_, err := client.NewEthereumPaymentClient(cfg, invalidUser, tcp.NewTCPBackend(5*time.Second))
@@ -187,15 +187,4 @@ func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	})
 
 	// TODO: (mano) Faulty Persistence data and Reconnection errors.
-}
-
-func newDatabaseDir(t *testing.T) (dir string) {
-	databaseDir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		if err := os.RemoveAll(databaseDir); err != nil {
-			t.Logf("Error in removing the file in test cleanup - %v", err)
-		}
-	})
-	return databaseDir
 }
