@@ -23,6 +23,13 @@ import (
 	"github.com/hyperledger-labs/perun-node/log"
 )
 
+var walletBackend perun.WalletBackend
+
+func init() {
+	// This can be overridden (only) in tests by calling the SetWalletBackend function.
+	walletBackend = ethereum.NewWalletBackend()
+}
+
 type (
 	// Session ...
 	Session struct {
@@ -81,7 +88,7 @@ type (
 )
 
 func New(cfg Config) (*Session, error) {
-	wb := ethereum.NewWalletBackend()
+	wb := walletBackend
 
 	user, err := NewUnlockedUser(wb, cfg.User)
 	if err != nil {
@@ -98,6 +105,7 @@ func New(cfg Config) (*Session, error) {
 			Adjudicator: cfg.Adjudicator,
 			Asset:       cfg.Asset,
 			URL:         cfg.ChainURL,
+			ConnTimeout: cfg.ChainConnTimeout,
 		},
 		DatabaseDir: cfg.DatabaseDir,
 	}
