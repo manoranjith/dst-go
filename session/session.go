@@ -111,13 +111,15 @@ func New(cfg Config) (*Session, error) {
 		return nil, err
 	}
 	sessionID := calcSessionID(user.OffChainAddr.Bytes())
-	return &Session{
+	sess := &Session{
 		Logger:   log.NewLoggerWithField("session-id", sessionID),
 		ID:       sessionID,
 		ChClient: chClient,
 		Contacts: contacts,
 		Channels: make(map[string]*Channel),
-	}, nil
+	}
+	chClient.Handle(sess, sess) // Init handlers
+	return sess, nil
 }
 
 func initContacts(contactsType, contactsURL string, wb perun.WalletBackend, ownInfo perun.Peer) (perun.Contacts, error) {
@@ -218,8 +220,26 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	ch := NewChannel(pch, openingBals.Currency, parts)
 	s.Channels[ch.ID] = ch
 
+	go func(s *Session, chID string) {
+		err := pch.Watch()
+		s.HandleClose(chID, err)
+	}(s, ch.ID)
+
 	return ch.GetInfo(), nil
 }
+
+// func (s *Session) HandleClose(chID string, err error) {
+// 	ch.Logger.Debug("SDK Callback: Channel watcher returned.")
+
+// 	// Might be a mutex messup... check later.
+// 	ch := s.Channels[channelIDStr]
+// 	ch.Lock()
+// 	defer ch.Unlock()
+
+// 	if ch.LockState != ChannelClosed {
+// 		/// Send close notification
+// 	}
+// }
 
 // makeAllocation makes an allocation or the given BalInfo and channel asset.
 // It errors, if the amounts in the balInfo are invalid.
