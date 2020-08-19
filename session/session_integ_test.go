@@ -26,16 +26,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/phayes/freeport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"perun.network/go-perun/apps/payment"
+
 	"github.com/hyperledger-labs/perun-node"
 	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
-	"github.com/phayes/freeport"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/apps/payment"
 )
 
 var (
@@ -159,6 +160,8 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	require.NoError(t, err)
 	t.Log("Bob unsubscribed to payment proposal notifications")
 
+	wg.Wait()
+
 	t.Log("")
 	t.Log("=====Completed channel proposal & accept sequence=====")
 	t.Log("")
@@ -189,34 +192,39 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	// fmt.Println("err", err)
 	// require.NoError(t, err)
 
-	// t.Log("Alice: Getting channel object from session")
-	// ch1, err := alice.GetCh(payChInfo.ChannelID)
-	// require.NoError(t, err)
+	t.Log("Alice: Getting channel object from session")
+	ch1, err := alice.GetCh(payChInfo.ChannelID)
+	require.NoError(t, err)
 
-	// t.Log("Bob: Getting channel object from session")
-	// ch2, err := bob.GetCh(payChInfo.ChannelID)
-	// require.NoError(t, err)
+	t.Log("Bob: Getting channel object from session")
+	ch2, err := bob.GetCh(payChInfo.ChannelID)
+	require.NoError(t, err)
 
-	// t.Log("Alice: Getting balance")
-	// balInfo := paymentAppLib.GetBalance(ch1)
-	// t.Log("Alice: Got Balance -", balInfo)
+	t.Log("Alice: Getting balance")
+	balInfo := paymentAppLib.GetBalance(ch1)
+	t.Log("Alice: Got Balance -", balInfo)
 
-	// go func() {
-	// 	err = paymentAppLib.SendPayChUpdate(ch1, "2", "0.5")
-	// 	require.NoError(t, err)
-	// }()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = paymentAppLib.SendPayChUpdate(ch1, "bob", "0.5")
+		require.NoError(t, err)
+	}()
 
-	// var updateNotifFrom1 paymentAppLib.PayChUpdateNotif
-	// PayChUpdateNotifAccept := func(notif paymentAppLib.PayChUpdateNotif) {
-	// 	fmt.Printf("\n Update Notification from 1: %+v\n", notif)
-	// 	updateNotifFrom1 = notif
-	// }
-	// err = paymentAppLib.SubPayChUpdates(ch2, PayChUpdateNotifAccept)
-	// time.Sleep(1 * time.Second)
+	var updateNotifFrom1 = make(chan paymentAppLib.PayChUpdateNotif)
+	PayChUpdateNotifAccept := func(notif paymentAppLib.PayChUpdateNotif) {
+		fmt.Printf("\n Update Notification from 1: %+v\n", notif)
+		updateNotifFrom1 <- notif
+	}
+	err = paymentAppLib.SubPayChUpdates(ch2, PayChUpdateNotifAccept)
+	time.Sleep(1 * time.Second)
 
-	// err = paymentAppLib.RespondPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
-	// require.NoError(t, err)
-	// fmt.Println("Update was accepted")
+	notif2 := <-updateNotifFrom1
+	err = paymentAppLib.RespondPayChUpdate(ch2, notif2.UpdateID, true)
+	require.NoError(t, err)
+	fmt.Println("Update was accepted")
+
+	wg.Wait()
 
 	// balInfo = paymentAppLib.GetBalance(ch1)
 	// fmt.Printf("\n%+v", balInfo)
@@ -239,7 +247,6 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	// time.Sleep(3 * time.Second)
 	// fmt.Printf("\n%+v\n", closeNotifFrom2)
 	// fmt.Println("channel notification was received")
-	wg.Wait()
 }
 
 func newTestSession(t *testing.T, testUser perun.User) *session.Session {
