@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/phayes/freeport"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"perun.network/go-perun/apps/payment"
@@ -166,31 +167,42 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	t.Log("=====Completed channel proposal & accept sequence=====")
 	t.Log("")
 
-	// // OpenCh: 2 proposes
-	// go func() {
-	// 	sess2Bals := make(map[string]string)
-	// 	sess2Bals["self"] = "2"
-	// 	sess2Bals["1"] = "1"
-	// 	chInfo, err := sess2.OpenCh("1", session.BalInfo{
-	// 		Currency: "ETH",
-	// 		Bals:     sess2Bals}, paymentApp, 15)
-	// 	fmt.Println("err", err)
-	// 	require.NoError(t, err)
-	// 	fmt.Printf("\nsess2 chInfo %+v\n", chInfo)
-	// }()
+	// OpenCh: 2 proposes
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
 
-	// // SubChProposals: 1 Subs
-	// var notifFrom2 session.ChProposalNotif
-	// chProposalNotifierReject := func(notif session.ChProposalNotif) {
-	// 	fmt.Printf("\nNotification from 2: %+v\n", notif)
-	// 	notifFrom2 = notif
-	// }
-	// sess1.SubChProposals(chProposalNotifierReject)
-	// time.Sleep(1 * time.Second)
-	// // Accept the notification
-	// err = sess1.RespondChProposal(notifFrom2.ProposalID, false)
-	// fmt.Println("err", err)
-	// require.NoError(t, err)
+		aliceProposedBals := make(map[string]string)
+		aliceProposedBals["self"] = "1"
+		aliceProposedBals[aliceAlias] = "2"
+		aliceProposedBalInfo := session.BalInfo{
+			Currency: "ETH",
+			Bals:     aliceProposedBals}
+		_, err = paymentAppLib.OpenPayCh(bob, aliceAlias, aliceProposedBalInfo, challengeDurSecs)
+		require.True(t, errors.Is(err, perun.ErrPeerRejected))
+		t.Log(" payment channel rejected by peer")
+
+	}()
+	propNotif2 := make(chan paymentAppLib.PayChProposalNotif)
+	proposalNotifier2 := func(notif paymentAppLib.PayChProposalNotif) {
+		propNotif2 <- notif
+	}
+	err = paymentAppLib.SubPayChProposals(alice, proposalNotifier2)
+	require.NoError(t, err)
+	t.Log("Alice subscribed to payment proposal notifications")
+
+	notif3 := <-propNotif2
+	t.Log("Alice received payment channel proposal notification", notif3)
+
+	err = paymentAppLib.RespondPayChProposal(alice, notif3.ProposalID, false)
+	require.NoError(t, err)
+	t.Log("Alice accepted payment channel proposal")
+
+	err = paymentAppLib.UnsubPayChProposals(alice)
+	require.NoError(t, err)
+	t.Log("Alice unsubscribed to payment proposal notifications")
+
+	wg.Wait()
 
 	t.Log("Alice: Getting channel object from session")
 	ch1, err := alice.GetCh(payChInfo.ChannelID)
