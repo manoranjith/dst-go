@@ -211,7 +211,7 @@ func (ch *Channel) Close() (ChannelInfo, error) {
 	// Try to finalize state, so that channel can be settled collaboratively.
 	// If this fails, channel will still be settled but by registering the state on-chain
 	// and waiting for challenge duration to expire.
-	if err := ch.Channel.UpdateBy(nil, func(_ *channel.State) {}); err != nil {
+	if err := ch.Channel.UpdateBy(context.TODO(), func(_ *channel.State) {}); err != nil {
 		ch.Logger.Info("Error when trying to finalize state for closing:", err)
 		ch.Logger.Info("Opting for non collaborative close")
 	}
