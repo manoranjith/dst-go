@@ -125,32 +125,45 @@ func Test_Integ_OpenCh(t *testing.T) {
 	bobContact.Alias = "2"
 	require.NoError(t, alice.AddContact(bobContact))
 
-	// OpenCh: 1 proposes
-	t.Log("Starting channel proposal response sequence")
+	t.Log("")
+	t.Log("=====Starting channel proposal & accept sequence=====")
+	t.Log("")
+	var challengeDurSecs uint64 = 10
+	var payChInfo paymentAppLib.PayChInfo
 	go func() {
 		aliceProposedBals := make(map[string]string)
 		aliceProposedBals["self"] = "1"
 		aliceProposedBals["2"] = "2"
-		payChInfo, err := paymentAppLib.OpenPayCh(alice, "2", session.BalInfo{
+		aliceProposedBalInfo := session.BalInfo{
 			Currency: "ETH",
-			Bals:     aliceProposedBals},
-			3)
+			Bals:     aliceProposedBals}
+		payChInfo, err = paymentAppLib.OpenPayCh(alice, "2", aliceProposedBalInfo, challengeDurSecs)
 		require.NoError(t, err)
-		t.Log("Alice successfully opened paymentchannel", payChInfo)
+		t.Log("Alice opened payment channel", payChInfo)
 	}()
 
-	// SubChProposals: 2 Subs
-	var notifFrom1 session.ChProposalNotif
-	chProposalNotifierAccept := func(notif session.ChProposalNotif) {
-		fmt.Printf("\nNotification from 1: %+v\n", notif)
-		notifFrom1 = notif
+	propNotif := make(chan paymentAppLib.PayChProposalNotif)
+	proposalNotifier1 := func(notif paymentAppLib.PayChProposalNotif) {
+		propNotif <- notif
 	}
-	bob.SubChProposals(chProposalNotifierAccept)
-	time.Sleep(1 * time.Second)
-	// Accept the notification
-	err = bob.RespondChProposal(notifFrom1.ProposalID, true)
-	fmt.Println("err", err)
+	err = paymentAppLib.SubPayChProposals(bob, proposalNotifier1)
 	require.NoError(t, err)
+	t.Log("Bob subscribed to payment proposal notifications")
+
+	notif := <-propNotif
+	t.Log("Bob received payment channel proposal notification", notif)
+
+	err = paymentAppLib.RespondPayChProposal(bob, notif.ProposalID, true)
+	require.NoError(t, err)
+	t.Log("Bob accepted payment channel proposal")
+
+	err = paymentAppLib.UnsubPayChProposals(bob)
+	require.NoError(t, err)
+	t.Log("Bob unsubscribed to payment proposal notifications")
+
+	t.Log("")
+	t.Log("=====Completed channel proposal & accept sequence=====")
+	t.Log("")
 
 	// // OpenCh: 2 proposes
 	// go func() {
@@ -178,32 +191,18 @@ func Test_Integ_OpenCh(t *testing.T) {
 	// fmt.Println("err", err)
 	// require.NoError(t, err)
 
-	// GetChannel ID from Session 1
-	chInfos1 := alice.GetChs()
-	fmt.Printf("\nChannel Infos in s1%+v\n", chInfos1)
-
-	chID1 := chInfos1[0].ChannelID
-
-	// get channel instance
-	ch1, err := alice.GetCh(chID1)
+	t.Log("Alice: Getting channel object from session")
+	ch1, err := alice.GetCh(payChInfo.ChannelID)
 	require.NoError(t, err)
-	fmt.Println("channel id in s1", ch1.ID)
 
-	// GetChannel ID from Session 1
-	chInfos2 := bob.GetChs()
-	fmt.Printf("\nChannel Infos in s2 %+v\n", chInfos2)
-
-	chID2 := chInfos2[0].ChannelID
-
-	// get channel instance
-	ch2, err := bob.GetCh(chID2)
+	t.Log("Bob: Getting channel object from session")
+	ch2, err := bob.GetCh(payChInfo.ChannelID)
 	require.NoError(t, err)
-	fmt.Println("channel id in s2", ch2.ID)
 
+	t.Log("Alice: Getting balance")
 	balInfo := paymentAppLib.GetBalance(ch1)
-	fmt.Printf("\n%+v", balInfo)
+	t.Log("Alice: Got Balance -", balInfo)
 
-	// Send channel update from s1
 	go func() {
 		err = paymentAppLib.SendPayChUpdate(ch1, "2", "0.5")
 		require.NoError(t, err)

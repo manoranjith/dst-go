@@ -41,7 +41,7 @@ func OpenPayCh(s *session.Session, peerAlias string, openingBals session.BalInfo
 		return PayChInfo{}, err
 	}
 	return PayChInfo{
-		channelID: chInfo.ChannelID,
+		ChannelID: chInfo.ChannelID,
 		BalInfo:   balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
 		Version:   fmt.Sprintf("%d", chInfo.State.Version),
 	}, nil
@@ -53,7 +53,7 @@ func GetPayChs(s *session.Session) []PayChInfo {
 	payChInfos := make([]PayChInfo, len(chInfos))
 	for i := range chInfos {
 		payChInfos[i] = PayChInfo{
-			channelID: chInfos[i].ChannelID,
+			ChannelID: chInfos[i].ChannelID,
 			BalInfo:   balsFromState(chInfos[i].Currency, chInfos[i].State, chInfos[i].Parts),
 			Version:   fmt.Sprintf("%d", chInfos[i].State.Version),
 		}
@@ -87,7 +87,7 @@ func SubPayChCloses(s *session.Session, notifier PayChCloseNotifier) error {
 	return s.SubChCloses(func(notif session.ChCloseNotif) {
 		notifier(PayChCloseNotif{
 			ClosingState: PayChInfo{
-				channelID: notif.ChannelID,
+				ChannelID: notif.ChannelID,
 				BalInfo:   balsFromState(notif.Currency, notif.ChState, notif.Parts),
 				Version:   fmt.Sprintf("%d", notif.ChState.Version),
 			},
