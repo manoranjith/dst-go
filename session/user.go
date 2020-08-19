@@ -56,6 +56,9 @@ func newCred(wb perun.WalletBackend, cfg WalletConfig, addr string) (perun.Crede
 		return perun.Credential{}, err
 	}
 	addrs, err := parseUnlock(wb, w, addr)
+	if err != nil {
+		return perun.Credential{}, err
+	}
 	return perun.Credential{
 		Addr:     addrs[0],
 		Wallet:   w,
