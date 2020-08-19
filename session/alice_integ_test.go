@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	aliceAlias = "1"
+	aliceAlias = "alice"
 	alicePort  = 4341
 
-	bobAlias = "2"
+	bobAlias = "bob"
 	bobPort  = 4342
 )
 
@@ -44,3 +44,8 @@ func newSession(t *testing.T, role string) (*session.Session, perun.Peer) {
 	}
 	return nil, perun.Peer{}
 }
+
+// func Test_Integ_Role_Alice(t *testing.T) {
+
+// 	alice, gotBobContact := newSession(t, aliceAlias)
+// }
