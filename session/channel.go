@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/client"
 	pclient "perun.network/go-perun/client"
@@ -150,11 +149,11 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	entry, ok := ch.chUpdateResponders[chUpdateID]
 	if !ok {
 		ch.Logger.Error(perun.ErrUnknownUpdateID, chUpdateID)
-		return perun.ErrUnknownChannelID
+		return perun.ErrUnknownUpdateID
 	}
 	// TODO: Check if delete or defer delete
 	delete(ch.chUpdateResponders, chUpdateID)
-	if entry.Expiry > time.Now().UTC().Unix() {
+	if entry.Expiry < time.Now().UTC().Unix() {
 		ch.Logger.Error(perun.ErrRespTimeoutExpired)
 		return perun.ErrRespTimeoutExpired
 	}
@@ -163,13 +162,14 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	case true:
 		err := entry.chUpdateResponder.Accept(context.TODO())
 		if err != nil {
-			return errors.New("")
+			ch.Logger.Error("Accepting channel update", err)
+			return perun.GetAPIError(err)
 		}
 
 	case false:
 		err := entry.chUpdateResponder.Reject(context.TODO(), "rejected by user")
 		if err != nil {
-			ch.Logger.Error("Accepting channe update", err)
+			ch.Logger.Error("Rejecting channel update", err)
 			return perun.GetAPIError(err)
 		}
 	}

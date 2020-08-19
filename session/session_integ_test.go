@@ -31,6 +31,7 @@ import (
 	"perun.network/go-perun/apps/payment"
 
 	"github.com/hyperledger-labs/perun-node"
+	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
@@ -200,8 +201,25 @@ func Test_Integ_OpenCh(t *testing.T) {
 	// get channel instance
 	ch2, err := sess2.GetCh(chID2)
 	require.NoError(t, err)
-	fmt.Println("channel id in s2", ch2.ID) // err = paymentAppLib.SendPayChUpdate(ch, "2", "0.1")
-	// require.NoError(t, err)
+	fmt.Println("channel id in s2", ch2.ID)
+
+	// Send channel update from s1
+	go func() {
+		err = paymentAppLib.SendPayChUpdate(ch1, "2", "0.5")
+		require.NoError(t, err)
+	}()
+
+	var updateNotifFrom1 paymentAppLib.PayChUpdateNotif
+	PayChUpdateNotifAccept := func(notif paymentAppLib.PayChUpdateNotif) {
+		fmt.Printf("\n Update Notification from 1: %+v\n", notif)
+		updateNotifFrom1 = notif
+	}
+	err = paymentAppLib.SubPayChUpdates(ch2, PayChUpdateNotifAccept)
+	time.Sleep(1 * time.Second)
+
+	err = paymentAppLib.RespondToPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
+	require.NoError(t, err)
+
 }
 
 func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
