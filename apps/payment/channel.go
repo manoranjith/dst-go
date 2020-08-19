@@ -12,7 +12,7 @@ import (
 
 type (
 	PayChInfo struct {
-		channelID string
+		ChannelID string
 		BalInfo   session.BalInfo
 		Version   string
 	}
@@ -39,7 +39,7 @@ func SendPayChUpdate(ch *session.Channel, payee, amount string) error {
 	return ch.SendChUpdate(f)
 }
 
-func RespondToPayChUpdate(ch *session.Channel, updateID string, accept bool) error {
+func RespondPayChUpdate(ch *session.Channel, updateID string, accept bool) error {
 	return ch.RespondChUpdate(updateID, accept)
 }
 
