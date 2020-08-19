@@ -203,6 +203,9 @@ func Test_Integ_OpenCh(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Println("channel id in s2", ch2.ID)
 
+	balInfo := paymentAppLib.GetBalance(ch1)
+	fmt.Printf("\n%+v", balInfo)
+
 	// Send channel update from s1
 	go func() {
 		err = paymentAppLib.SendPayChUpdate(ch1, "2", "0.5")
@@ -220,6 +223,28 @@ func Test_Integ_OpenCh(t *testing.T) {
 	err = paymentAppLib.RespondToPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
 	require.NoError(t, err)
 	fmt.Println("Update was accepted")
+
+	balInfo = paymentAppLib.GetBalance(ch1)
+	fmt.Printf("\n%+v", balInfo)
+
+	// 2 closes the channel
+	closingBal, err := paymentAppLib.ClosePayCh(ch2)
+	require.NoError(t, err)
+	fmt.Printf("\n%+v\n", closingBal)
+	fmt.Println("channel was closed")
+
+	// 1 subs from chClose
+	var closeNotifFrom2 paymentAppLib.PayChCloseNotif
+	PayChCloseNotifier := func(notif paymentAppLib.PayChCloseNotif) {
+		fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
+		closeNotifFrom2 = notif
+	}
+	err = paymentAppLib.SubPayChCloses(sess1, PayChCloseNotifier)
+	require.NoError(t, err)
+
+	time.Sleep(3 * time.Second)
+	fmt.Printf("\n%+v\n", closeNotifFrom2)
+	fmt.Println("channel notification was received")
 }
 
 func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
