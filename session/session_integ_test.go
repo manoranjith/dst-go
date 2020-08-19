@@ -97,12 +97,13 @@ func newPaymentAppDef(t *testing.T) {
 	payment.SetAppDef(emptyAddr) // dummy app def.
 }
 
-func Test_Integ_OpenCh(t *testing.T) {
-	prng := rand.New(rand.NewSource(1729))
-	newPaymentAppDef(t)
+var ()
 
-	alice := newTestSession(t, prng)
-	bob := newTestSession(t, prng)
+func Test_Integ_OpenCh(t *testing.T) {
+
+	alice := newSession(t, aliceAlias)
+	bob := newSession(t, bobAlias)
+
 	t.Log("alice session id:", alice.ID)
 	t.Log("bob session id:", bob.ID)
 
@@ -240,14 +241,8 @@ func Test_Integ_OpenCh(t *testing.T) {
 	// fmt.Println("channel notification was received")
 }
 
-func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
-	_, testUser := sessiontest.NewTestUser(t, prng, 0)
+func newTestSession(t *testing.T, testUser perun.User) *session.Session {
 	adjudicator, asset := clienttest.NewChainSetup(t, testUser.OnChain, clienttest.TestChainURL)
-
-	testUser.CommType = "tcp"
-	port, err := freeport.GetFreePort()
-	require.NoError(t, err)
-	testUser.CommAddr = fmt.Sprintf("127.0.0.1:%d", port)
 
 	emptyContacts, err := ioutil.TempFile("", "")
 	require.NoError(t, err)
