@@ -29,6 +29,9 @@ type (
 		LockState ChannelLockState
 		Currency  string
 		Parts     []string
+		// Store a clone of current state of the channel.
+		// Because the channel mutex in sdk will be locked during handle update function and the state cannot be read then.
+		CurrState *channel.State
 
 		chUpdateNotifier   ChUpdateNotifier
 		chUpdateNotifCache []ChUpdateNotif
@@ -89,6 +92,7 @@ func NewChannel(pch *client.Channel, currency string, parts []string) *Channel {
 		ID:                 BytesToHex(channelID[:]),
 		Channel:            pch,
 		LockState:          ChannelOpen,
+		CurrState:          pch.State().Clone(),
 		Currency:           currency,
 		Parts:              parts,
 		chUpdateResponders: make(map[string]ChUpdateResponderEntry),
@@ -107,6 +111,7 @@ func (ch *Channel) SendChUpdate(stateUpdater StateUpdater) error {
 		ch.Logger.Error("Sending channel update:", err)
 		return perun.GetAPIError(err)
 	}
+	ch.CurrState = ch.Channel.State().Clone()
 	return nil
 }
 
@@ -165,6 +170,7 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 			ch.Logger.Error("Accepting channel update", err)
 			return perun.GetAPIError(err)
 		}
+		ch.CurrState = ch.Channel.State().Clone()
 
 	case false:
 		err := entry.chUpdateResponder.Reject(context.TODO(), "rejected by user")

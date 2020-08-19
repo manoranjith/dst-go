@@ -219,7 +219,7 @@ func Test_Integ_OpenCh(t *testing.T) {
 
 	err = paymentAppLib.RespondToPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
 	require.NoError(t, err)
-
+	fmt.Println("Update was accepted")
 }
 
 func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {

@@ -360,24 +360,24 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 
 	s.Logger.Debug("Waiting for lock")
-	// ch.Lock()
-	// defer ch.Unlock()
+	ch.Lock()
+	defer ch.Unlock()
 	ch.Logger.Debug("SDK Callback: Start processing")
 
-	// err := validateUpdate(ch.Channel.State().Clone(), chUpdate.State.Clone())
-	// if err != nil {
-	// 	ch.Logger.Info("Received invalid update")
-	// 	err := responder.Reject(context.TODO(), "invalid update")
-	// 	if err != nil {
-	// 		s.Logger.Error("Rejecting invalid update", err)
-	// 	}
-	// }
+	ch.Logger.Debug(fmt.Sprintf("%+v", ch.CurrState))
+	err := validateUpdate(ch.CurrState, chUpdate.State.Clone())
+	if err != nil {
+		ch.Logger.Info("Received invalid update")
+		err := responder.Reject(context.TODO(), "invalid update")
+		if err != nil {
+			s.Logger.Error("Rejecting invalid update", err)
+		}
+	}
 
 	if chUpdate.State.IsFinal {
 		ch.Logger.Info("Received final update, channel is finalized.")
 		ch.LockState = ChannelFinalized
 	}
-	ch.Logger.Info("Received non final update.")
 
 	entry := ChUpdateResponderEntry{
 		chUpdateResponder: responder,
@@ -385,21 +385,18 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 	ch.chUpdateResponders[updateID] = entry
 
-	ch.Logger.Info("Registereed responder.")
 	notif := ChUpdateNotif{
-		UpdateID: updateID,
-		Currency: ch.Currency,
-		// CurrState: ch.Channel.State().Clone(),
-		Update: &chUpdate,
-		Parts:  ch.Parts,
-		Expiry: expiry,
+		UpdateID:  updateID,
+		Currency:  ch.Currency,
+		CurrState: ch.CurrState,
+		Update:    &chUpdate,
+		Parts:     ch.Parts,
+		Expiry:    expiry,
 	}
 	if ch.chUpdateNotifier == nil {
-		ch.Logger.Debug("going to cache")
 		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
 		ch.Logger.Debug("SDK Callback: Notification cached")
 	} else {
-		ch.Logger.Debug("going to send")
 		ch.chUpdateNotifier(notif)
 		ch.Logger.Debug("SDK Callback: Notification sent")
 	}
@@ -408,7 +405,7 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 // For now, treat all channels as payment channels.
 // TODO: (mano) Fix it once support is added in the sdk.
 func validateUpdate(current, proposed *channel.State) error {
-	var oldSum, newSum *big.Int
+	var oldSum, newSum = big.NewInt(0), big.NewInt(0)
 	oldBals := current.Allocation.Balances[0]
 	oldSum.Add(oldBals[0], oldBals[1])
 	newBals := proposed.Allocation.Balances[0]
