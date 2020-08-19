@@ -25,17 +25,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phayes/freeport"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/apps/payment"
-
 	"github.com/hyperledger-labs/perun-node"
 	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
+	"github.com/phayes/freeport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"perun.network/go-perun/apps/payment"
 )
 
 var (
@@ -189,56 +188,56 @@ func Test_Integ_OpenCh(t *testing.T) {
 	// fmt.Println("err", err)
 	// require.NoError(t, err)
 
-	t.Log("Alice: Getting channel object from session")
-	ch1, err := alice.GetCh(payChInfo.ChannelID)
-	require.NoError(t, err)
+	// t.Log("Alice: Getting channel object from session")
+	// ch1, err := alice.GetCh(payChInfo.ChannelID)
+	// require.NoError(t, err)
 
-	t.Log("Bob: Getting channel object from session")
-	ch2, err := bob.GetCh(payChInfo.ChannelID)
-	require.NoError(t, err)
+	// t.Log("Bob: Getting channel object from session")
+	// ch2, err := bob.GetCh(payChInfo.ChannelID)
+	// require.NoError(t, err)
 
-	t.Log("Alice: Getting balance")
-	balInfo := paymentAppLib.GetBalance(ch1)
-	t.Log("Alice: Got Balance -", balInfo)
+	// t.Log("Alice: Getting balance")
+	// balInfo := paymentAppLib.GetBalance(ch1)
+	// t.Log("Alice: Got Balance -", balInfo)
 
-	go func() {
-		err = paymentAppLib.SendPayChUpdate(ch1, "2", "0.5")
-		require.NoError(t, err)
-	}()
+	// go func() {
+	// 	err = paymentAppLib.SendPayChUpdate(ch1, "2", "0.5")
+	// 	require.NoError(t, err)
+	// }()
 
-	var updateNotifFrom1 paymentAppLib.PayChUpdateNotif
-	PayChUpdateNotifAccept := func(notif paymentAppLib.PayChUpdateNotif) {
-		fmt.Printf("\n Update Notification from 1: %+v\n", notif)
-		updateNotifFrom1 = notif
-	}
-	err = paymentAppLib.SubPayChUpdates(ch2, PayChUpdateNotifAccept)
-	time.Sleep(1 * time.Second)
+	// var updateNotifFrom1 paymentAppLib.PayChUpdateNotif
+	// PayChUpdateNotifAccept := func(notif paymentAppLib.PayChUpdateNotif) {
+	// 	fmt.Printf("\n Update Notification from 1: %+v\n", notif)
+	// 	updateNotifFrom1 = notif
+	// }
+	// err = paymentAppLib.SubPayChUpdates(ch2, PayChUpdateNotifAccept)
+	// time.Sleep(1 * time.Second)
 
-	err = paymentAppLib.RespondPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
-	require.NoError(t, err)
-	fmt.Println("Update was accepted")
+	// err = paymentAppLib.RespondPayChUpdate(ch2, updateNotifFrom1.UpdateID, true)
+	// require.NoError(t, err)
+	// fmt.Println("Update was accepted")
 
-	balInfo = paymentAppLib.GetBalance(ch1)
-	fmt.Printf("\n%+v", balInfo)
+	// balInfo = paymentAppLib.GetBalance(ch1)
+	// fmt.Printf("\n%+v", balInfo)
 
-	// 2 closes the channel
-	closingBal, err := paymentAppLib.ClosePayCh(ch2)
-	require.NoError(t, err)
-	fmt.Printf("\n%+v\n", closingBal)
-	fmt.Println("channel was closed")
+	// // 2 closes the channel
+	// closingBal, err := paymentAppLib.ClosePayCh(ch2)
+	// require.NoError(t, err)
+	// fmt.Printf("\n%+v\n", closingBal)
+	// fmt.Println("channel was closed")
 
-	// 1 subs from chClose
-	var closeNotifFrom2 paymentAppLib.PayChCloseNotif
-	PayChCloseNotifier := func(notif paymentAppLib.PayChCloseNotif) {
-		fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
-		closeNotifFrom2 = notif
-	}
-	err = paymentAppLib.SubPayChCloses(alice, PayChCloseNotifier)
-	require.NoError(t, err)
+	// // 1 subs from chClose
+	// var closeNotifFrom2 paymentAppLib.PayChCloseNotif
+	// PayChCloseNotifier := func(notif paymentAppLib.PayChCloseNotif) {
+	// 	fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
+	// 	closeNotifFrom2 = notif
+	// }
+	// err = paymentAppLib.SubPayChCloses(alice, PayChCloseNotifier)
+	// require.NoError(t, err)
 
-	time.Sleep(3 * time.Second)
-	fmt.Printf("\n%+v\n", closeNotifFrom2)
-	fmt.Println("channel notification was received")
+	// time.Sleep(3 * time.Second)
+	// fmt.Printf("\n%+v\n", closeNotifFrom2)
+	// fmt.Println("channel notification was received")
 }
 
 func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
