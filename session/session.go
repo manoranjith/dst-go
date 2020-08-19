@@ -263,17 +263,19 @@ func (s *Session) HandleClose(chID string, err error) {
 		Currency:  chInfo.Currency,
 		ChState:   chInfo.State,
 		Parts:     chInfo.Parts,
-		Error:     err.Error(),
+	}
+	if err != nil {
+		notif.Error = err.Error()
 	}
 
 	if ch.LockState != ChannelClosed {
 		ch.LockState = ChannelClosed
 		if s.chCloseNotifier == nil {
 			s.chCloseNotifsCache = append(s.chCloseNotifsCache, notif)
-			s.Logger.Debug("SDK Callback: Notification sent")
+			s.Logger.Debug("SDK Callback: Notification cached")
 		} else {
 			s.chCloseNotifier(notif)
-			s.Logger.Debug("SDK Callback: Notification cached")
+			s.Logger.Debug("SDK Callback: Notification sent")
 		}
 	}
 }
