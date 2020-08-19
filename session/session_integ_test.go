@@ -25,17 +25,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phayes/freeport"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/apps/payment"
-
 	"github.com/hyperledger-labs/perun-node"
 	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
+	"github.com/phayes/freeport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"perun.network/go-perun/apps/payment"
 )
 
 var (
@@ -100,34 +99,23 @@ func newPaymentAppDef(t *testing.T) {
 
 var ()
 
-func Test_Integ_OpenCh(t *testing.T) {
+func Test_Integ_Role_Bob(t *testing.T) {
 
 	alice, gotBobContact := newSession(t, aliceAlias)
 	bob, gotAliceContact := newSession(t, bobAlias)
-
+	var err error
 	t.Log("alice session id:", alice.ID)
 	t.Log("bob session id:", bob.ID)
 
-	t.Log("read alice own contact")
-	aliceContact, err := alice.GetContact(perun.OwnAlias)
-	require.NoError(t, err)
-
-	t.Log("read bob own contact")
-	bobContact, err := bob.GetContact(perun.OwnAlias)
-	require.NoError(t, err)
-
 	t.Log("add alice contact to bob")
-	aliceContact.Alias = aliceAlias
-	require.NoError(t, bob.AddContact(aliceContact))
+	require.NoError(t, bob.AddContact(gotAliceContact))
 
 	t.Log("add bob contact to alice")
-	bobContact.Alias = bobAlias
-	require.NoError(t, alice.AddContact(bobContact))
+	require.NoError(t, alice.AddContact(gotBobContact))
+
 	t.Log("")
 	t.Log("=====Starting channel proposal & accept sequence=====")
 	t.Log("")
-	t.Logf("%+v, %+v", aliceContact, gotAliceContact)
-	t.Logf("%+v, %+v", bobContact, gotBobContact)
 	t.Log("")
 	t.Log("=====Starting channel proposal & accept sequence=====")
 	t.Log("")
