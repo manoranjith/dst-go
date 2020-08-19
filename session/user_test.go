@@ -45,6 +45,8 @@ func Test_New_Happy(t *testing.T) {
 			KeystorePath: testUser.OffChain.Keystore,
 			Password:     "",
 		},
+		CommType: "tcp",
+		CommAddr: "127.0.0.1:5751",
 	}
 
 	userCfg.PartAddrs = make([]string, len(testUser.PartAddrs))
