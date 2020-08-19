@@ -13,7 +13,10 @@ func (e APIError) Error() string {
 
 // GetAPIError returns the APIError contained in err if err is an APIError.
 // If not, it returns ErrInternalServer API error.
-func GetAPIError(err error) APIError {
+func GetAPIError(err error) error {
+	if err == nil {
+		return nil
+	}
 	var apiErr APIError
 	if !errors.As(err, &apiErr) {
 		return ErrInternalServer
