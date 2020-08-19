@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -101,6 +102,8 @@ var ()
 
 func Test_Integ_Role_Bob(t *testing.T) {
 
+	wg := sync.WaitGroup{}
+
 	alice, gotBobContact := newSession(t, aliceAlias)
 	bob, gotAliceContact := newSession(t, bobAlias)
 	var err error
@@ -121,7 +124,11 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	t.Log("")
 	var challengeDurSecs uint64 = 10
 	var payChInfo paymentAppLib.PayChInfo
+
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		aliceProposedBals := make(map[string]string)
 		aliceProposedBals["self"] = "1"
 		aliceProposedBals[bobAlias] = "2"
@@ -232,6 +239,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	// time.Sleep(3 * time.Second)
 	// fmt.Printf("\n%+v\n", closeNotifFrom2)
 	// fmt.Println("channel notification was received")
+	wg.Wait()
 }
 
 func newTestSession(t *testing.T, testUser perun.User) *session.Session {
