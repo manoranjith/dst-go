@@ -93,55 +93,50 @@ func Test_Integ_New(t *testing.T) {
 	assert.NotNil(t, sess)
 }
 
-func Test_Integ_OpenCh(t *testing.T) {
-	prng := rand.New(rand.NewSource(1729))
-	sess1 := newTestSession(t, prng)
-	sess2 := newTestSession(t, prng)
-	fmt.Println("sess1", sess1.ID)
-	fmt.Println("sess2", sess2.ID)
-	fmt.Println("sess1 on", sess1.User.OnChain.Addr.String())
-	fmt.Println("sess1 off", sess1.User.OffChain.Addr.String())
-	fmt.Println("sess1 on", sess2.User.OnChain.Addr.String())
-	fmt.Println("sess2 off", sess2.User.OffChain.Addr.String())
-
-	own1, err := sess1.GetContact(perun.OwnAlias)
-	require.NoError(t, err)
-	fmt.Printf("\nsess1 own %+v\n", own1)
-	own2, err := sess2.GetContact(perun.OwnAlias)
-	require.NoError(t, err)
-	fmt.Printf("\nsess2 own %+v\n", own2)
-
-	// Add contact
-	own1.Alias = "1"
-	own2.Alias = "2"
-	err = sess1.AddContact(own2)
-	fmt.Println("err", err)
-	require.NoError(t, err)
-	err = sess2.AddContact(own1)
-	fmt.Println("err", err)
-	require.NoError(t, err)
-
+func newPaymentAppDef(t *testing.T) {
 	wb := ethereumtest.NewTestWalletBackend()
 	emptyAddr, err := wb.ParseAddr("0x0")
-	fmt.Println("err", err)
 	require.NoError(t, err)
 	payment.SetAppDef(emptyAddr) // dummy app def.
-	paymentApp := session.App{
-		Def:  payment.AppDef(),
-		Data: &payment.NoData{},
-	}
+}
+
+func Test_Integ_OpenCh(t *testing.T) {
+	prng := rand.New(rand.NewSource(1729))
+	newPaymentAppDef(t)
+
+	alice := newTestSession(t, prng)
+	bob := newTestSession(t, prng)
+	t.Log("alice session id:", alice.ID)
+	t.Log("bob session id:", bob.ID)
+
+	t.Log("read alice own contact")
+	aliceContact, err := alice.GetContact(perun.OwnAlias)
+	require.NoError(t, err)
+
+	t.Log("read bob own contact")
+	bobContact, err := bob.GetContact(perun.OwnAlias)
+	require.NoError(t, err)
+
+	t.Log("add alice contact to bob")
+	aliceContact.Alias = "1"
+	require.NoError(t, bob.AddContact(aliceContact))
+
+	t.Log("add bob contact to alice")
+	bobContact.Alias = "2"
+	require.NoError(t, alice.AddContact(bobContact))
 
 	// OpenCh: 1 proposes
+	t.Log("Starting channel proposal response sequence")
 	go func() {
-		sess1Bals := make(map[string]string)
-		sess1Bals["self"] = "1"
-		sess1Bals["2"] = "2"
-		chInfo, err := sess1.OpenCh("2", session.BalInfo{
+		aliceProposedBals := make(map[string]string)
+		aliceProposedBals["self"] = "1"
+		aliceProposedBals["2"] = "2"
+		payChInfo, err := paymentAppLib.OpenPayCh(alice, "2", session.BalInfo{
 			Currency: "ETH",
-			Bals:     sess1Bals}, paymentApp, 15)
-		fmt.Println("err", err)
+			Bals:     aliceProposedBals},
+			3)
 		require.NoError(t, err)
-		fmt.Printf("\nsess1 chInfo %+v\n", chInfo)
+		t.Log("Alice successfully opened paymentchannel", payChInfo)
 	}()
 
 	// SubChProposals: 2 Subs
@@ -150,10 +145,10 @@ func Test_Integ_OpenCh(t *testing.T) {
 		fmt.Printf("\nNotification from 1: %+v\n", notif)
 		notifFrom1 = notif
 	}
-	sess2.SubChProposals(chProposalNotifierAccept)
+	bob.SubChProposals(chProposalNotifierAccept)
 	time.Sleep(1 * time.Second)
 	// Accept the notification
-	err = sess2.RespondChProposal(notifFrom1.ProposalID, true)
+	err = bob.RespondChProposal(notifFrom1.ProposalID, true)
 	fmt.Println("err", err)
 	require.NoError(t, err)
 
@@ -184,24 +179,24 @@ func Test_Integ_OpenCh(t *testing.T) {
 	// require.NoError(t, err)
 
 	// GetChannel ID from Session 1
-	chInfos1 := sess1.GetChs()
+	chInfos1 := alice.GetChs()
 	fmt.Printf("\nChannel Infos in s1%+v\n", chInfos1)
 
 	chID1 := chInfos1[0].ChannelID
 
 	// get channel instance
-	ch1, err := sess1.GetCh(chID1)
+	ch1, err := alice.GetCh(chID1)
 	require.NoError(t, err)
 	fmt.Println("channel id in s1", ch1.ID)
 
 	// GetChannel ID from Session 1
-	chInfos2 := sess2.GetChs()
+	chInfos2 := bob.GetChs()
 	fmt.Printf("\nChannel Infos in s2 %+v\n", chInfos2)
 
 	chID2 := chInfos2[0].ChannelID
 
 	// get channel instance
-	ch2, err := sess2.GetCh(chID2)
+	ch2, err := bob.GetCh(chID2)
 	require.NoError(t, err)
 	fmt.Println("channel id in s2", ch2.ID)
 
@@ -241,7 +236,7 @@ func Test_Integ_OpenCh(t *testing.T) {
 		fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
 		closeNotifFrom2 = notif
 	}
-	err = paymentAppLib.SubPayChCloses(sess1, PayChCloseNotifier)
+	err = paymentAppLib.SubPayChCloses(alice, PayChCloseNotifier)
 	require.NoError(t, err)
 
 	time.Sleep(3 * time.Second)
