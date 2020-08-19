@@ -95,7 +95,6 @@ func NewEthereumPaymentClient(cfg Config, user perun.User, comm perun.CommBacken
 	if err != nil {
 		return nil, err
 	}
-	client.runAsGoRoutine(func() { client.Handle(&ProposalHandler{}, &UpdateHandler{}) })
 	client.runAsGoRoutine(func() { msgBus.Listen(listener) })
 
 	return client, nil
@@ -103,6 +102,10 @@ func NewEthereumPaymentClient(cfg Config, user perun.User, comm perun.CommBacken
 
 func (c *Client) Register(offChainAddr wire.Address, commAddr string) {
 	c.msgBusRegistry.Register(offChainAddr, commAddr)
+}
+
+func (c *Client) Handle(ph client.ProposalHandler, ch client.UpdateHandler) {
+	c.runAsGoRoutine(func() { c.ChannelClient.Handle(ph, ch) })
 }
 
 // Close closes the client and waits until the listener and handler go routines return.
