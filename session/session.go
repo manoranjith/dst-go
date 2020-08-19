@@ -317,6 +317,18 @@ func nonce() *big.Int {
 	return val
 }
 
+func (s *Session) GetCh(channelID string) (*Channel, error) {
+	s.Logger.Debug("Internal call to get channel instance.")
+	s.Lock()
+	defer s.Unlock()
+
+	ch, ok := s.Channels[channelID]
+	if !ok {
+		return nil, perun.ErrUnknownChannelID
+	}
+	return ch, nil
+}
+
 func (s *Session) GetChs() []ChannelInfo {
 	s.Logger.Debug("Received request: session.GetChannels")
 	s.Lock()
@@ -343,10 +355,7 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	ch, ok := s.Channels[channelIDStr]
 	if !ok {
 		s.Logger.Info("Received update for unknown channel", channelIDStr)
-		err := responder.Reject(context.TODO(), "unknown channel")
-		if err != nil {
-			s.Logger.Error("Rejecting update for unknown channel", err)
-		}
+		return
 	}
 
 	ch.Lock()
