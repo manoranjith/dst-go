@@ -25,16 +25,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/phayes/freeport"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"perun.network/go-perun/apps/payment"
+
 	"github.com/hyperledger-labs/perun-node"
 	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
-	"github.com/phayes/freeport"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/apps/payment"
 )
 
 var (
@@ -101,8 +102,8 @@ var ()
 
 func Test_Integ_OpenCh(t *testing.T) {
 
-	alice := newSession(t, aliceAlias)
-	bob := newSession(t, bobAlias)
+	alice, gotBobContact := newSession(t, aliceAlias)
+	bob, gotAliceContact := newSession(t, bobAlias)
 
 	t.Log("alice session id:", alice.ID)
 	t.Log("bob session id:", bob.ID)
@@ -122,7 +123,11 @@ func Test_Integ_OpenCh(t *testing.T) {
 	t.Log("add bob contact to alice")
 	bobContact.Alias = bobAlias
 	require.NoError(t, alice.AddContact(bobContact))
-
+	t.Log("")
+	t.Log("=====Starting channel proposal & accept sequence=====")
+	t.Log("")
+	t.Logf("%+v, %+v", aliceContact, gotAliceContact)
+	t.Logf("%+v, %+v", bobContact, gotBobContact)
 	t.Log("")
 	t.Log("=====Starting channel proposal & accept sequence=====")
 	t.Log("")
