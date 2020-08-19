@@ -20,7 +20,9 @@ package session_test
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -256,6 +258,15 @@ func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
 	require.NoError(t, err)
 	testUser.CommAddr = fmt.Sprintf("127.0.0.1:%d", port)
 
+	emptyContacts, err := ioutil.TempFile("", "")
+	require.NoError(t, err)
+	require.NoError(t, emptyContacts.Close())
+	t.Cleanup(func() {
+		if err = os.Remove(emptyContacts.Name()); err != nil {
+			t.Log("Error in test cleanup: removing file - " + emptyContacts.Name())
+		}
+	})
+
 	userCfg := session.UserConfig{
 		Alias:       testUser.Alias,
 		OnChainAddr: testUser.OnChain.Addr.String(),
@@ -281,7 +292,7 @@ func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
 		DatabaseDir:      clienttest.NewDatabaseDir(t),
 
 		ContactsType: "yaml",
-		ContactsURL:  testContactsYAML,
+		ContactsURL:  emptyContacts.Name(),
 	}
 
 	sess, err := session.New(cfg)
