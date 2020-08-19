@@ -37,6 +37,7 @@ type (
 
 		ID       string
 		User     perun.User
+		ChAsset  channel.Asset
 		ChClient perun.ChannelClient
 		Contacts perun.Contacts
 
@@ -113,6 +114,10 @@ func New(cfg Config) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	chAsset, err := wb.ParseAddr(cfg.Asset)
+	if err != nil {
+		return nil, err
+	}
 
 	contacts, err := initContacts(cfg.ContactsType, cfg.ContactsURL, wb, user.Peer)
 	if err != nil {
@@ -120,11 +125,14 @@ func New(cfg Config) (*Session, error) {
 	}
 	sessionID := calcSessionID(user.OffChainAddr.Bytes())
 	sess := &Session{
-		Logger:   log.NewLoggerWithField("session-id", sessionID),
-		ID:       sessionID,
-		ChClient: chClient,
-		Contacts: contacts,
-		Channels: make(map[string]*Channel),
+		Logger:               log.NewLoggerWithField("session-id", sessionID),
+		ID:                   sessionID,
+		User:                 user,
+		ChAsset:              chAsset,
+		ChClient:             chClient,
+		Contacts:             contacts,
+		Channels:             make(map[string]*Channel),
+		chProposalResponders: make(map[string]ChProposalResponderEntry),
 	}
 	chClient.Handle(sess, sess) // Init handlers
 	return sess, nil
@@ -203,7 +211,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 		return ChannelInfo{}, perun.ErrUnsupportedCurrency
 	}
 
-	allocations, err := makeAllocation(openingBals, peerAlias, nil) // Pass a proper asset.
+	allocations, err := makeAllocation(openingBals, peerAlias, s.ChAsset) // Pass a proper asset.
 	if err != nil {
 		s.Logger.Error(err)
 		return ChannelInfo{}, perun.GetAPIError(err)
@@ -435,10 +443,10 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
-		s.Logger.Debug("SDK Callback: Notification sent")
+		s.Logger.Debug("SDK Callback: Notification cached")
 	} else {
 		s.chProposalNotifier(notif)
-		s.Logger.Debug("SDK Callback: Notification cached")
+		s.Logger.Debug("SDK Callback: Notification sent")
 	}
 }
 
@@ -481,10 +489,13 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 
 	entry, ok := s.chProposalResponders[chProposalID]
 	if !ok {
+		s.Logger.Info("Unknonw proposal ID")
 		return perun.ErrUnknownProposalID
 	}
 	delete(s.chProposalResponders, chProposalID)
-	if entry.Expiry > time.Now().UTC().Unix() {
+	currTime := time.Now().UTC().Unix()
+	if entry.Expiry < currTime {
+		s.Logger.Info("timeout:", entry.Expiry, "received response at:", currTime)
 		return perun.ErrRespTimeoutExpired
 	}
 

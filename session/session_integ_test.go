@@ -28,7 +28,9 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"perun.network/go-perun/apps/payment"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
@@ -88,13 +90,76 @@ func Test_Integ_New(t *testing.T) {
 	assert.NotNil(t, sess)
 }
 
-// func Test_Integ_OpenCh(t *testing.T) {
-// 	sess1 := newTestSession(t *testing.T)
-// 	sess2 := newTestSession(t *testing.T)
-// }
-
-func newTestSession(t *testing.T) *session.Session {
+func Test_Integ_OpenCh(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))
+	sess1 := newTestSession(t, prng)
+	sess2 := newTestSession(t, prng)
+	fmt.Println("sess1", sess1.ID)
+	fmt.Println("sess2", sess2.ID)
+	fmt.Println("sess1 on", sess1.User.OnChain.Addr.String())
+	fmt.Println("sess1 off", sess1.User.OffChain.Addr.String())
+	fmt.Println("sess1 on", sess2.User.OnChain.Addr.String())
+	fmt.Println("sess2 off", sess2.User.OffChain.Addr.String())
+
+	own1, err := sess1.GetContact(perun.OwnAlias)
+	require.NoError(t, err)
+	fmt.Printf("\nsess1 own %+v\n", own1)
+	own2, err := sess2.GetContact(perun.OwnAlias)
+	require.NoError(t, err)
+	fmt.Printf("\nsess2 own %+v\n", own2)
+
+	// Add contact
+	own1.Alias = "1"
+	own2.Alias = "2"
+	err = sess1.AddContact(own2)
+	fmt.Println("err", err)
+	require.NoError(t, err)
+	err = sess2.AddContact(own1)
+	fmt.Println("err", err)
+	require.NoError(t, err)
+
+	wb := ethereumtest.NewTestWalletBackend()
+	emptyAddr, err := wb.ParseAddr("0x0")
+	fmt.Println("err", err)
+	require.NoError(t, err)
+	payment.SetAppDef(emptyAddr) // dummy app def.
+	paymentApp := session.App{
+		Def:  payment.AppDef(),
+		Data: &payment.NoData{},
+	}
+
+	// OpenCh: 1 proposes
+	go func() {
+		sess1Bals := make(map[string]string)
+		sess1Bals["self"] = "1"
+		sess1Bals["2"] = "2"
+		chInfo, err := sess1.OpenCh("2", session.BalInfo{
+			Currency: "ETH",
+			Bals:     sess1Bals}, paymentApp, 15)
+		fmt.Println("err", err)
+		require.NoError(t, err)
+		fmt.Printf("\nsess1 chInfo %+v\n", chInfo)
+	}()
+
+	// SubChProposals: 2 Subs
+	var notifFrom1 session.ChProposalNotif
+	chProposalNotifierAccept := func(notif session.ChProposalNotif) {
+		fmt.Printf("\nNotification from 1: %+v\n", notif)
+		notifFrom1 = notif
+	}
+	sess2.SubChProposals(chProposalNotifierAccept)
+	time.Sleep(1 * time.Second)
+	// Accept the notification
+	err = sess2.RespondChProposal(notifFrom1.ProposalID, true)
+	fmt.Println("err", err)
+	require.NoError(t, err)
+	time.Sleep(5 * time.Second)
+
+	// GetChannel ID
+
+}
+
+func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
 	_, testUser := sessiontest.NewTestUser(t, prng, 0)
 	adjudicator, asset := clienttest.NewChainSetup(t, testUser.OnChain, clienttest.TestChainURL)
 
@@ -133,5 +198,6 @@ func newTestSession(t *testing.T) *session.Session {
 
 	sess, err := session.New(cfg)
 	require.NoError(t, err)
+	require.NotNil(t, sess)
 	return sess
 }

@@ -87,11 +87,12 @@ type (
 func NewChannel(pch *client.Channel, currency string, parts []string) *Channel {
 	channelID := pch.ID()
 	ch := &Channel{
-		ID:        BytesToHex(channelID[:]),
-		Channel:   pch,
-		LockState: ChannelOpen,
-		Currency:  currency,
-		Parts:     parts,
+		ID:                 BytesToHex(channelID[:]),
+		Channel:            pch,
+		LockState:          ChannelOpen,
+		Currency:           currency,
+		Parts:              parts,
+		chUpdateResponders: make(map[string]ChUpdateResponderEntry),
 	}
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.ID)
 	return ch
