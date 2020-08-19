@@ -154,33 +154,54 @@ func Test_Integ_OpenCh(t *testing.T) {
 	fmt.Println("err", err)
 	require.NoError(t, err)
 
-	// OpenCh: 2 proposes
-	go func() {
-		sess2Bals := make(map[string]string)
-		sess2Bals["self"] = "2"
-		sess2Bals["1"] = "1"
-		chInfo, err := sess2.OpenCh("1", session.BalInfo{
-			Currency: "ETH",
-			Bals:     sess2Bals}, paymentApp, 15)
-		fmt.Println("err", err)
-		require.NoError(t, err)
-		fmt.Printf("\nsess2 chInfo %+v\n", chInfo)
-	}()
+	// // OpenCh: 2 proposes
+	// go func() {
+	// 	sess2Bals := make(map[string]string)
+	// 	sess2Bals["self"] = "2"
+	// 	sess2Bals["1"] = "1"
+	// 	chInfo, err := sess2.OpenCh("1", session.BalInfo{
+	// 		Currency: "ETH",
+	// 		Bals:     sess2Bals}, paymentApp, 15)
+	// 	fmt.Println("err", err)
+	// 	require.NoError(t, err)
+	// 	fmt.Printf("\nsess2 chInfo %+v\n", chInfo)
+	// }()
 
-	// SubChProposals: 1 Subs
-	var notifFrom2 session.ChProposalNotif
-	chProposalNotifierReject := func(notif session.ChProposalNotif) {
-		fmt.Printf("\nNotification from 2: %+v\n", notif)
-		notifFrom2 = notif
-	}
-	sess1.SubChProposals(chProposalNotifierReject)
-	time.Sleep(1 * time.Second)
-	// Accept the notification
-	err = sess1.RespondChProposal(notifFrom2.ProposalID, false)
-	fmt.Println("err", err)
+	// // SubChProposals: 1 Subs
+	// var notifFrom2 session.ChProposalNotif
+	// chProposalNotifierReject := func(notif session.ChProposalNotif) {
+	// 	fmt.Printf("\nNotification from 2: %+v\n", notif)
+	// 	notifFrom2 = notif
+	// }
+	// sess1.SubChProposals(chProposalNotifierReject)
+	// time.Sleep(1 * time.Second)
+	// // Accept the notification
+	// err = sess1.RespondChProposal(notifFrom2.ProposalID, false)
+	// fmt.Println("err", err)
+	// require.NoError(t, err)
+
+	// GetChannel ID from Session 1
+	chInfos1 := sess1.GetChs()
+	fmt.Printf("\nChannel Infos in s1%+v\n", chInfos1)
+
+	chID1 := chInfos1[0].ChannelID
+
+	// get channel instance
+	ch1, err := sess1.GetCh(chID1)
 	require.NoError(t, err)
-	// GetChannel ID
+	fmt.Println("channel id in s1", ch1.ID)
 
+	// GetChannel ID from Session 1
+	chInfos2 := sess2.GetChs()
+	fmt.Printf("\nChannel Infos in s2 %+v\n", chInfos2)
+
+	chID2 := chInfos2[0].ChannelID
+
+	// get channel instance
+	ch2, err := sess2.GetCh(chID2)
+	require.NoError(t, err)
+	fmt.Println("channel id in s2", ch2.ID) // err = paymentAppLib.SendPayChUpdate(ch, "2", "0.1")
+	// require.NoError(t, err)
 }
 
 func newTestSession(t *testing.T, prng *rand.Rand) *session.Session {
