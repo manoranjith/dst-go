@@ -32,6 +32,7 @@ import (
 
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/client"
+	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/comm/tcp"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
@@ -50,13 +51,13 @@ import (
 func Test_Integ_NewEthereumPaymentClient(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))
 	_, user := sessiontest.NewTestUser(t, prng, 0)
-	adjudicator, asset := setup(t, user.OnChain)
+	adjudicator, asset := clienttest.NewChainSetup(t, user.OnChain, clienttest.TestChainURL)
 
 	cfg := client.Config{
 		Chain: client.ChainConfig{
 			Adjudicator: adjudicator.String(),
 			Asset:       asset.String(),
-			URL:         testChainURL,
+			URL:         clienttest.TestChainURL,
 			ConnTimeout: 10 * time.Second,
 		},
 		PeerReconnTimeout: 0,

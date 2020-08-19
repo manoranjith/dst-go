@@ -16,7 +16,7 @@
 
 // +build integration
 
-package client_test
+package clienttest
 
 import (
 	"testing"
@@ -32,17 +32,17 @@ import (
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
 )
 
-var testChainURL = "ws://127.0.0.1:8545"
+var TestChainURL = "ws://127.0.0.1:8545"
 
 // setup checks if valid contracts are deployed in pre-computed addresses, if not it deployes them.
 // Address generation mechanism in ethereum is used to pre-compute the contract address.
-func setup(t *testing.T, onChainCred perun.Credential) (adjudicator, asset wallet.Address) {
-	require.Truef(t, isBlockchainRunning(testChainURL), "cannot connect to ganache-cli node at "+testChainURL)
+func NewChainSetup(t *testing.T, onChainCred perun.Credential, chainURL string) (adjudicator, asset wallet.Address) {
+	require.Truef(t, isBlockchainRunning(chainURL), "cannot connect to ganache-cli node at "+chainURL)
 
 	adjudicator = ethwallet.AsWalletAddr(crypto.CreateAddress(ethwallet.AsEthAddr(onChainCred.Addr), 0))
 	asset = ethwallet.AsWalletAddr(crypto.CreateAddress(ethwallet.AsEthAddr(onChainCred.Addr), 1))
 
-	chain, err := ethereum.NewChainBackend(testChainURL, 10*time.Second, onChainCred)
+	chain, err := ethereum.NewChainBackend(chainURL, 10*time.Second, onChainCred)
 	require.NoError(t, err)
 
 	if err = chain.ValidateContracts(adjudicator, asset); err != nil {
