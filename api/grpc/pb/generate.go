@@ -14,7 +14,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package grpc provides the interface for the user to access node, session and channel functionality.
-package grpc
+// Package pb contains proto3 definitions for user API and the corresponding
+// generated code for grpc server and client.
+package pb
 
-//go:generate protoc --go_out=plugins=grpc:. *.proto
+//go:generate protoc --go_out=plugins=grpc:. api.proto

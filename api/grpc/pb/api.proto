@@ -16,10 +16,11 @@
 
 syntax = "proto3";
 
-// Package grpc provides the interface for the user to access node, session and channel functionality.
-package grpc;
+// Package pb contains proto3 definitions for user API and the corresponding
+// generated code for grpc server and client.
+package pb;
 
-// Peer is used to identify a peer in the network.
+// Peer represents a peer in the off-chain network.
 message Peer {
     string alias=1;
     string offChainAddress=2;
@@ -28,7 +29,7 @@ message Peer {
 }
 
 // BalanceInfo represents the balanace of the corresponding alias 
-// and the curruncy used for specifying the amount.
+// and the currency used for specifying the amount.
 message BalanceInfo {
     string currency=1;
     message AliasBalance {
@@ -37,7 +38,6 @@ message BalanceInfo {
     repeated AliasBalance balances=2;
 }
 
-// PaymentChannel contains channelID, BalanceInfo and the current version of the channel
 message PaymentChannel {
     string channelID = 1;
     BalanceInfo balanceinfo = 2;
@@ -49,9 +49,8 @@ message MsgError {
     string error = 1;
 }
 
-// Payment_API provides APIs to for a user to open as session and within it
-// open payment channels, send/receive payments and finalize the channels on
-// the blockchain
+// Payment_API provides APIs for a user to open payment channels, send/receive payments
+// and finalize the channels on the blockchain 
 service Payment_API{
     rpc GetConfig (GetConfigReq) returns (GetConfigResp){}
     rpc OpenSession (OpenSessionReq) returns (OpenSessionResp) {}
@@ -73,7 +72,7 @@ service Payment_API{
     rpc SubPayChUpdates (SubpayChUpdatesReq) returns (stream SubPayChUpdatesResp) {}
     rpc UnsubPayChUpdates (UnsubPayChUpdatesReq) returns (UnsubPayChUpdatesResp) {}
     rpc RespondPayChUpdate (RespondPayChUpdateReq) returns (RespondPayChUpdateResp) {}
-    rpc GetBalance (GetBalanceReq) returns (GetBalanceResp) {}
+    rpc GetPayChBalance (GetPayChBalanceReq) returns (GetPayChBalanceResp) {}
     rpc ClosePayCh (ClosePayChReq) returns (ClosePayChResp) {}
 }
 
@@ -187,12 +186,10 @@ message SubPayChProposalsResp {
         MsgError error = 2;
     }
     message Notify {
-        string sessionID = 1;
         string proposalID = 2;
-        string payee = 3;
         BalanceInfo openingBalance = 4;
         uint64 challengeDurSecs = 5;
-        int64 timeout = 6;
+        int64 expiry = 6;
     }
 }
 
@@ -223,6 +220,7 @@ message RespondPayChProposalResp {
     }
     message MsgSuccess {
         bool success=1;
+        PaymentChannel channel=2;
     }
 }
 
@@ -299,9 +297,9 @@ message SubPayChUpdatesResp {
     }
     message Notify {
         BalanceInfo proposedBalance = 1;
-        string version = 2;
+        string updateID = 2;
         bool final = 3;
-        int64 timeout = 4;
+        int64 expiry = 4;
     }
 }
 
@@ -323,7 +321,7 @@ message UnsubPayChUpdatesResp {
 message RespondPayChUpdateReq{
     string sessionID=1;
     string channelID=2;
-    string version=3;
+    string updateID=3;
     bool accept=4;
 }
 
@@ -337,12 +335,12 @@ message RespondPayChUpdateResp {
     }
 }
 
-message GetBalanceReq {
+message GetPayChBalanceReq {
     string sessionID=1;
     string channelID=2;
 }
 
-message GetBalanceResp {
+message GetPayChBalanceResp {
     oneof response{
         MsgSuccess msgSuccess = 1;
         MsgError error = 2;
@@ -368,4 +366,3 @@ message ClosePayChResp {
         string closingVersion = 2;
     }
 }
-
