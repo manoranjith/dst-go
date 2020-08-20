@@ -34,7 +34,6 @@ import (
 	"github.com/hyperledger-labs/perun-node"
 	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
-	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
@@ -52,7 +51,7 @@ func init() {
 func Test_Integ_New(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))
 	_, testUser := sessiontest.NewTestUser(t, prng, 0)
-	adjudicator, asset := clienttest.NewChainSetup(t, testUser.OnChain, clienttest.TestChainURL)
+	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL)
 
 	testUser.CommType = "tcp"
 	port, err := freeport.GetFreePort()
@@ -77,11 +76,11 @@ func Test_Integ_New(t *testing.T) {
 
 	cfg := session.Config{
 		User:             userCfg,
-		ChainURL:         clienttest.TestChainURL,
+		ChainURL:         ethereumtest.TestChainURL,
 		Adjudicator:      adjudicator.String(),
 		Asset:            asset.String(),
 		ChainConnTimeout: 30 * time.Second,
-		DatabaseDir:      clienttest.NewDatabaseDir(t),
+		DatabaseDir:      newDatabaseDir(t),
 
 		ContactsType: "yaml",
 		ContactsURL:  testContactsYAML,
@@ -262,7 +261,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 }
 
 func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
-	adjudicator, asset := clienttest.NewChainSetup(t, testUser.OnChain, clienttest.TestChainURL)
+	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL)
 
 	emptyContacts, err := ioutil.TempFile("", "")
 	require.NoError(t, err)
@@ -291,11 +290,11 @@ func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
 
 	cfg := session.Config{
 		User:             userCfg,
-		ChainURL:         clienttest.TestChainURL,
+		ChainURL:         ethereumtest.TestChainURL,
 		Adjudicator:      adjudicator.String(),
 		Asset:            asset.String(),
 		ChainConnTimeout: 30 * time.Second,
-		DatabaseDir:      clienttest.NewDatabaseDir(t),
+		DatabaseDir:      newDatabaseDir(t),
 
 		ContactsType: "yaml",
 		ContactsURL:  emptyContacts.Name(),
@@ -305,4 +304,15 @@ func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
 	require.NoError(t, err)
 	require.NotNil(t, sess)
 	return sess
+}
+
+func newDatabaseDir(t *testing.T) (dir string) {
+	databaseDir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if err := os.RemoveAll(databaseDir); err != nil {
+			t.Logf("Error in removing the file in test cleanup - %v", err)
+		}
+	})
+	return databaseDir
 }
