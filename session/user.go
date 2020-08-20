@@ -18,7 +18,7 @@ package session
 
 import (
 	"github.com/pkg/errors"
-	"perun.network/go-perun/wallet"
+	pwallet "perun.network/go-perun/wallet"
 
 	"github.com/hyperledger-labs/perun-node"
 )
@@ -69,9 +69,9 @@ func newCred(wb perun.WalletBackend, cfg WalletConfig, addr string) (perun.Crede
 
 // parseUnlock parses the given addresses string using the wallet backend and unlocks accounts
 // corresponding to each of the given addresses.
-func parseUnlock(wb perun.WalletBackend, w wallet.Wallet, addrs ...string) ([]wallet.Address, error) {
+func parseUnlock(wb perun.WalletBackend, w pwallet.Wallet, addrs ...string) ([]pwallet.Address, error) {
 	var err error
-	parsedAddrs := make([]wallet.Address, len(addrs))
+	parsedAddrs := make([]pwallet.Address, len(addrs))
 	for i, addr := range addrs {
 		if parsedAddrs[i], err = wb.ParseAddr(addr); err != nil {
 			return nil, err
