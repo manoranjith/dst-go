@@ -1,6 +1,11 @@
 package node
 
-import "time"
+import (
+	"path/filepath"
+	"time"
+
+	"github.com/spf13/viper"
+)
 
 // Config represents the configuratio parameters for the node.
 type Config struct {
@@ -17,4 +22,16 @@ type Config struct {
 	ChainConnTimeout time.Duration // Timeout for connecting to blockchain node.
 	OnChainTxTimeout time.Duration // Timeout to wait for confirmation of on-chain tx.
 	ResponseTimeout  time.Duration // Timeout to wait for a response from the peer / user.
+}
+
+func ParseConfig(configFile string) (Config, error) {
+	v := viper.New()
+	v.SetConfigFile(filepath.Clean(configFile))
+
+	var cfg Config
+	err := v.ReadInConfig()
+	if err != nil {
+		return Config{}, err
+	}
+	return cfg, v.Unmarshal(&cfg)
 }

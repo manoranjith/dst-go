@@ -50,8 +50,8 @@ var (
 		ContactsType: "yaml",
 		ContactsURL:  "./test-contacts.yaml",
 		ChainURL:     "ws://127.0.0.1:8545",
-		Asset:        "0x2681807986951466585898338058137657239292",
-		Adjudicator:  "0x9833928268137658696658581723920798514805",
+		Asset:        "0x5992089d61cE79B6CF90506F70DD42B8E42FB21d",
+		Adjudicator:  "0x9daEdAcb21dce86Af8604Ba1A1D7F9BFE55ddd63",
 		DatabaseDir:  "./test-db",
 	}
 )

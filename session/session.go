@@ -86,11 +86,13 @@ func New(cfg Config) (*session, error) {
 
 	chClientCfg := client.Config{
 		Chain: client.ChainConfig{
-			Adjudicator:      cfg.Adjudicator,
-			Asset:            cfg.Asset,
-			URL:              cfg.ChainURL,
-			ConnTimeout:      cfg.ChainConnTimeout,
-			OnChainTxTimeout: cfg.OnChainTxTimeout,
+			Adjudicator: cfg.Adjudicator,
+			Asset:       cfg.Asset,
+			URL:         cfg.ChainURL,
+			// ConnTimeout:      cfg.ChainConnTimeout,
+			ConnTimeout:      30 * time.Second,
+			OnChainTxTimeout: 10 * time.Second,
+			// OnChainTxTimeout: cfg.OnChainTxTimeout,
 		},
 		DatabaseDir:       cfg.DatabaseDir,
 		PeerReconnTimeout: cfg.PeerReconnTimeout,
