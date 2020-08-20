@@ -24,6 +24,7 @@ import (
 	"github.com/hyperledger-labs/perun-node/log"
 )
 
+// walletBackend is used for parsing off-chain addresses in incoming contacts.
 var walletBackend perun.WalletBackend
 
 func init() {
@@ -32,21 +33,21 @@ func init() {
 }
 
 type (
-	// session ...
 	session struct {
 		log.Logger
 
-		id       string
-		user     perun.User
-		chAsset  pchannel.Asset
-		chClient perun.ChannelClient
-		contacts perun.Contacts
+		id         string
+		timeoutCfg timeoutConfig
+		user       perun.User
+		chAsset    pchannel.Asset
+		chClient   perun.ChannelClient
+		contacts   perun.Contacts
 
 		channels map[string]*channel
 
 		chProposalNotifier    perun.ChProposalNotifier
 		chProposalNotifsCache []perun.ChProposalNotif
-		chProposalResponders  map[string]ChProposalResponderEntry
+		chProposalResponders  map[string]chProposalResponderEntry
 
 		chCloseNotifier    perun.ChCloseNotifier
 		chCloseNotifsCache []perun.ChCloseNotif
@@ -54,16 +55,17 @@ type (
 		sync.RWMutex
 	}
 
-	ChProposalResponderEntry struct {
-		responder ChProposalResponder
-		parts     []string
-		expiry    int64
+	chProposalResponderEntry struct {
+		responder        chProposalResponder
+		challengeDurSecs uint64
+		parts            []string
+		expiry           int64
 	}
 
-	//go:generate mockery -name ProposalResponder -output ../internal/mocks
+	//go:generate mockery -name chProposalResponder -output ../internal/mocks
 
 	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
-	ChProposalResponder interface {
+	chProposalResponder interface {
 		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
 		Reject(ctx context.Context, reason string) error
 	}
@@ -104,16 +106,22 @@ func New(cfg Config) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	sessionID := calcSessionID(user.OffChainAddr.Bytes())
+	timeoutCfg := timeoutConfig{
+		onChainTx: cfg.OnChainTxTimeout,
+		response:  cfg.ResponseTimeout,
+	}
 	sess := &session{
 		Logger:               log.NewLoggerWithField("session-id", sessionID),
 		id:                   sessionID,
+		timeoutCfg:           timeoutCfg,
 		user:                 user,
 		chAsset:              chAsset,
 		chClient:             chClient,
 		contacts:             contacts,
 		channels:             make(map[string]*channel),
-		chProposalResponders: make(map[string]ChProposalResponderEntry),
+		chProposalResponders: make(map[string]chProposalResponderEntry),
 	}
 	chClient.Handle(sess, sess) // Init handlers
 	return sess, nil
@@ -212,17 +220,19 @@ func (s *session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.
 		InitBals:          allocations,
 		PeerAddrs:         partAddrs,
 	}
-	pch, err := s.chClient.ProposeChannel(context.TODO(), proposal)
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.proposeCh(challengeDurSecs))
+	defer cancel()
+	pch, err := s.chClient.ProposeChannel(ctx, proposal)
 	if err != nil {
 		s.Logger.Error(err)
-		// TODO: (mano) Use errors.Is here once a sentinal error is defined in the sdk.
+		// TODO: (mano) Use errors.Is here once a sentinal error value is defined in the sdk.
 		if strings.Contains(err.Error(), "channel proposal rejected") {
 			err = perun.ErrPeerRejected
 		}
 		return perun.ChannelInfo{}, perun.GetAPIError(err)
 	}
 
-	ch := NewChannel(pch, openingBals.Currency, parts)
+	ch := NewChannel(pch, openingBals.Currency, parts, s.timeoutCfg)
 	s.channels[ch.id] = ch
 
 	go func(s *session, chID string) {
@@ -236,7 +246,6 @@ func (s *session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.
 func (s *session) HandleClose(chID string, err error) {
 	s.Logger.Debug("SDK Callback: Channel watcher returned.")
 
-	// Might be a mutex messup... check later.
 	ch := s.channels[chID]
 	ch.Lock()
 	defer ch.Unlock()
@@ -333,7 +342,7 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	s.Logger.Debug("SDK Callback: HandleUpdate")
 	s.Lock()
 	defer s.Unlock()
-	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
+	expiry := time.Now().UTC().Add(s.timeoutCfg.response).Unix()
 
 	channelID := chUpdate.State.ID
 	channelIDStr := BytesToHex(channelID[:])
@@ -354,10 +363,13 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	err := validateUpdate(ch.currState, chUpdate.State.Clone())
 	if err != nil {
 		ch.Logger.Info("Received invalid update")
-		err := responder.Reject(context.TODO(), "invalid update")
+		ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChUpdateReject())
+		defer cancel()
+		err := responder.Reject(ctx, "invalid update")
 		if err != nil {
 			s.Logger.Error("Rejecting invalid update", err)
 		}
+		expiry = 0
 	}
 
 	if chUpdate.State.IsFinal {
@@ -411,27 +423,31 @@ func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	s.Logger.Debug("SDK Callback: HandleProposal")
 	s.Lock()
 	defer s.Unlock()
-	expiry := time.Now().UTC().Add(30 * time.Minute).Unix()
+	expiry := time.Now().UTC().Add(s.timeoutCfg.response).Unix()
 
 	parts := make([]string, len(chProposal.PeerAddrs))
 	for i := range chProposal.PeerAddrs {
 		p, ok := s.contacts.ReadByOffChainAddr(chProposal.PeerAddrs[i])
 		if !ok {
 			s.Logger.Info("Received channel proposal from unknonwn peer", chProposal.PeerAddrs[i].String())
-			err := responder.Reject(context.TODO(), "unknonwn peer")
+			ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChProposalReject())
+			defer cancel()
+			err := responder.Reject(ctx, "peer not found in session contacts")
 			if err != nil {
 				s.Logger.Error("Rejecting channel proposal from unknown peer", err)
 			}
+			expiry = 0
 		}
 		parts[i] = p.Alias
 	}
 
 	proposalID := chProposal.SessID()
 	proposalIDStr := BytesToHex(proposalID[:])
-	entry := ChProposalResponderEntry{
-		responder: responder,
-		parts:     parts,
-		expiry:    expiry,
+	entry := chProposalResponderEntry{
+		responder:        responder,
+		challengeDurSecs: chProposal.ChallengeDuration,
+		parts:            parts,
+		expiry:           expiry,
 	}
 	s.chProposalResponders[proposalIDStr] = entry
 
@@ -453,6 +469,7 @@ func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 }
 
+// Start listening for sub before notif
 func (s *session) SubChProposals(notifier perun.ChProposalNotifier) error {
 	s.Logger.Debug("Received request: session.SubChProposals")
 	s.Lock()
@@ -504,7 +521,9 @@ func (s *session) RespondChProposal(chProposalID string, accept bool) error {
 
 	switch accept {
 	case true:
-		pch, err := entry.responder.Accept(context.TODO(), pclient.ProposalAcc{Participant: s.user.OffChainAddr})
+		ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChProposalAccept(entry.challengeDurSecs))
+		defer cancel()
+		pch, err := entry.responder.Accept(ctx, pclient.ProposalAcc{Participant: s.user.OffChainAddr})
 		if err != nil {
 			s.Logger.Error("Accepting channel proposal", err)
 			return perun.GetAPIError(err)
@@ -512,11 +531,13 @@ func (s *session) RespondChProposal(chProposalID string, accept bool) error {
 
 		// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
 		// Currently assume ETH as the currency for incoming channel.
-		ch := NewChannel(pch, currency.ETH, entry.parts)
+		ch := NewChannel(pch, currency.ETH, entry.parts, s.timeoutCfg)
 		s.channels[ch.id] = ch
 
 	case false:
-		err := entry.responder.Reject(context.TODO(), "rejected by user")
+		ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChProposalReject())
+		defer cancel()
+		err := entry.responder.Reject(ctx, "rejected by user")
 		if err != nil {
 			s.Logger.Error("Rejecting channel proposal", err)
 			return perun.GetAPIError(err)
@@ -535,8 +556,8 @@ func (s *session) SubChCloses(notifier perun.ChCloseNotifier) error {
 	}
 	s.chCloseNotifier = notifier
 
-	// TODO: (mano) This works for gRPC, but change to send in background.
 	// Send all cached notifications
+	// TODO: (mano) This works for gRPC, but change to send in background.
 	for i := len(s.chCloseNotifsCache); i > 0; i-- {
 		s.chCloseNotifier(s.chCloseNotifsCache[0])
 		s.chCloseNotifsCache = s.chCloseNotifsCache[1:i]

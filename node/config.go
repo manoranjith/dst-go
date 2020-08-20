@@ -1,5 +1,7 @@
 package node
 
+import "time"
+
 // Config represents the configuratio parameters for the node.
 type Config struct {
 	LogLevel string
@@ -11,4 +13,8 @@ type Config struct {
 	CommTypes       []string // Communication protocols supported by the node for off-chain communication.
 	ContactTypes    []string // Contacts Provider backends supported by the node.
 	Currencies      []string // Currencies supported by the node.
+
+	ChainConnTimeout time.Duration // Timeout for connecting to blockchain node.
+	OnChainTxTimeout time.Duration // Timeout to wait for confirmation of on-chain tx.
+	ResponseTimeout  time.Duration // Timeout to wait for a response from the peer / user.
 }

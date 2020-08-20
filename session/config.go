@@ -54,6 +54,8 @@ type Config struct {
 	ChainURL           string        // URL of the blockchain node.
 	Asset, Adjudicator string        // Address of the Asset and Adjudicator contracts.
 	ChainConnTimeout   time.Duration // Timeout for connecting to blockchain node.
+	OnChainTxTimeout   time.Duration // Timeout to wait for confirmation of on-chain tx.
+	ResponseTimeout    time.Duration // Timeout to wait for a response from the peer / user.
 
 	DatabaseDir string // Path to directory containing persistence database.
 }
