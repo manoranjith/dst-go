@@ -139,19 +139,6 @@ type (
 		Expiry    int64
 	}
 
-	ChUpdateResponderEntry struct {
-		chUpdateResponder ChUpdateResponder
-		Expiry            int64
-	}
-
-	//go:generate mockery -name ProposalResponder -output ../internal/mocks
-
-	// ChUpdaterResponder represents the methods on channel update responder that will be used the pern node.
-	ChUpdateResponder interface {
-		Accept(ctx context.Context) error
-		Reject(ctx context.Context, reason string) error
-	}
-
 	App struct {
 		Def  wallet.Address
 		Data channel.Data
