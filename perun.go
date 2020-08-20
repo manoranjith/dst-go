@@ -19,6 +19,7 @@ package perun
 import (
 	"context"
 	"math/big"
+	"time"
 
 	pchannel "perun.network/go-perun/channel"
 	ppersistence "perun.network/go-perun/channel/persistence"
@@ -268,9 +269,24 @@ type WalletBackend interface {
 	UnlockAccount(pwallet.Wallet, pwallet.Address) (pwallet.Account, error)
 } // nolint:gofumpt // unknown error, maybe a false positive
 
+type NodeConfig struct {
+	LogLevel string
+	LogFile  string
+
+	ChainAddr       string   // Address of the default blockchain node used by the perun node.
+	AdjudicatorAddr string   // Address of the default Adjudicator contract used by the perun node.
+	AssetAddr       string   // Address of the default Asset Holder contract used by the perun node.
+	CommTypes       []string // Communication protocols supported by the node for off-chain communication.
+	ContactTypes    []string // Contacts Provider backends supported by the node.
+	Currencies      []string // Currencies supported by the node.
+
+	ChainConnTimeout time.Duration // Timeout for connecting to blockchain node.
+	OnChainTxTimeout time.Duration // Timeout to wait for confirmation of on-chain tx.
+	ResponseTimeout  time.Duration // Timeout to wait for a response from the peer / user.
+}
 type NodeAPI interface {
 	Time() int64
-	GetConfig() map[string]string
+	GetConfig() NodeConfig
 	Help() []string
 	OpenSession(configFile string) (ID string, _ error)
 }

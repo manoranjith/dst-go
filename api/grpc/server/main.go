@@ -7,12 +7,13 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 	"github.com/hyperledger-labs/perun-node/node"
 )
 
 type PaymentAPI struct {
-	n *node.Node
+	n perun.NodeAPI
 }
 
 func (a *PaymentAPI) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfigResp, error) {

@@ -3,48 +3,45 @@ package node
 import (
 	"time"
 
-	"github.com/pkg/errors"
-	psync "perun.network/go-perun/pkg/sync"
-	pwallet "perun.network/go-perun/wallet"
-
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
 	"github.com/hyperledger-labs/perun-node/log"
 	"github.com/hyperledger-labs/perun-node/session"
+	"github.com/pkg/errors"
+	psync "perun.network/go-perun/pkg/sync"
 )
 
-type Node struct {
+type node struct {
 	log.Logger
 
-	Cfg Config
+	cfg perun.NodeConfig
 
-	Adjudicator, AssetHolder pwallet.Address
-	Sessions                 map[string]perun.SessionAPI // Map of session ID to session instances.
+	sessions map[string]perun.SessionAPI // Map of session ID to session instances.
 
 	psync.Mutex
 }
 
-func New(cfg Config) (*Node, error) {
-	err := log.InitLogger(cfg.LogLevel, cfg.LogFile)
+func New(cfg perun.NodeConfig) (*node, error) {
+	// To validate the contracts, credentials are required for connecting to the
+	// blockchain, which only a session has.
+	// For now, just check if the addresses are valid.
+	wb := ethereum.NewWalletBackend()
+	_, err := wb.ParseAddr(cfg.AdjudicatorAddr)
+	if err != nil {
+		return nil, errors.WithMessage(err, "default adjudicator addres")
+	}
+	_, err = wb.ParseAddr(cfg.AssetAddr)
+	if err != nil {
+		return nil, errors.WithMessage(err, "default adjudicator addres")
+	}
+
+	err = log.InitLogger(cfg.LogLevel, cfg.LogFile)
 	if err != nil {
 		return nil, errors.WithMessage(err, "initializing logger for node")
 	}
-
-	// TODO: (mano) Currently, credentials are required to initialize a chain backend
-	// for connecting to node and validating contracts. So store the config.
-	wb := ethereum.NewWalletBackend()
-	adjudicator, err := wb.ParseAddr(cfg.AdjudicatorAddr)
-	if err != nil {
-		return nil, errors.WithMessage(err, "default adjudicator addres")
-	}
-	asset, err := wb.ParseAddr(cfg.AssetAddr)
-	if err != nil {
-		return nil, errors.WithMessage(err, "default adjudicator addres")
-	}
-
-	return &Node{
+	return &node{
 		Logger: log.NewLoggerWithField("node", 1), // ID of the node is always 1.
-		Cfg: Config{
+		cfg: perun.NodeConfig{
 			LogLevel: cfg.LogLevel,
 			LogFile:  cfg.LogFile,
 
@@ -55,25 +52,21 @@ func New(cfg Config) (*Node, error) {
 			ContactTypes:    []string{"yaml"},
 			Currencies:      []string{"ETH"},
 		},
-		Adjudicator: adjudicator,
-		AssetHolder: asset,
-		Sessions:    make(map[string]perun.SessionAPI),
+		sessions: make(map[string]perun.SessionAPI),
 	}, nil
 }
 
-func (n *Node) Time() int64 {
+func (n *node) Time() int64 {
 	n.Logger.Debug("Received request: node.Time")
 	return time.Now().UTC().Unix()
 }
 
-// TODO: Change return type to map. Or is it easier to store a map and directly return it everytime
-// ?
-func (n *Node) GetConfig() Config {
+func (n *node) GetConfig() perun.NodeConfig {
 	n.Logger.Debug("Received request: node.GetConfig")
-	return n.Cfg
+	return n.cfg
 }
 
-func (n *Node) Help() []string {
+func (n *node) Help() []string {
 	return []string{"payment"}
 }
 
@@ -82,7 +75,7 @@ func (n *Node) Help() []string {
 // If missing default values from the node will be used.
 //
 // The node also initializes a logger for the generated session that logs along with its session id.
-func (n *Node) OpenSession(configFile string) (ID string, _ error) {
+func (n *node) OpenSession(configFile string) (ID string, _ error) {
 	n.Logger.Debug("Received request: node.OpenSession")
 	n.Logger.Debug(configFile)
 	n.Lock()
@@ -99,24 +92,24 @@ func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 	if err != nil {
 		return "", err
 	}
-	n.Sessions[s.ID()] = s
+	n.sessions[s.ID()] = s
 	return s.ID(), nil
 }
 
 // fillInSessionConfig fills in the missing values in session configuration
 // for those fields that have a default value in the node config.
-func (n *Node) fillInSessionConfig(cfg *session.Config) {
+func (n *node) fillInSessionConfig(cfg *session.Config) {
 	if cfg.ChainURL == "" {
-		cfg.ChainURL = n.Cfg.ChainAddr
+		cfg.ChainURL = n.cfg.ChainAddr
 	}
 	if cfg.Asset == "" {
-		cfg.Asset = n.Cfg.AssetAddr
+		cfg.Asset = n.cfg.AssetAddr
 	}
 	if cfg.Adjudicator == "" {
-		cfg.Adjudicator = n.Cfg.AdjudicatorAddr
+		cfg.Adjudicator = n.cfg.AdjudicatorAddr
 	}
 
-	cfg.ChainConnTimeout = n.Cfg.ChainConnTimeout
-	cfg.OnChainTxTimeout = n.Cfg.OnChainTxTimeout
-	cfg.ResponseTimeout = n.Cfg.ResponseTimeout
+	cfg.ChainConnTimeout = n.cfg.ChainConnTimeout
+	cfg.OnChainTxTimeout = n.cfg.OnChainTxTimeout
+	cfg.ResponseTimeout = n.cfg.ResponseTimeout
 }
