@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"perun.network/go-perun/channel"
+	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
 	"perun.network/go-perun/wallet"
 
@@ -38,11 +38,11 @@ type (
 
 		ID       string
 		User     perun.User
-		ChAsset  channel.Asset
+		ChAsset  pchannel.Asset
 		ChClient perun.ChannelClient
 		Contacts perun.Contacts
 
-		Channels map[string]*Channel
+		Channels map[string]*channel
 
 		chProposalNotifier    ChProposalNotifier
 		chProposalNotifsCache []ChProposalNotif
@@ -83,7 +83,7 @@ type (
 	ChCloseNotif struct {
 		ChannelID string
 		Currency  string
-		ChState   *channel.State
+		ChState   *pchannel.State
 		Parts     []string
 		Error     string
 	}
@@ -132,7 +132,7 @@ func New(cfg Config) (*Session, error) {
 		ChAsset:              chAsset,
 		ChClient:             chClient,
 		Contacts:             contacts,
-		Channels:             make(map[string]*Channel),
+		Channels:             make(map[string]*channel),
 		chProposalResponders: make(map[string]ChProposalResponderEntry),
 	}
 	chClient.Handle(sess, sess) // Init handlers
@@ -284,7 +284,7 @@ func (s *Session) HandleClose(chID string, err error) {
 // It errors, if the amounts in the balInfo are invalid.
 // It arranges balances in this order: own, peer.
 // PeerAddrs in channel also should be in the same order.
-func makeAllocation(bals perun.BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
+func makeAllocation(bals perun.BalInfo, peerAlias string, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
 	ownBalAmount, ok := bals.Bals[perun.OwnAlias]
 	if !ok {
 		return nil, errors.Wrap(perun.ErrMissingBalance, "for self")
@@ -302,8 +302,8 @@ func makeAllocation(bals perun.BalInfo, peerAlias string, chAsset channel.Asset)
 	if err != nil {
 		return nil, errors.WithMessage(perun.ErrInvalidAmount, "for peer"+err.Error())
 	}
-	return &channel.Allocation{
-		Assets:   []channel.Asset{chAsset},
+	return &pchannel.Allocation{
+		Assets:   []pchannel.Asset{chAsset},
 		Balances: [][]*big.Int{{ownBal, peerBal}},
 	}, nil
 }
@@ -319,7 +319,7 @@ func nonce() *big.Int {
 	return val
 }
 
-func (s *Session) GetCh(channelID string) (*Channel, error) {
+func (s *Session) GetCh(channelID string) (*channel, error) {
 	s.Logger.Debug("Internal call to get channel instance.", channelID, "--")
 	s.Lock()
 	defer s.Unlock()
@@ -406,7 +406,7 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 
 // For now, treat all channels as payment channels.
 // TODO: (mano) Fix it once support is added in the sdk.
-func validateUpdate(current, proposed *channel.State) error {
+func validateUpdate(current, proposed *pchannel.State) error {
 	var oldSum, newSum = big.NewInt(0), big.NewInt(0)
 	oldBals := current.Allocation.Balances[0]
 	oldSum.Add(oldBals[0], oldBals[1])
