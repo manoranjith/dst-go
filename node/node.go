@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"perun.network/go-perun/apps/payment"
-	"perun.network/go-perun/pkg/sync"
-	"perun.network/go-perun/wallet"
+	ppayment "perun.network/go-perun/apps/payment"
+	psync "perun.network/go-perun/pkg/sync"
+	pwallet "perun.network/go-perun/wallet"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
@@ -19,10 +19,10 @@ type Node struct {
 
 	cfg Config
 
-	Adjudicator, AssetHolder wallet.Address
+	Adjudicator, AssetHolder pwallet.Address
 	Sessions                 map[string]perun.SessionAPI // Map of session ID to session instances.
 
-	sync.Mutex
+	psync.Mutex
 }
 
 func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node, error) {
@@ -47,7 +47,7 @@ func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node
 	if err != nil {
 		return nil, errors.WithMessage(err, "parsing empty address for app def")
 	}
-	payment.SetAppDef(emptyAddr) // dummy app def.
+	ppayment.SetAppDef(emptyAddr) // dummy app def.
 
 	return &Node{
 		Logger: log.NewLoggerWithField("node", 1), // ID of the node is always 1.

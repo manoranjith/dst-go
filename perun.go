@@ -21,13 +21,12 @@ import (
 	"math/big"
 
 	pchannel "perun.network/go-perun/channel"
-	"perun.network/go-perun/channel/persistence"
-	"perun.network/go-perun/client"
+	ppersistence "perun.network/go-perun/channel/persistence"
 	pclient "perun.network/go-perun/client"
 	perunLog "perun.network/go-perun/log"
-	"perun.network/go-perun/wallet"
-	"perun.network/go-perun/wire"
-	"perun.network/go-perun/wire/net"
+	pwallet "perun.network/go-perun/wallet"
+	pwire "perun.network/go-perun/wire"
+	pnet "perun.network/go-perun/wire/net"
 )
 
 // Peer represents any participant in the off-chain network that the user wants to transact with.
@@ -37,7 +36,7 @@ type Peer struct {
 	Alias string `yaml:"alias"`
 
 	// Permanent identity used for authenticating the peer in the off-chain network.
-	OffChainAddr wire.Address `yaml:"-"`
+	OffChainAddr pwire.Address `yaml:"-"`
 	// This field holds the string value of address for easy marshaling / unmarshaling.
 	OffChainAddrString string `yaml:"offchain_address"`
 
@@ -54,7 +53,7 @@ const OwnAlias = "self"
 // ContactsReader represents a read only cached list of contacts.
 type ContactsReader interface {
 	ReadByAlias(alias string) (p Peer, contains bool)
-	ReadByOffChainAddr(offChainAddr wire.Address) (p Peer, contains bool)
+	ReadByOffChainAddr(offChainAddr pwire.Address) (p Peer, contains bool)
 }
 
 // Contacts represents a cached list of contacts backed by a storage. Read, Write and Delete methods act on the
@@ -72,7 +71,7 @@ type Contacts interface {
 // This can be protocols such as tcp, websockets, MQTT.
 type CommBackend interface {
 	// Returns a listener that can listen for incoming messages at the specified address.
-	NewListener(address string) (net.Listener, error)
+	NewListener(address string) (pnet.Listener, error)
 
 	// Returns a dialer that can dial for new outgoing connections.
 	// If timeout is zero, program will use no timeout, but standard OS timeouts may still apply.
@@ -83,7 +82,7 @@ type CommBackend interface {
 
 // Dialer extends net.Dialer with Registerer interface.
 type Dialer interface {
-	net.Dialer
+	pnet.Dialer
 	Registerer
 }
 
@@ -91,13 +90,13 @@ type Dialer interface {
 
 // Registerer is used to register the commAddr corresponding to an offChainAddr to the wire.Bus in runtime.
 type Registerer interface {
-	Register(offChainAddr wire.Address, commAddr string)
+	Register(offChainAddr pwire.Address, commAddr string)
 }
 
 // Credential represents the parameters required to access the keys and make signatures for a given address.
 type Credential struct {
-	Addr     wallet.Address
-	Wallet   wallet.Wallet
+	Addr     pwallet.Address
+	Wallet   pwallet.Wallet
 	Keystore string
 	Password string
 }
@@ -111,7 +110,7 @@ type User struct {
 
 	// List of participant addresses for this user in each open channel.
 	// OffChain credential is used for managing all these accounts.
-	PartAddrs []wallet.Address
+	PartAddrs []pwallet.Address
 }
 
 // Session provides a context for the user to interact with a node. It manages user data (such as IDs, contacts),
@@ -140,7 +139,7 @@ type (
 	}
 
 	App struct {
-		Def  wallet.Address
+		Def  pwallet.Address
 		Data pchannel.Data
 	}
 
@@ -226,13 +225,13 @@ type Currency interface {
 // Hence it is highly recommended not to stop the channel client if there are open channels.
 type ChannelClient interface {
 	Registerer
-	ProposeChannel(context.Context, *client.ChannelProposal) (*client.Channel, error)
-	Handle(client.ProposalHandler, client.UpdateHandler)
-	Channel(pchannel.ID) (*client.Channel, error)
+	ProposeChannel(context.Context, *pclient.ChannelProposal) (*pclient.Channel, error)
+	Handle(pclient.ProposalHandler, pclient.UpdateHandler)
+	Channel(pchannel.ID) (*pclient.Channel, error)
 	Close() error
 
-	EnablePersistence(persistence.PersistRestorer)
-	OnNewChannel(handler func(*client.Channel))
+	EnablePersistence(ppersistence.PersistRestorer)
+	OnNewChannel(handler func(*pclient.Channel))
 	Restore(context.Context) error
 
 	Log() perunLog.Logger
@@ -244,7 +243,7 @@ type ChannelClient interface {
 // wire.Bus (in go-perun) is a central message bus over which all clients of a channel network
 // communicate. It is used as the transport layer abstraction for the ChannelClient.
 type WireBus interface {
-	wire.Bus
+	pwire.Bus
 	Close() error
 }
 
@@ -255,18 +254,18 @@ type WireBus interface {
 //
 // It defines methods for deploying contracts; validating deployed contracts and instantiating a funder, adjudicator.
 type ChainBackend interface {
-	DeployAdjudicator() (adjAddr wallet.Address, _ error)
-	DeployAsset(adjAddr wallet.Address) (assetAddr wallet.Address, _ error)
-	ValidateContracts(adjAddr, assetAddr wallet.Address) error
-	NewFunder(assetAddr wallet.Address) pchannel.Funder
-	NewAdjudicator(adjAddr, receiverAddr wallet.Address) pchannel.Adjudicator
+	DeployAdjudicator() (adjAddr pwallet.Address, _ error)
+	DeployAsset(adjAddr pwallet.Address) (assetAddr pwallet.Address, _ error)
+	ValidateContracts(adjAddr, assetAddr pwallet.Address) error
+	NewFunder(assetAddr pwallet.Address) pchannel.Funder
+	NewAdjudicator(adjAddr, receiverAddr pwallet.Address) pchannel.Adjudicator
 }
 
 // WalletBackend wraps the methods for instantiating wallets and accounts that are specific to a blockchain platform.
 type WalletBackend interface {
-	ParseAddr(string) (wallet.Address, error)
-	NewWallet(keystore string, password string) (wallet.Wallet, error)
-	UnlockAccount(wallet.Wallet, wallet.Address) (wallet.Account, error)
+	ParseAddr(string) (pwallet.Address, error)
+	NewWallet(keystore string, password string) (pwallet.Wallet, error)
+	UnlockAccount(pwallet.Wallet, pwallet.Address) (pwallet.Account, error)
 } // nolint:gofumpt // unknown error, maybe a false positive
 
 type NodeAPI interface {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"perun.network/go-perun/apps/payment"
+	ppayment "perun.network/go-perun/apps/payment"
 	pchannel "perun.network/go-perun/channel"
 
 	"github.com/hyperledger-labs/perun-node"
@@ -32,8 +32,8 @@ type (
 
 func OpenPayCh(s perun.SessionAPI, peerAlias string, openingBals perun.BalInfo, challengeDurSecs uint64) (PayChInfo, error) {
 	paymentApp := perun.App{
-		Def:  payment.AppDef(),
-		Data: &payment.NoData{},
+		Def:  ppayment.AppDef(),
+		Data: &ppayment.NoData{},
 	}
 
 	chInfo, err := s.OpenCh(peerAlias, openingBals, paymentApp, challengeDurSecs)
