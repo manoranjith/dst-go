@@ -22,14 +22,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/client"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 )
-
-func Test_ChannelClient_Interface(t *testing.T) {
-	assert.Implements(t, (*perun.ChannelClient)(nil), new(client.Client))
-}
 
 func Test_Client_Close(t *testing.T) {
 	// happy path test is covered in integration test, as internal components of
@@ -37,10 +32,7 @@ func Test_Client_Close(t *testing.T) {
 	t.Run("err_channelClient_Err", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}
 		msgBus := &mocks.WireBus{}
-		Client := client.Client{
-			ChannelClient: chClient,
-			WireBus:       msgBus,
-		}
+		Client := client.NewClientForTest(chClient, msgBus, nil)
 
 		chClient.On("Close").Return(errors.New("error for test"))
 		msgBus.On("Close").Return(nil)
@@ -50,10 +42,7 @@ func Test_Client_Close(t *testing.T) {
 	t.Run("err_wireBus_Err", func(t *testing.T) {
 		chClient := &mocks.ChannelClient{}
 		msgBus := &mocks.WireBus{}
-		Client := client.Client{
-			ChannelClient: chClient,
-			WireBus:       msgBus,
-		}
+		Client := client.NewClientForTest(chClient, msgBus, nil)
 
 		chClient.On("Close").Return(nil)
 		msgBus.On("Close").Return(errors.New("error for test"))
