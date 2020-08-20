@@ -3,7 +3,7 @@ package payment
 import (
 	"fmt"
 
-	"perun.network/go-perun/channel"
+	pchannel "perun.network/go-perun/channel"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/currency"
@@ -55,7 +55,7 @@ func ClosePayCh(ch perun.ChannelAPI) (perun.BalInfo, error) {
 	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts), nil
 }
 
-func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amount string) (perun.StateUpdater, error) {
+func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, amount string) (perun.StateUpdater, error) {
 	parsedAmount, err := currency.NewParser(chCurrency).Parse(amount)
 	if err != nil {
 		return nil, perun.ErrInvalidAmount
@@ -81,7 +81,7 @@ func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amo
 	}
 
 	// return updater func
-	return func(state *channel.State) {
+	return func(state *pchannel.State) {
 		state.Allocation.Balances[0][payerIdx] = bals[payerIdx]
 		state.Allocation.Balances[0][payeeIdx] = bals[payeeIdx]
 	}, nil
@@ -105,7 +105,7 @@ func UnSubPayChUpdates(ch perun.ChannelAPI) error {
 }
 
 // TODO: Add a hook
-// func ValidateUpdate(current, proposed *channel.State) error {
+// func ValidateUpdate(current, proposed *pchannel.State) error {
 
 // 	// check 1:
 // 	var oldSum, newSum *big.Int

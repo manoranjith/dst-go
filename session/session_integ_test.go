@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"perun.network/go-perun/apps/payment"
+	ppayment "perun.network/go-perun/apps/payment"
 
 	"github.com/hyperledger-labs/perun-node"
 	paymentAppLib "github.com/hyperledger-labs/perun-node/apps/payment"
@@ -97,7 +97,7 @@ func newPaymentAppDef(t *testing.T) {
 	wb := ethereumtest.NewTestWalletBackend()
 	emptyAddr, err := wb.ParseAddr("0x0")
 	require.NoError(t, err)
-	payment.SetAppDef(emptyAddr) // dummy app def.
+	ppayment.SetAppDef(emptyAddr) // dummy app def.
 }
 
 var ()

@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"perun.network/go-perun/apps/payment"
-	"perun.network/go-perun/channel"
+	pchannel "perun.network/go-perun/channel"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/currency"
@@ -99,7 +99,7 @@ func UnsubPayChCloses(s perun.SessionAPI) error {
 	return s.UnsubChCloses()
 }
 
-func balsFromState(currency string, state *channel.State, parts []string) perun.BalInfo {
+func balsFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
 	return balsFromBigInt(currency, state.Balances[0], parts)
 }
 

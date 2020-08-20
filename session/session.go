@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
-	"perun.network/go-perun/wallet"
+	pwallet "perun.network/go-perun/wallet"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
@@ -56,8 +56,8 @@ type (
 
 	ChProposalResponderEntry struct {
 		responder ChProposalResponder
-		parts               []string
-		expiry              int64
+		parts     []string
+		expiry    int64
 	}
 
 	//go:generate mockery -name ProposalResponder -output ../internal/mocks
@@ -201,7 +201,7 @@ func (s *session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.
 		s.Logger.Error(err)
 		return perun.ChannelInfo{}, perun.GetAPIError(err)
 	}
-	partAddrs := []wallet.Address{s.user.OffChainAddr, peer.OffChainAddr}
+	partAddrs := []pwallet.Address{s.user.OffChainAddr, peer.OffChainAddr}
 	parts := []string{perun.OwnAlias, peer.Alias}
 	proposal := &pclient.ChannelProposal{
 		ChallengeDuration: challengeDurSecs,
@@ -367,7 +367,7 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 
 	entry := chUpdateResponderEntry{
 		responder: responder,
-		expiry:            expiry,
+		expiry:    expiry,
 	}
 	ch.chUpdateResponders[updateID] = entry
 
@@ -430,8 +430,8 @@ func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	proposalIDStr := BytesToHex(proposalID[:])
 	entry := ChProposalResponderEntry{
 		responder: responder,
-		parts:               parts,
-		expiry:              expiry,
+		parts:     parts,
+		expiry:    expiry,
 	}
 	s.chProposalResponders[proposalIDStr] = entry
 
