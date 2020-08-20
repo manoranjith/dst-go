@@ -20,7 +20,7 @@ import (
 	"context"
 	"math/big"
 
-	"perun.network/go-perun/channel"
+	pchannel "perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence"
 	"perun.network/go-perun/client"
 	pclient "perun.network/go-perun/client"
@@ -133,7 +133,7 @@ type (
 	ChUpdateNotif struct {
 		UpdateID  string
 		Currency  string
-		CurrState *channel.State
+		CurrState *pchannel.State
 		Update    *pclient.ChannelUpdate
 		Parts     []string
 		Expiry    int64
@@ -141,13 +141,13 @@ type (
 
 	App struct {
 		Def  wallet.Address
-		Data channel.Data
+		Data pchannel.Data
 	}
 
 	ChannelInfo struct {
 		ChannelID string
 		Currency  string
-		State     *channel.State
+		State     *pchannel.State
 		Parts     []string // List of Alias of channel participants.
 	}
 
@@ -156,7 +156,7 @@ type (
 		Bals     map[string]string // Map of alias to balance.
 	}
 
-	StateUpdater func(*channel.State)
+	StateUpdater func(*pchannel.State)
 )
 
 type ChannelAPI interface {
@@ -168,20 +168,42 @@ type ChannelAPI interface {
 	Close() (ChannelInfo, error)
 }
 
-// type SessionAPI interface {
-// 	AddContact(peer Peer) error
-// 	OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error)
-// 	HandleClose(chID string, err error)
-// 	GetCh(channelID string) (*Channel, error)
-// 	GetChInfos() []ChannelInfo
-// 	HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder)
-// 	HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder)
-// 	SubChProposals(notifier ChProposalNotifier) error
-// 	UnsubChProposals() error
-// 	RespondChProposal(chProposalID string, accept bool) error
-// 	SubChCloses(notifier ChCloseNotifier) error
-// 	UnsubChCloses() error
-// }
+type (
+	ChProposalNotifier func(ChProposalNotif)
+
+	ChProposalNotif struct {
+		ProposalID string
+		Currency   string
+		Proposal   *pclient.ChannelProposal
+		Parts      []string
+		Expiry     int64
+	}
+
+	ChCloseNotifier func(ChCloseNotif)
+
+	ChCloseNotif struct {
+		ChannelID string
+		Currency  string
+		ChState   *pchannel.State
+		Parts     []string
+		Error     string
+	}
+)
+
+type SessionAPI interface {
+	AddContact(peer Peer) error
+	OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error)
+	HandleClose(chID string, err error)
+	GetCh(channelID string) (ChannelAPI, error)
+	GetChInfos() []ChannelInfo
+	HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder)
+	HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder)
+	SubChProposals(notifier ChProposalNotifier) error
+	UnsubChProposals() error
+	RespondChProposal(chProposalID string, accept bool) error
+	SubChCloses(notifier ChCloseNotifier) error
+	UnsubChCloses() error
+}
 
 // Currency represents a parser than can convert between string represetation of a currency and
 // their equivalent value in base unit represented as a big interger.
@@ -204,7 +226,7 @@ type ChannelClient interface {
 	Registerer
 	ProposeChannel(context.Context, *client.ChannelProposal) (*client.Channel, error)
 	Handle(client.ProposalHandler, client.UpdateHandler)
-	Channel(channel.ID) (*client.Channel, error)
+	Channel(pchannel.ID) (*client.Channel, error)
 	Close() error
 
 	EnablePersistence(persistence.PersistRestorer)
@@ -234,8 +256,8 @@ type ChainBackend interface {
 	DeployAdjudicator() (adjAddr wallet.Address, _ error)
 	DeployAsset(adjAddr wallet.Address) (assetAddr wallet.Address, _ error)
 	ValidateContracts(adjAddr, assetAddr wallet.Address) error
-	NewFunder(assetAddr wallet.Address) channel.Funder
-	NewAdjudicator(adjAddr, receiverAddr wallet.Address) channel.Adjudicator
+	NewFunder(assetAddr wallet.Address) pchannel.Funder
+	NewAdjudicator(adjAddr, receiverAddr wallet.Address) pchannel.Adjudicator
 }
 
 // WalletBackend wraps the methods for instantiating wallets and accounts that are specific to a blockchain platform.

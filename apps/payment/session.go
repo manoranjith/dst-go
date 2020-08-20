@@ -64,7 +64,7 @@ func GetPayChs(s *session.Session) []PayChInfo {
 }
 
 func SubPayChProposals(s *session.Session, notifier PayChProposalNotifier) error {
-	return s.SubChProposals(func(notif session.ChProposalNotif) {
+	return s.SubChProposals(func(notif perun.ChProposalNotif) {
 		balsBigInt := notif.Proposal.InitBals.Balances[0]
 		notifier(PayChProposalNotif{
 			ProposalID:       notif.ProposalID,
@@ -85,7 +85,7 @@ func UnsubPayChProposals(s *session.Session) error {
 }
 
 func SubPayChCloses(s *session.Session, notifier PayChCloseNotifier) error {
-	return s.SubChCloses(func(notif session.ChCloseNotif) {
+	return s.SubChCloses(func(notif perun.ChCloseNotif) {
 		notifier(PayChCloseNotif{
 			ClosingState: PayChInfo{
 				ChannelID: notif.ChannelID,
