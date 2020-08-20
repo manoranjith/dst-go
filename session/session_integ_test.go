@@ -41,6 +41,11 @@ import (
 var (
 	testdataDir = filepath.Join("..", "testdata", "contacts")
 
+	aliceAlias = "alice"
+	alicePort  = 4341
+
+	bobAlias         = "bob"
+	bobPort          = 4342
 	testContactsYAML = filepath.Join(testdataDir, "test.yaml")
 )
 
@@ -80,6 +85,8 @@ func Test_Integ_New(t *testing.T) {
 		Adjudicator:      adjudicator.String(),
 		Asset:            asset.String(),
 		ChainConnTimeout: 30 * time.Second,
+		ResponseTimeout:  10 * time.Second,
+		OnChainTxTimeout: 5 * time.Second,
 		DatabaseDir:      newDatabaseDir(t),
 
 		ContactsType: "yaml",
@@ -260,6 +267,32 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	wg.Wait()
 }
 
+func newSession(t *testing.T, role string) (perun.SessionAPI, perun.Peer) {
+	prng := rand.New(rand.NewSource(1729))
+
+	_, aliceUser := sessiontest.NewTestUser(t, prng, uint(0))
+	aliceUser.Alias = aliceAlias
+	aliceUser.CommType = "tcp"
+	aliceUser.CommAddr = fmt.Sprintf("127.0.0.1:%d", 4341)
+	aliceUser.OffChainAddrString = aliceUser.OffChainAddr.String()
+
+	_, bobUser := sessiontest.NewTestUser(t, prng, uint(0))
+	bobUser.Alias = bobAlias
+	bobUser.CommType = "tcp"
+	bobUser.CommAddr = fmt.Sprintf("127.0.0.1:%d", 4342)
+	bobUser.OffChainAddrString = bobUser.OffChainAddr.String()
+
+	switch role {
+	case aliceAlias:
+		alice := newTestSession(t, aliceUser)
+		return alice, bobUser.Peer
+	case bobAlias:
+		bob := newTestSession(t, bobUser)
+		return bob, aliceUser.Peer
+	}
+	return nil, perun.Peer{}
+}
+
 func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
 	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL)
 
@@ -294,6 +327,8 @@ func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
 		Adjudicator:      adjudicator.String(),
 		Asset:            asset.String(),
 		ChainConnTimeout: 30 * time.Second,
+		ResponseTimeout:  10 * time.Second,
+		OnChainTxTimeout: 5 * time.Second,
 		DatabaseDir:      newDatabaseDir(t),
 
 		ContactsType: "yaml",
