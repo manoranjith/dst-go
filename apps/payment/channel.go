@@ -7,7 +7,6 @@ import (
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/currency"
-	"github.com/hyperledger-labs/perun-node/session"
 )
 
 type (
@@ -30,7 +29,7 @@ type (
 	}
 )
 
-func SendPayChUpdate(ch *session.Channel, payee, amount string) error {
+func SendPayChUpdate(ch perun.ChannelAPI, payee, amount string) error {
 	chInfo := ch.GetInfo()
 	f, err := newUpdater(chInfo.State, chInfo.Parts, chInfo.Currency, payee, amount)
 	if err != nil {
@@ -39,16 +38,16 @@ func SendPayChUpdate(ch *session.Channel, payee, amount string) error {
 	return ch.SendChUpdate(f)
 }
 
-func RespondPayChUpdate(ch *session.Channel, updateID string, accept bool) error {
+func RespondPayChUpdate(ch perun.ChannelAPI, updateID string, accept bool) error {
 	return ch.RespondChUpdate(updateID, accept)
 }
 
-func GetBalance(ch *session.Channel) perun.BalInfo {
+func GetBalance(ch perun.ChannelAPI) perun.BalInfo {
 	chInfo := ch.GetInfo()
 	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
 }
 
-func ClosePayCh(ch *session.Channel) (perun.BalInfo, error) {
+func ClosePayCh(ch perun.ChannelAPI) (perun.BalInfo, error) {
 	chInfo, err := ch.Close()
 	if err != nil {
 		return perun.BalInfo{}, err
@@ -89,7 +88,7 @@ func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amo
 
 }
 
-func SubPayChUpdates(ch *session.Channel, notifier PayChUpdateNotifier) error {
+func SubPayChUpdates(ch perun.ChannelAPI, notifier PayChUpdateNotifier) error {
 	return ch.SubChUpdates(func(notif perun.ChUpdateNotif) {
 		notifier(PayChUpdateNotif{
 			UpdateID:     notif.UpdateID,
@@ -101,7 +100,7 @@ func SubPayChUpdates(ch *session.Channel, notifier PayChUpdateNotifier) error {
 	})
 }
 
-func UnSubPayChUpdates(ch *session.Channel) error {
+func UnSubPayChUpdates(ch perun.ChannelAPI) error {
 	return ch.UnsubChUpdates()
 }
 
