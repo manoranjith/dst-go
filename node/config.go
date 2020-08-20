@@ -8,8 +8,7 @@ import (
 	"github.com/hyperledger-labs/perun-node"
 )
 
-// Config represents the configuratio parameters for the node.
-
+// ParseConfig parses the node configuration from a file.
 func ParseConfig(configFile string) (perun.NodeConfig, error) {
 	v := viper.New()
 	v.SetConfigFile(filepath.Clean(configFile))

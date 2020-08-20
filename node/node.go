@@ -14,14 +14,14 @@ import (
 
 type node struct {
 	log.Logger
-
-	cfg perun.NodeConfig
-
-	sessions map[string]perun.SessionAPI // Map of session ID to session instances.
-
+	cfg      perun.NodeConfig
+	sessions map[string]perun.SessionAPI
 	psync.Mutex
 }
 
+// New returns a perun NodeAPI instance initialized using the given config.
+// This should be called only once, subsequent calls after the first non error
+// response will return an error.
 func New(cfg perun.NodeConfig) (*node, error) {
 	// To validate the contracts, credentials are required for connecting to the
 	// blockchain, which only a session has.
@@ -29,11 +29,11 @@ func New(cfg perun.NodeConfig) (*node, error) {
 	wb := ethereum.NewWalletBackend()
 	_, err := wb.ParseAddr(cfg.AdjudicatorAddr)
 	if err != nil {
-		return nil, errors.WithMessage(err, "default adjudicator addres")
+		return nil, errors.WithMessage(err, "default adjudicator address")
 	}
 	_, err = wb.ParseAddr(cfg.AssetAddr)
 	if err != nil {
-		return nil, errors.WithMessage(err, "default adjudicator addres")
+		return nil, errors.WithMessage(err, "default adjudicator address")
 	}
 
 	err = log.InitLogger(cfg.LogLevel, cfg.LogFile)
@@ -71,11 +71,10 @@ func (n *node) Help() []string {
 	return []string{"payment"}
 }
 
-// OpenSession opens a new session based on the given configuration.
-// Parameters to connect to the chain (chainURL, asset & adjudicator addresses) are optional.
-// If missing default values from the node will be used.
+// OpenSession opens a new session for the given configuration.
+// The following parameters are optional. If missing the default values of the node will be used.
+// chainURL, asset & adjudicator addresses.
 //
-// The node also initializes a logger for the generated session that logs along with its session id.
 func (n *node) OpenSession(configFile string) (ID string, _ error) {
 	n.Logger.Debug("Received request: node.OpenSession")
 	n.Logger.Debug(configFile)
@@ -88,7 +87,7 @@ func (n *node) OpenSession(configFile string) (ID string, _ error) {
 		return "", perun.ErrInvalidConfig
 	}
 	n.fillInSessionConfig(&sessionCfg)
-	n.Logger.Debugf("%+v", sessionCfg)
+	n.Logger.Debugf("Starting node with this configuration - %+v", sessionCfg)
 	s, err := session.New(sessionCfg)
 	if err != nil {
 		return "", err
