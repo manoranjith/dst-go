@@ -14,11 +14,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clienttest
+package ethereumtest
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 	"time"
 
@@ -51,9 +49,9 @@ var (
 	adjudicatorAddr, assetAddr pwallet.Address
 )
 
-// setup checks if valid contracts are deployed in pre-computed addresses, if not it deployes them.
+// SetupContracts checks if valid contracts are deployed in pre-computed addresses, if not it deployes them.
 // Address generation mechanism in ethereum is used to pre-compute the contract address.
-func NewChainSetup(t *testing.T, onChainCred perun.Credential, chainURL string) (adjudicator, asset pwallet.Address) {
+func SetupContracts(t *testing.T, onChainCred perun.Credential, chainURL string) (adjudicator, asset pwallet.Address) {
 	require.Truef(t, isBlockchainRunning(chainURL), "cannot connect to ganache-cli node at "+chainURL)
 
 	if adjudicatorAddr == nil && assetAddr == nil {
@@ -88,15 +86,4 @@ func deployContracts(t *testing.T, chain perun.ChainBackend) (adjudicator, asset
 	asset, err = chain.DeployAsset(adjudicator)
 	require.NoError(t, err)
 	return adjudicator, asset
-}
-
-func NewDatabaseDir(t *testing.T) (dir string) {
-	databaseDir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		if err := os.RemoveAll(databaseDir); err != nil {
-			t.Logf("Error in removing the file in test cleanup - %v", err)
-		}
-	})
-	return databaseDir
 }
