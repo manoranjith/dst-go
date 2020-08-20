@@ -160,6 +160,7 @@ type (
 )
 
 type ChannelAPI interface {
+	ID() string
 	SendChUpdate(stateUpdater StateUpdater) error
 	SubChUpdates(notifier ChUpdateNotifier) error
 	UnsubChUpdates() error
