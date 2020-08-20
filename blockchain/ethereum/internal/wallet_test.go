@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"testing"
 
-	ethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	pethwallet "perun.network/go-perun/backend/ethereum/wallet"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,7 +93,7 @@ func Test_WalletBackend_ParseAddr(t *testing.T) {
 		assert.True(t, validAddr.Equals(gotAddr))
 	})
 	t.Run("happy_zero_value", func(t *testing.T) {
-		validAddr := ethwallet.Address{}
+		validAddr := pethwallet.Address{}
 		gotAddr, err := wb.ParseAddr(validAddr.String())
 		assert.NoError(t, err)
 		require.NotNil(t, gotAddr)

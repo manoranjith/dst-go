@@ -22,14 +22,14 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"perun.network/go-perun/channel"
-	"perun.network/go-perun/channel/persistence"
-	"perun.network/go-perun/channel/persistence/keyvalue"
-	"perun.network/go-perun/client"
+	pchannel "perun.network/go-perun/channel"
+	ppersistence "perun.network/go-perun/channel/persistence"
+	pkeyvalue "perun.network/go-perun/channel/persistence/keyvalue"
+	pclient "perun.network/go-perun/client"
 	perunLog "perun.network/go-perun/log"
-	"perun.network/go-perun/pkg/sortedkv/leveldb"
-	"perun.network/go-perun/wire"
-	"perun.network/go-perun/wire/net"
+	pleveldb "perun.network/go-perun/pkg/sortedkv/leveldb"
+	pwire "perun.network/go-perun/wire"
+	pnet "perun.network/go-perun/wire/net"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
@@ -37,13 +37,13 @@ import (
 
 // ChannelClient represents the methods on client.Client that are used.
 type ChannelClient interface {
-	ProposeChannel(context.Context, *client.ChannelProposal) (*client.Channel, error)
-	Handle(client.ProposalHandler, client.UpdateHandler)
-	Channel(channel.ID) (*client.Channel, error)
+	ProposeChannel(context.Context, *pclient.ChannelProposal) (*pclient.Channel, error)
+	Handle(pclient.ProposalHandler, pclient.UpdateHandler)
+	Channel(pchannel.ID) (*pclient.Channel, error)
 	Close() error
 
-	EnablePersistence(persistence.PersistRestorer)
-	OnNewChannel(handler func(*client.Channel))
+	EnablePersistence(ppersistence.PersistRestorer)
+	OnNewChannel(handler func(*pclient.Channel))
 	Restore(context.Context) error
 
 	Log() perunLog.Logger
@@ -74,9 +74,9 @@ func NewEthereumPaymentClient(cfg Config, user perun.User, comm perun.CommBacken
 		return nil, errors.WithMessage(err, "off-chain account")
 	}
 	dialer := comm.NewDialer()
-	msgBus := net.NewBus(offChainAcc, dialer)
+	msgBus := pnet.NewBus(offChainAcc, dialer)
 
-	c, err := client.New(offChainAcc.Address(), msgBus, funder, adjudicator, user.OffChain.Wallet)
+	c, err := pclient.New(offChainAcc.Address(), msgBus, funder, adjudicator, user.OffChain.Wallet)
 	if err != nil {
 		return nil, errors.Wrap(err, "initializing state channel client")
 	}
@@ -100,11 +100,11 @@ func NewEthereumPaymentClient(cfg Config, user perun.User, comm perun.CommBacken
 	return client, nil
 }
 
-func (c *Client) Register(offChainAddr wire.Address, commAddr string) {
+func (c *Client) Register(offChainAddr pwire.Address, commAddr string) {
 	c.msgBusRegistry.Register(offChainAddr, commAddr)
 }
 
-func (c *Client) Handle(ph client.ProposalHandler, ch client.UpdateHandler) {
+func (c *Client) Handle(ph pclient.ProposalHandler, ch pclient.UpdateHandler) {
 	c.runAsGoRoutine(func() { c.ChannelClient.Handle(ph, ch) })
 }
 
@@ -124,7 +124,7 @@ func (c *Client) Close() error {
 	return nil
 }
 
-func connectToChain(cfg ChainConfig, cred perun.Credential) (channel.Funder, channel.Adjudicator, error) {
+func connectToChain(cfg ChainConfig, cred perun.Credential) (pchannel.Funder, pchannel.Adjudicator, error) {
 	walletBackend := ethereum.NewWalletBackend()
 	assetAddr, err := walletBackend.ParseAddr(cfg.Asset)
 	if err != nil {
@@ -143,12 +143,12 @@ func connectToChain(cfg ChainConfig, cred perun.Credential) (channel.Funder, cha
 	return chain.NewFunder(assetAddr), chain.NewAdjudicator(adjudicatorAddr, cred.Addr), err
 }
 
-func loadPersister(c *client.Client, dbPath string, reconnTimeout time.Duration) error {
-	db, err := leveldb.LoadDatabase(dbPath)
+func loadPersister(c *pclient.Client, dbPath string, reconnTimeout time.Duration) error {
+	db, err := pleveldb.LoadDatabase(dbPath)
 	if err != nil {
 		return errors.Wrap(err, "initializing persistence database in dir - "+dbPath)
 	}
-	pr := keyvalue.NewPersistRestorer(db)
+	pr := pkeyvalue.NewPersistRestorer(db)
 	c.EnablePersistence(pr)
 	ctx, cancel := context.WithTimeout(context.Background(), reconnTimeout)
 	defer cancel()
@@ -170,7 +170,7 @@ type ProposalHandler struct{}
 // This method is called on every incoming channel proposal.
 // TODO: (mano) Implement an accept all handler until user api components are implemented.
 // TODO: (mano) Replace with proper implementation after user api components are implemented.
-func (ph *ProposalHandler) HandleProposal(_ *client.ChannelProposal, _ *client.ProposalResponder) {
+func (ph *ProposalHandler) HandleProposal(_ *pclient.ChannelProposal, _ *pclient.ProposalResponder) {
 	panic("proposalHandler.HandleProposal not implemented")
 }
 
@@ -181,6 +181,6 @@ type UpdateHandler struct{}
 // This method is called on every incoming state update for any channel managed by this client.
 // TODO: (mano) Implement an accept all handler until user api components are implemented.
 // TODO: (mano) Replace with proper implementation after user api components are implemented.
-func (uh *UpdateHandler) HandleUpdate(_ client.ChannelUpdate, _ *client.UpdateResponder) {
+func (uh *UpdateHandler) HandleUpdate(_ pclient.ChannelUpdate, _ *pclient.UpdateResponder) {
 	panic("updateHandler.HandleUpdate not implemented")
 }
