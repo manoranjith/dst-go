@@ -9,7 +9,7 @@ user:
     keystorePath: ./test-keystore-off-chain
     password: test-password-off-chain
   commAddr: 127.0.0.1:5751
-  commType: tcpip
+  commType: tcp
 
 
 contactsType: yaml 

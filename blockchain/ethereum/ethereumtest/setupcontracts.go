@@ -44,14 +44,18 @@ import (
 //
 // The contracts will be deployed only during the first run of tests and will be resused in subsequent runs. This
 // saves ~0.3s of setup time in each run. Hence when running tests on development machine, START THE NODE ONLY ONCE.
-var (
-	TestChainURL               = "ws://127.0.0.1:8545"
-	adjudicatorAddr, assetAddr pwallet.Address
+const (
+	OnChainTxTimeout = 10 * time.Second
+	TestChainURL     = "ws://127.0.0.1:8545"
+	chainConnTimeout = 10 * time.Second
 )
+
+var adjudicatorAddr, assetAddr pwallet.Address
 
 // SetupContracts checks if valid contracts are deployed in pre-computed addresses, if not it deployes them.
 // Address generation mechanism in ethereum is used to pre-compute the contract address.
-func SetupContracts(t *testing.T, onChainCred perun.Credential, chainURL string) (adjudicator, asset pwallet.Address) {
+func SetupContracts(t *testing.T, onChainCred perun.Credential, chainURL string, onChainTxTimeout time.Duration) (
+	adjudicator, asset pwallet.Address) {
 	require.Truef(t, isBlockchainRunning(chainURL), "cannot connect to ganache-cli node at "+chainURL)
 
 	if adjudicatorAddr == nil && assetAddr == nil {
@@ -64,7 +68,7 @@ func SetupContracts(t *testing.T, onChainCred perun.Credential, chainURL string)
 		asset = assetAddr
 	}
 
-	chain, err := ethereum.NewChainBackend(chainURL, 10*time.Second, onChainCred)
+	chain, err := ethereum.NewChainBackend(chainURL, chainConnTimeout, onChainTxTimeout, onChainCred)
 	require.NoError(t, err)
 
 	if err = chain.ValidateContracts(adjudicator, asset); err != nil {

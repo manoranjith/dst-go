@@ -58,6 +58,9 @@ type Config struct {
 	ResponseTimeout    time.Duration // Timeout to wait for a response from the peer / user.
 
 	DatabaseDir string // Path to directory containing persistence database.
+	// Timeout for re-establishing all open channels (if any) that was persisted during the
+	// previous running instance of the node.
+	PeerReconnTimeout time.Duration
 }
 
 func ParseConfig(configFile string) (Config, error) {

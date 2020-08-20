@@ -81,6 +81,11 @@ func (ch *channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
 	ch.Lock()
 	defer ch.Unlock()
 
+	if ch.lockState != open {
+		ch.Logger.Info("Dropping update request as the channel is " + ch.lockState)
+		return perun.ErrChNotOpen
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), ch.timeoutCfg.chUpdate())
 	defer cancel()
 	err := ch.pchannel.UpdateBy(ctx, stateUpdater)
@@ -180,7 +185,7 @@ func (ch *channel) getChInfo() perun.ChannelInfo {
 	return perun.ChannelInfo{
 		ChannelID: ch.id,
 		Currency:  ch.currency,
-		State:     ch.pchannel.State().Clone(),
+		State:     ch.currState,
 		Parts:     ch.parts,
 	}
 }
@@ -201,6 +206,8 @@ func (ch *channel) Close() (perun.ChannelInfo, error) {
 	if err := ch.pchannel.UpdateBy(upCtx, chFinalizer); err != nil {
 		ch.Logger.Info("Error when trying to finalize state for closing:", err)
 		ch.Logger.Info("Opting for non collaborative close")
+	} else {
+		ch.currState = ch.pchannel.State().Clone()
 	}
 
 	clCtx, clCancel := context.WithTimeout(context.Background(), ch.timeoutCfg.closeCh(ch.challengeDurSecs))

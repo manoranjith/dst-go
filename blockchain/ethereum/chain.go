@@ -31,19 +31,16 @@ import (
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/internal"
 )
 
-// ChainTxTimeout is the timeout for on-chain transactions.
-// An arbitrarily value of 10 minute is used, for real backends.
-const ChainTxTimeout = 10 * time.Minute
-
 // NewChainBackend initializes a connection to blockchain node and sets up a wallet with given credentials
 // for funding on-chain transactions and channel balances.
 //
 // It uses the provided credentials to initialize a new keystore wallet.
 //
 // The function signature uses only types defined in the root package of this project and types from std lib.
-// This enables the function to be loaded as symbol without importing this package when it is compiled as plugin.
-func NewChainBackend(url string, timeout time.Duration, cred perun.Credential) (perun.ChainBackend, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+// Enabling it to be loaded as symbol without importing this package when the package is compiled as plugin.
+func NewChainBackend(url string, chainConnTimeout, onChainTxTimeout time.Duration, cred perun.Credential) (
+	perun.ChainBackend, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), chainConnTimeout)
 	defer cancel()
 	ethereumBackend, err := ethclient.DialContext(ctx, url)
 	if err != nil {
@@ -56,5 +53,5 @@ func NewChainBackend(url string, timeout time.Duration, cred perun.Credential) (
 		return nil, errors.Wrap(err, "unlocking on-chain keystore for addr - "+cred.Addr.String())
 	}
 	cb := pethchannel.NewContractBackend(ethereumBackend, ks, &acc)
-	return &internal.ChainBackend{Cb: &cb, TxTimeout: ChainTxTimeout}, nil
+	return &internal.ChainBackend{Cb: &cb, TxTimeout: onChainTxTimeout}, nil
 }

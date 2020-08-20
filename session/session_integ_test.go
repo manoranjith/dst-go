@@ -41,9 +41,8 @@ import (
 var (
 	testdataDir = filepath.Join("..", "testdata", "contacts")
 
-	aliceAlias = "alice"
-	alicePort  = 4341
-
+	aliceAlias       = "alice"
+	alicePort        = 4341
 	bobAlias         = "bob"
 	bobPort          = 4342
 	testContactsYAML = filepath.Join(testdataDir, "test.yaml")
@@ -56,7 +55,7 @@ func init() {
 func Test_Integ_New(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))
 	_, testUser := sessiontest.NewTestUser(t, prng, 0)
-	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL)
+	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL, ethereumtest.OnChainTxTimeout)
 
 	testUser.CommType = "tcp"
 	port, err := freeport.GetFreePort()
@@ -294,7 +293,7 @@ func newSession(t *testing.T, role string) (perun.SessionAPI, perun.Peer) {
 }
 
 func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
-	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL)
+	adjudicator, asset := ethereumtest.SetupContracts(t, testUser.OnChain, ethereumtest.TestChainURL, ethereumtest.OnChainTxTimeout)
 
 	emptyContacts, err := ioutil.TempFile("", "")
 	require.NoError(t, err)

@@ -86,12 +86,14 @@ func New(cfg Config) (*session, error) {
 
 	chClientCfg := client.Config{
 		Chain: client.ChainConfig{
-			Adjudicator: cfg.Adjudicator,
-			Asset:       cfg.Asset,
-			URL:         cfg.ChainURL,
-			ConnTimeout: cfg.ChainConnTimeout,
+			Adjudicator:      cfg.Adjudicator,
+			Asset:            cfg.Asset,
+			URL:              cfg.ChainURL,
+			ConnTimeout:      cfg.ChainConnTimeout,
+			OnChainTxTimeout: cfg.OnChainTxTimeout,
 		},
-		DatabaseDir: cfg.DatabaseDir,
+		DatabaseDir:       cfg.DatabaseDir,
+		PeerReconnTimeout: cfg.PeerReconnTimeout,
 	}
 	chClient, err := client.NewEthereumPaymentClient(chClientCfg, user, commBackend)
 	if err != nil {
@@ -360,17 +362,6 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	ch.Logger.Debug("SDK Callback: Start processing")
 
 	ch.Logger.Debug(fmt.Sprintf("%+v", ch.currState))
-	err := validateUpdate(ch.currState, chUpdate.State.Clone())
-	if err != nil {
-		ch.Logger.Info("Received invalid update")
-		ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChUpdateReject())
-		defer cancel()
-		err := responder.Reject(ctx, "invalid update")
-		if err != nil {
-			s.Logger.Error("Rejecting invalid update", err)
-		}
-		expiry = 0
-	}
 
 	if chUpdate.State.IsFinal {
 		ch.Logger.Info("Received final update, channel is finalized.")
@@ -398,25 +389,6 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 		ch.chUpdateNotifier(notif)
 		ch.Logger.Debug("SDK Callback: Notification sent")
 	}
-}
-
-// For now, treat all channels as payment channels.
-// TODO: (mano) Fix it once support is added in the sdk.
-func validateUpdate(current, proposed *pchannel.State) error {
-	var oldSum, newSum = big.NewInt(0), big.NewInt(0)
-	oldBals := current.Allocation.Balances[0]
-	oldSum.Add(oldBals[0], oldBals[1])
-	newBals := proposed.Allocation.Balances[0]
-	newSum.Add(newBals[0], newBals[1])
-
-	if newSum.Cmp(oldSum) != 0 {
-		return errors.New("invalid update: sum of balances is not constant")
-	}
-
-	if newBals[0].Sign() == -1 || newBals[1].Sign() == -1 {
-		return errors.New("this update results in negative balance, hence not allowed")
-	}
-	return nil
 }
 
 func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder) {
@@ -451,8 +423,8 @@ func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 	s.chProposalResponders[proposalIDStr] = entry
 
-	// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
-	// Currently assume ETH as the currency for incoming channel.
+	// Set ETH as the currency interpretter for incoming channel.
+	// TODO: (mano) Provide an option for user to configure when more currency interpretters are supported.
 	notif := perun.ChProposalNotif{
 		ProposalID: proposalIDStr,
 		Currency:   currency.ETH,
@@ -529,8 +501,8 @@ func (s *session) RespondChProposal(chProposalID string, accept bool) error {
 			return perun.GetAPIError(err)
 		}
 
-		// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
-		// Currently assume ETH as the currency for incoming channel.
+		// Set ETH as the currency interpretter for incoming channel.
+		// TODO: (mano) Provide an option for user to configure when more currency interpretters are supported.
 		ch := NewChannel(pch, currency.ETH, entry.parts, s.timeoutCfg)
 		s.channels[ch.id] = ch
 
