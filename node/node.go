@@ -3,12 +3,13 @@ package node
 import (
 	"time"
 
+	"github.com/pkg/errors"
+	psync "perun.network/go-perun/pkg/sync"
+
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
 	"github.com/hyperledger-labs/perun-node/log"
 	"github.com/hyperledger-labs/perun-node/session"
-	"github.com/pkg/errors"
-	psync "perun.network/go-perun/pkg/sync"
 )
 
 type node struct {

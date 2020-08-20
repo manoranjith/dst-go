@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/node"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/node"
 )
 
 var (

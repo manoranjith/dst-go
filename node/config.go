@@ -3,8 +3,9 @@ package node
 import (
 	"path/filepath"
 
-	"github.com/hyperledger-labs/perun-node"
 	"github.com/spf13/viper"
+
+	"github.com/hyperledger-labs/perun-node"
 )
 
 // Config represents the configuratio parameters for the node.
