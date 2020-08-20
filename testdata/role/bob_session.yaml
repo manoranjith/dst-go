@@ -1,0 +1,20 @@
+user:
+  alias: bob
+  onchainaddr: 0xc4bA4815c82727554e4c12A07a139b74c6742322
+  onchainwallet:
+    keystorepath: ../../../testdata/role/bob_session.yaml
+    password: ""
+  partaddrs: []
+  offchainaddr: 0x7b7E212652b9C3755C4E1f1718a142dDE3817523
+  offchainwallet:
+    keystorepath: ../../../testdata/role/bob_keystore
+    password: ""
+  commaddr: 127.0.0.1:4342
+  commtype: tcp
+contactstype: yaml
+contactsurl: ../../../testdata/role/bob_contacts.yaml
+chainurl: ws://127.0.0.1:8545
+asset: 0x5992089d61cE79B6CF90506F70DD42B8E42FB21d
+adjudicator: 0x9daEdAcb21dce86Af8604Ba1A1D7F9BFE55ddd63
+databasedir: /tmp/052160772
+peerreconntimeout: 0s

@@ -1,0 +1,20 @@
+user:
+  alias: alice
+  onchainaddr: 0x8450c0055cB180C7C37A25866132A740b812937B
+  onchainwallet:
+    keystorepath: ../../../testdata/role/alice_keystore
+    password: ""
+  partaddrs: []
+  offchainaddr: 0xa617fa2cc5eC8d72d4A60b9F424677e74E6bef68
+  offchainwallet:
+    keystorepath: ../../../testdata/role/alice_keystore
+    password: ""
+  commaddr: 127.0.0.1:4341
+  commtype: tcp
+contactstype: yaml
+contactsurl: ../../../testdata/role/alice_contacts.yaml
+chainurl: ws://127.0.0.1:8545
+asset: 0x5992089d61cE79B6CF90506F70DD42B8E42FB21d
+adjudicator: 0x9daEdAcb21dce86Af8604Ba1A1D7F9BFE55ddd63
+databasedir: /tmp/349501338
+peerreconntimeout: 0s

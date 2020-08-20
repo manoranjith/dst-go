@@ -1,0 +1,10 @@
+alice:
+    alias: alice
+    offchain_address: 0xa617fa2cc5eC8d72d4A60b9F424677e74E6bef68
+    comm_address: 127.0.0.1:4341
+    comm_type: tcp
+bob:
+    alias: bob
+    offchain_address: 0x7b7E212652b9C3755C4E1f1718a142dDE3817523
+    comm_address: 127.0.0.1:4342
+    comm_type: tcp
