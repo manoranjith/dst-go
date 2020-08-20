@@ -20,7 +20,7 @@ type Node struct {
 	cfg Config
 
 	Adjudicator, AssetHolder wallet.Address
-	Sessions                 map[string]*session.Session // Map of session ID to session instances.
+	Sessions                 map[string]perun.SessionAPI // Map of session ID to session instances.
 
 	sync.Mutex
 }
@@ -64,7 +64,7 @@ func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node
 		},
 		Adjudicator: adjudicator,
 		AssetHolder: asset,
-		Sessions:    make(map[string]*session.Session),
+		Sessions:    make(map[string]perun.SessionAPI),
 	}, nil
 }
 
@@ -105,8 +105,8 @@ func (n *Node) OpenSession(configFile string) (ID string, _ error) {
 	if err != nil {
 		return "", err
 	}
-	n.Sessions[s.ID] = s
-	return s.ID, nil
+	n.Sessions[s.ID()] = s
+	return s.ID(), nil
 }
 
 // fillInSessionConfig fills in the missing values in session configuration

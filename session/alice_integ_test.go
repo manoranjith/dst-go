@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
@@ -18,7 +17,7 @@ var (
 	bobPort  = 4342
 )
 
-func newSession(t *testing.T, role string) (*session.Session, perun.Peer) {
+func newSession(t *testing.T, role string) (perun.SessionAPI, perun.Peer) {
 	prng := rand.New(rand.NewSource(1729))
 	newPaymentAppDef(t)
 

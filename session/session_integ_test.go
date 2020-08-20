@@ -109,8 +109,8 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	alice, gotBobContact := newSession(t, aliceAlias)
 	bob, gotAliceContact := newSession(t, bobAlias)
 	var err error
-	t.Log("alice session id:", alice.ID)
-	t.Log("bob session id:", bob.ID)
+	t.Log("alice session id:", alice.ID())
+	t.Log("bob session id:", bob.ID())
 
 	t.Log("add alice contact to bob")
 	require.NoError(t, bob.AddContact(gotAliceContact))
@@ -271,7 +271,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	wg.Wait()
 }
 
-func newTestSession(t *testing.T, testUser perun.User) *session.Session {
+func newTestSession(t *testing.T, testUser perun.User) perun.SessionAPI {
 	adjudicator, asset := clienttest.NewChainSetup(t, testUser.OnChain, clienttest.TestChainURL)
 
 	emptyContacts, err := ioutil.TempFile("", "")
