@@ -46,6 +46,7 @@ var (
 	ErrNoActiveSub      = APIError("No active subscription was found.")
 	ErrSubAlreadyExists = APIError("A subscription for this context already exists.")
 
+	ErrChNotOpen          = APIError("Channel is not open. It is either closed or finalized")
 	ErrPeerAliasInUse     = APIError("Alias already used by another peer in the contacts.")
 	ErrPeerExists         = APIError("Peer already available in the contacts provider.")
 	ErrRespTimeoutExpired = APIError("Response to the notification was sent after the timeout has expired.")

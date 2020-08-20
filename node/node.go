@@ -115,7 +115,7 @@ func (n *Node) fillInSessionConfig(cfg *session.Config) {
 		cfg.Adjudicator = n.cfg.AdjudicatorAddr
 	}
 
+	cfg.ChainConnTimeout = n.cfg.ChainConnTimeout
 	cfg.OnChainTxTimeout = n.cfg.OnChainTxTimeout
 	cfg.ResponseTimeout = n.cfg.ResponseTimeout
-	cfg.ChainConnTimeout = n.cfg.ChainConnTimeout
 }

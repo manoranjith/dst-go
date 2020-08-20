@@ -45,7 +45,7 @@ var (
 				Password:     "test-password-off-chain",
 			},
 			CommAddr: "127.0.0.1:5751",
-			CommType: "tcpip",
+			CommType: "tcp",
 		},
 		ContactsType: "yaml",
 		ContactsURL:  "./test-contacts.yaml",
