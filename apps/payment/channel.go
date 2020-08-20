@@ -30,17 +30,17 @@ type (
 	}
 )
 
-func SendPayChUpdate(ch perun.ChannelAPI, payee, amount string) error {
+func SendPayChUpdate(pctx context.Context, ch perun.ChannelAPI, payee, amount string) error {
 	chInfo := ch.GetInfo()
 	f, err := newUpdater(chInfo.State, chInfo.Parts, chInfo.Currency, payee, amount)
 	if err != nil {
 		return err
 	}
-	return ch.SendChUpdate(context.Background(), f)
+	return ch.SendChUpdate(pctx, f)
 }
 
-func RespondPayChUpdate(ch perun.ChannelAPI, updateID string, accept bool) error {
-	return ch.RespondChUpdate(context.Background(), updateID, accept)
+func RespondPayChUpdate(pctx context.Context, ch perun.ChannelAPI, updateID string, accept bool) error {
+	return ch.RespondChUpdate(pctx, updateID, accept)
 }
 
 func GetBalance(ch perun.ChannelAPI) perun.BalInfo {
@@ -48,8 +48,8 @@ func GetBalance(ch perun.ChannelAPI) perun.BalInfo {
 	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
 }
 
-func ClosePayCh(ch perun.ChannelAPI) (perun.BalInfo, error) {
-	chInfo, err := ch.Close(context.Background())
+func ClosePayCh(pctx context.Context, ch perun.ChannelAPI) (perun.BalInfo, error) {
+	chInfo, err := ch.Close(pctx)
 	if err != nil {
 		return perun.BalInfo{}, err
 	}

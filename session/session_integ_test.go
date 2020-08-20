@@ -17,6 +17,7 @@
 package session_test
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -100,6 +101,7 @@ func Test_Integ_New(t *testing.T) {
 func Test_Integ_Role_Bob(t *testing.T) {
 
 	wg := sync.WaitGroup{}
+	ctx := context.Background()
 
 	alice, gotBobContact := newSession(t, aliceAlias)
 	bob, gotAliceContact := newSession(t, bobAlias)
@@ -132,7 +134,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		aliceProposedBalInfo := perun.BalInfo{
 			Currency: "ETH",
 			Bals:     aliceProposedBals}
-		payChInfo, err = paymentAppLib.OpenPayCh(alice, bobAlias, aliceProposedBalInfo, challengeDurSecs)
+		payChInfo, err = paymentAppLib.OpenPayCh(ctx, alice, bobAlias, aliceProposedBalInfo, challengeDurSecs)
 		require.NoError(t, err)
 		t.Log("Alice opened payment channel", payChInfo)
 	}()
@@ -148,7 +150,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	notif := <-propNotif
 	t.Log("Bob received payment channel proposal notification", notif)
 
-	err = paymentAppLib.RespondPayChProposal(bob, notif.ProposalID, true)
+	err = paymentAppLib.RespondPayChProposal(ctx, bob, notif.ProposalID, true)
 	require.NoError(t, err)
 	t.Log("Bob accepted payment channel proposal")
 
@@ -173,7 +175,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		aliceProposedBalInfo := perun.BalInfo{
 			Currency: "ETH",
 			Bals:     aliceProposedBals}
-		_, err = paymentAppLib.OpenPayCh(bob, aliceAlias, aliceProposedBalInfo, challengeDurSecs)
+		_, err = paymentAppLib.OpenPayCh(ctx, bob, aliceAlias, aliceProposedBalInfo, challengeDurSecs)
 		require.True(t, errors.Is(err, perun.ErrPeerRejected))
 		t.Log(" payment channel rejected by peer")
 
@@ -189,7 +191,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	notif3 := <-propNotif2
 	t.Log("Alice received payment channel proposal notification", notif3)
 
-	err = paymentAppLib.RespondPayChProposal(alice, notif3.ProposalID, false)
+	err = paymentAppLib.RespondPayChProposal(ctx, alice, notif3.ProposalID, false)
 	require.NoError(t, err)
 	t.Log("Alice accepted payment channel proposal")
 
@@ -214,7 +216,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err = paymentAppLib.SendPayChUpdate(ch1, "bob", "0.5")
+		err = paymentAppLib.SendPayChUpdate(ctx, ch1, "bob", "0.5")
 		require.NoError(t, err)
 	}()
 
@@ -227,7 +229,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	notif2 := <-updateNotifFrom1
-	err = paymentAppLib.RespondPayChUpdate(ch2, notif2.UpdateID, true)
+	err = paymentAppLib.RespondPayChUpdate(ctx, ch2, notif2.UpdateID, true)
 	require.NoError(t, err)
 	fmt.Println("Update was accepted")
 
@@ -240,7 +242,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		closingBal, err := paymentAppLib.ClosePayCh(ch1)
+		closingBal, err := paymentAppLib.ClosePayCh(ctx, ch1)
 		require.NoError(t, err)
 		fmt.Printf("\n%+v\n", closingBal)
 		fmt.Println("channel was closed")
@@ -248,7 +250,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 
 	// accept final update
 	notif2 = <-updateNotifFrom1
-	err = paymentAppLib.RespondPayChUpdate(ch2, notif2.UpdateID, true)
+	err = paymentAppLib.RespondPayChUpdate(ctx, ch2, notif2.UpdateID, true)
 	require.NoError(t, err)
 	fmt.Println("Update was accepted")
 
