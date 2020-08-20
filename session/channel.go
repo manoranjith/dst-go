@@ -13,42 +13,42 @@ import (
 )
 
 const (
-	ChannelOpen      ChannelLockState = "Open"
-	ChannelFinalized ChannelLockState = "Finalized"
-	ChannelClosed    ChannelLockState = "Closed"
+	open      chLockState = "open"
+	finalized chLockState = "finalized"
+	closed    chLockState = "closed"
 )
 
 type (
 	channel struct {
 		log.Logger
 
-		ID        string
-		Channel   *pclient.Channel
-		LockState ChannelLockState
-		Currency  string
-		Parts     []string
+		id        string
+		pchannel  *pclient.Channel
+		lockState chLockState
+		currency  string
+		parts     []string
 		// Store a clone of current state of the channel.
 		// Because the channel mutex in sdk will be locked during handle update function and the state cannot be read then.
-		CurrState *pchannel.State
+		currState *pchannel.State
 
 		chUpdateNotifier   perun.ChUpdateNotifier
 		chUpdateNotifCache []perun.ChUpdateNotif
-		chUpdateResponders map[string]ChUpdateResponderEntry
+		chUpdateResponders map[string]chUpdateResponderEntry
 
 		sync.RWMutex
 	}
 
-	ChannelLockState string
+	chLockState string
 
-	ChUpdateResponderEntry struct {
-		chUpdateResponder ChUpdateResponder
-		Expiry            int64
+	chUpdateResponderEntry struct {
+		responder chUpdateResponder
+		expiry    int64
 	}
 
 	//go:generate mockery -name ProposalResponder -output ../internal/mocks
 
 	// ChUpdaterResponder represents the methods on channel update responder that will be used the pern node.
-	ChUpdateResponder interface {
+	chUpdateResponder interface {
 		Accept(ctx context.Context) error
 		Reject(ctx context.Context, reason string) error
 	}
@@ -57,16 +57,20 @@ type (
 func NewChannel(pch *pclient.Channel, currency string, parts []string) *channel {
 	channelID := pch.ID()
 	ch := &channel{
-		ID:                 BytesToHex(channelID[:]),
-		Channel:            pch,
-		LockState:          ChannelOpen,
-		CurrState:          pch.State().Clone(),
-		Currency:           currency,
-		Parts:              parts,
-		chUpdateResponders: make(map[string]ChUpdateResponderEntry),
+		id:                 BytesToHex(channelID[:]),
+		pchannel:           pch,
+		lockState:          open,
+		currState:          pch.State().Clone(),
+		currency:           currency,
+		parts:              parts,
+		chUpdateResponders: make(map[string]chUpdateResponderEntry),
 	}
-	ch.Logger = log.NewLoggerWithField("channel-id", ch.ID)
+	ch.Logger = log.NewLoggerWithField("channel-id", ch.id)
 	return ch
+}
+
+func (ch *channel) ID() string {
+	return ch.id
 }
 
 func (ch *channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
@@ -74,12 +78,12 @@ func (ch *channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
 	ch.Lock()
 	defer ch.Unlock()
 
-	err := ch.Channel.UpdateBy(context.TODO(), stateUpdater)
+	err := ch.pchannel.UpdateBy(context.TODO(), stateUpdater)
 	if err != nil {
 		ch.Logger.Error("Sending channel update:", err)
 		return perun.GetAPIError(err)
 	}
-	ch.CurrState = ch.Channel.State().Clone()
+	ch.currState = ch.pchannel.State().Clone()
 	return nil
 }
 
@@ -126,29 +130,29 @@ func (ch *channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	}
 	// TODO: Check if delete or defer delete
 	delete(ch.chUpdateResponders, chUpdateID)
-	if entry.Expiry < time.Now().UTC().Unix() {
+	if entry.expiry < time.Now().UTC().Unix() {
 		ch.Logger.Error(perun.ErrRespTimeoutExpired)
 		return perun.ErrRespTimeoutExpired
 	}
 
 	switch accept {
 	case true:
-		err := entry.chUpdateResponder.Accept(context.TODO())
+		err := entry.responder.Accept(context.TODO())
 		if err != nil {
 			ch.Logger.Error("Accepting channel update", err)
 			return perun.GetAPIError(err)
 		}
-		ch.CurrState = ch.Channel.State().Clone()
+		ch.currState = ch.pchannel.State().Clone()
 
 	case false:
-		err := entry.chUpdateResponder.Reject(context.TODO(), "rejected by user")
+		err := entry.responder.Reject(context.TODO(), "rejected by user")
 		if err != nil {
 			ch.Logger.Error("Rejecting channel update", err)
 			return perun.GetAPIError(err)
 		}
 	}
 
-	if ch.LockState == ChannelFinalized {
+	if ch.lockState == finalized {
 		// Init close, wait to see how to do this.
 	}
 	return nil
@@ -164,10 +168,10 @@ func (ch *channel) GetInfo() perun.ChannelInfo {
 // This function assumes that caller has already locked the channel.
 func (ch *channel) getChInfo() perun.ChannelInfo {
 	return perun.ChannelInfo{
-		ChannelID: ch.ID,
-		Currency:  ch.Currency,
-		State:     ch.Channel.State().Clone(),
-		Parts:     ch.Parts,
+		ChannelID: ch.id,
+		Currency:  ch.currency,
+		State:     ch.pchannel.State().Clone(),
+		Parts:     ch.parts,
 	}
 }
 
@@ -179,14 +183,14 @@ func (ch *channel) Close() (perun.ChannelInfo, error) {
 	// Try to finalize state, so that channel can be settled collaboratively.
 	// If this fails, channel will still be settled but by registering the state on-chain
 	// and waiting for challenge duration to expire.
-	if err := ch.Channel.UpdateBy(context.TODO(), func(_ *pchannel.State) {}); err != nil {
+	if err := ch.pchannel.UpdateBy(context.TODO(), func(_ *pchannel.State) {}); err != nil {
 		ch.Logger.Info("Error when trying to finalize state for closing:", err)
 		ch.Logger.Info("Opting for non collaborative close")
 	}
 
-	err := ch.Channel.Settle(context.TODO())
+	err := ch.pchannel.Settle(context.TODO())
 
-	if cerr := ch.Channel.Close(); err != nil {
+	if cerr := ch.pchannel.Close(); err != nil {
 		ch.Logger.Error("Settling channel", err)
 		return perun.ChannelInfo{}, perun.GetAPIError(err)
 	} else if cerr != nil {
