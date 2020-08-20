@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"perun.network/go-perun/channel"
-	"perun.network/go-perun/client"
+	pchannel "perun.network/go-perun/channel"
+	pclient "perun.network/go-perun/client"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/log"
@@ -19,17 +19,17 @@ const (
 )
 
 type (
-	Channel struct {
+	channel struct {
 		log.Logger
 
 		ID        string
-		Channel   *client.Channel
+		Channel   *pclient.Channel
 		LockState ChannelLockState
 		Currency  string
 		Parts     []string
 		// Store a clone of current state of the channel.
 		// Because the channel mutex in sdk will be locked during handle update function and the state cannot be read then.
-		CurrState *channel.State
+		CurrState *pchannel.State
 
 		chUpdateNotifier   perun.ChUpdateNotifier
 		chUpdateNotifCache []perun.ChUpdateNotif
@@ -54,9 +54,9 @@ type (
 	}
 )
 
-func NewChannel(pch *client.Channel, currency string, parts []string) *Channel {
+func NewChannel(pch *pclient.Channel, currency string, parts []string) *channel {
 	channelID := pch.ID()
-	ch := &Channel{
+	ch := &channel{
 		ID:                 BytesToHex(channelID[:]),
 		Channel:            pch,
 		LockState:          ChannelOpen,
@@ -69,7 +69,7 @@ func NewChannel(pch *client.Channel, currency string, parts []string) *Channel {
 	return ch
 }
 
-func (ch *Channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
+func (ch *channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
 	ch.Logger.Debug("Received request channel.sendChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -83,7 +83,7 @@ func (ch *Channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
 	return nil
 }
 
-func (ch *Channel) SubChUpdates(notifier perun.ChUpdateNotifier) error {
+func (ch *channel) SubChUpdates(notifier perun.ChUpdateNotifier) error {
 	ch.Logger.Debug("Received request channel.subChUpdates")
 	ch.Lock()
 	defer ch.Unlock()
@@ -102,7 +102,7 @@ func (ch *Channel) SubChUpdates(notifier perun.ChUpdateNotifier) error {
 	return nil
 }
 
-func (ch *Channel) UnsubChUpdates() error {
+func (ch *channel) UnsubChUpdates() error {
 	ch.Logger.Debug("Received request channel.unSubChUpdates")
 	ch.Lock()
 	defer ch.Unlock()
@@ -114,7 +114,7 @@ func (ch *Channel) UnsubChUpdates() error {
 	return nil
 }
 
-func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
+func (ch *channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -154,7 +154,7 @@ func (ch *Channel) RespondChUpdate(chUpdateID string, accept bool) error {
 	return nil
 }
 
-func (ch *Channel) GetInfo() perun.ChannelInfo {
+func (ch *channel) GetInfo() perun.ChannelInfo {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.RLock()
 	defer ch.RUnlock()
@@ -162,7 +162,7 @@ func (ch *Channel) GetInfo() perun.ChannelInfo {
 }
 
 // This function assumes that caller has already locked the channel.
-func (ch *Channel) getChInfo() perun.ChannelInfo {
+func (ch *channel) getChInfo() perun.ChannelInfo {
 	return perun.ChannelInfo{
 		ChannelID: ch.ID,
 		Currency:  ch.Currency,
@@ -171,7 +171,7 @@ func (ch *Channel) getChInfo() perun.ChannelInfo {
 	}
 }
 
-func (ch *Channel) Close() (perun.ChannelInfo, error) {
+func (ch *channel) Close() (perun.ChannelInfo, error) {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -179,7 +179,7 @@ func (ch *Channel) Close() (perun.ChannelInfo, error) {
 	// Try to finalize state, so that channel can be settled collaboratively.
 	// If this fails, channel will still be settled but by registering the state on-chain
 	// and waiting for challenge duration to expire.
-	if err := ch.Channel.UpdateBy(context.TODO(), func(_ *channel.State) {}); err != nil {
+	if err := ch.Channel.UpdateBy(context.TODO(), func(_ *pchannel.State) {}); err != nil {
 		ch.Logger.Info("Error when trying to finalize state for closing:", err)
 		ch.Logger.Info("Opting for non collaborative close")
 	}
