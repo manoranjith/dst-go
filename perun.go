@@ -160,12 +160,12 @@ type (
 
 type ChannelAPI interface {
 	ID() string
-	SendChUpdate(stateUpdater StateUpdater) error
-	SubChUpdates(notifier ChUpdateNotifier) error
+	SendChUpdate(context.Context, StateUpdater) error
+	SubChUpdates(ChUpdateNotifier) error
 	UnsubChUpdates() error
-	RespondChUpdate(chUpdateID string, accept bool) error
+	RespondChUpdate(ctx context.Context, chUpdateID string, accept bool) error
 	GetInfo() ChannelInfo
-	Close() (ChannelInfo, error)
+	Close(context.Context) (ChannelInfo, error)
 }
 
 type (
@@ -193,16 +193,16 @@ type (
 type SessionAPI interface {
 	ID() string
 	AddContact(peer Peer) error
-	OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error)
+	OpenCh(ctx context.Context, peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error)
 	HandleClose(chID string, err error)
 	GetCh(channelID string) (ChannelAPI, error)
 	GetChInfos() []ChannelInfo
-	HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder)
-	HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder)
-	SubChProposals(notifier ChProposalNotifier) error
+	HandleUpdate(pclient.ChannelUpdate, *pclient.UpdateResponder)
+	HandleProposal(*pclient.ChannelProposal, *pclient.ProposalResponder)
+	SubChProposals(ChProposalNotifier) error
 	UnsubChProposals() error
-	RespondChProposal(chProposalID string, accept bool) error
-	SubChCloses(notifier ChCloseNotifier) error
+	RespondChProposal(ctx context.Context, chProposalID string, accept bool) error
+	SubChCloses(ChCloseNotifier) error
 	UnsubChCloses() error
 }
 

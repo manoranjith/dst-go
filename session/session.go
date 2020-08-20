@@ -191,7 +191,7 @@ func (s *session) GetContact(alias string) (perun.Peer, error) {
 
 // OpenCh
 // Panics if the random number generator doesn't return a valid nonce.
-func (s *session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.App, challengeDurSecs uint64) (perun.ChannelInfo, error) {
+func (s *session) OpenCh(pctx context.Context, peerAlias string, openingBals perun.BalInfo, app perun.App, challengeDurSecs uint64) (perun.ChannelInfo, error) {
 	s.Logger.Debug("Received request: session.OpenCh")
 	s.Lock()
 	defer s.Unlock()
@@ -224,7 +224,7 @@ func (s *session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.
 		InitBals:          allocations,
 		PeerAddrs:         partAddrs,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.proposeCh(challengeDurSecs))
+	ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.proposeCh(challengeDurSecs))
 	defer cancel()
 	pch, err := s.chClient.ProposeChannel(ctx, proposal)
 	if err != nil {
@@ -476,7 +476,7 @@ func (s *session) UnsubChProposals() error {
 	return nil
 }
 
-func (s *session) RespondChProposal(chProposalID string, accept bool) error {
+func (s *session) RespondChProposal(pctx context.Context, chProposalID string, accept bool) error {
 	s.Logger.Debug("Received request: session.RespondChProposal")
 	s.Lock()
 	defer s.Unlock()
@@ -495,7 +495,7 @@ func (s *session) RespondChProposal(chProposalID string, accept bool) error {
 
 	switch accept {
 	case true:
-		ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChProposalAccept(entry.challengeDurSecs))
+		ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.respChProposalAccept(entry.challengeDurSecs))
 		defer cancel()
 		pch, err := entry.responder.Accept(ctx, pclient.ProposalAcc{Participant: s.user.OffChainAddr})
 		if err != nil {
@@ -509,7 +509,7 @@ func (s *session) RespondChProposal(chProposalID string, accept bool) error {
 		s.channels[ch.id] = ch
 
 	case false:
-		ctx, cancel := context.WithTimeout(context.Background(), s.timeoutCfg.respChProposalReject())
+		ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.respChProposalReject())
 		defer cancel()
 		err := entry.responder.Reject(ctx, "rejected by user")
 		if err != nil {

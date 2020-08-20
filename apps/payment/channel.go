@@ -1,6 +1,7 @@
 package payment
 
 import (
+	"context"
 	"fmt"
 
 	pchannel "perun.network/go-perun/channel"
@@ -35,11 +36,11 @@ func SendPayChUpdate(ch perun.ChannelAPI, payee, amount string) error {
 	if err != nil {
 		return err
 	}
-	return ch.SendChUpdate(f)
+	return ch.SendChUpdate(context.Background(), f)
 }
 
 func RespondPayChUpdate(ch perun.ChannelAPI, updateID string, accept bool) error {
-	return ch.RespondChUpdate(updateID, accept)
+	return ch.RespondChUpdate(context.Background(), updateID, accept)
 }
 
 func GetBalance(ch perun.ChannelAPI) perun.BalInfo {
@@ -48,7 +49,7 @@ func GetBalance(ch perun.ChannelAPI) perun.BalInfo {
 }
 
 func ClosePayCh(ch perun.ChannelAPI) (perun.BalInfo, error) {
-	chInfo, err := ch.Close()
+	chInfo, err := ch.Close(context.Background())
 	if err != nil {
 		return perun.BalInfo{}, err
 	}

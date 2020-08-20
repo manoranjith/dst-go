@@ -76,7 +76,7 @@ func (ch *channel) ID() string {
 	return ch.id
 }
 
-func (ch *channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
+func (ch *channel) SendChUpdate(pctx context.Context, stateUpdater perun.StateUpdater) error {
 	ch.Logger.Debug("Received request channel.sendChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -86,7 +86,7 @@ func (ch *channel) SendChUpdate(stateUpdater perun.StateUpdater) error {
 		return perun.ErrChNotOpen
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ch.timeoutCfg.chUpdate())
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
 	defer cancel()
 	err := ch.pchannel.UpdateBy(ctx, stateUpdater)
 	if err != nil {
@@ -128,7 +128,7 @@ func (ch *channel) UnsubChUpdates() error {
 	return nil
 }
 
-func (ch *channel) RespondChUpdate(chUpdateID string, accept bool) error {
+func (ch *channel) RespondChUpdate(pctx context.Context, chUpdateID string, accept bool) error {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -147,7 +147,7 @@ func (ch *channel) RespondChUpdate(chUpdateID string, accept bool) error {
 
 	switch accept {
 	case true:
-		ctx, cancel := context.WithTimeout(context.Background(), ch.timeoutCfg.respChUpdateAccept())
+		ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.respChUpdateAccept())
 		defer cancel()
 		err := entry.responder.Accept(ctx)
 		if err != nil {
@@ -157,7 +157,7 @@ func (ch *channel) RespondChUpdate(chUpdateID string, accept bool) error {
 		ch.currState = ch.pchannel.State().Clone()
 
 	case false:
-		ctx, cancel := context.WithTimeout(context.Background(), ch.timeoutCfg.respChUpdateReject())
+		ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.respChUpdateReject())
 		defer cancel()
 		err := entry.responder.Reject(ctx, "rejected by user")
 		if err != nil {
@@ -190,7 +190,7 @@ func (ch *channel) getChInfo() perun.ChannelInfo {
 	}
 }
 
-func (ch *channel) Close() (perun.ChannelInfo, error) {
+func (ch *channel) Close(pctx context.Context) (perun.ChannelInfo, error) {
 	ch.Logger.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -201,7 +201,7 @@ func (ch *channel) Close() (perun.ChannelInfo, error) {
 	chFinalizer := func(state *pchannel.State) {
 		state.IsFinal = true
 	}
-	upCtx, upCancel := context.WithTimeout(context.Background(), ch.timeoutCfg.chUpdate())
+	upCtx, upCancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
 	defer upCancel()
 	if err := ch.pchannel.UpdateBy(upCtx, chFinalizer); err != nil {
 		ch.Logger.Info("Error when trying to finalize state for closing:", err)
@@ -210,7 +210,7 @@ func (ch *channel) Close() (perun.ChannelInfo, error) {
 		ch.currState = ch.pchannel.State().Clone()
 	}
 
-	clCtx, clCancel := context.WithTimeout(context.Background(), ch.timeoutCfg.closeCh(ch.challengeDurSecs))
+	clCtx, clCancel := context.WithTimeout(pctx, ch.timeoutCfg.closeCh(ch.challengeDurSecs))
 	defer clCancel()
 	err := ch.pchannel.Settle(clCtx)
 
