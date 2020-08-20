@@ -19,7 +19,6 @@ var (
 
 func newSession(t *testing.T, role string) (perun.SessionAPI, perun.Peer) {
 	prng := rand.New(rand.NewSource(1729))
-	newPaymentAppDef(t)
 
 	_, aliceUser := sessiontest.NewTestUser(t, prng, uint(0))
 	aliceUser.Alias = aliceAlias

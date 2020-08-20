@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	ppayment "perun.network/go-perun/apps/payment"
 	psync "perun.network/go-perun/pkg/sync"
 	pwallet "perun.network/go-perun/wallet"
 
@@ -42,12 +41,6 @@ func New(chainAddr, adjudicatorAddr, assetAddr, logLevel, logFile string) (*Node
 	if err != nil {
 		return nil, errors.WithMessage(err, "default adjudicator addres")
 	}
-
-	emptyAddr, err := wb.ParseAddr("0x0")
-	if err != nil {
-		return nil, errors.WithMessage(err, "parsing empty address for app def")
-	}
-	ppayment.SetAppDef(emptyAddr) // dummy app def.
 
 	return &Node{
 		Logger: log.NewLoggerWithField("node", 1), // ID of the node is always 1.
