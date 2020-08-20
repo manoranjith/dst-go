@@ -12,7 +12,7 @@ import (
 	"github.com/hyperledger-labs/perun-node/session"
 )
 
-var dummyProposalNotifier = func(session.ChProposalNotif) {}
+var dummyProposalNotifier = func(perun.ChProposalNotif) {}
 
 func Test_Session_SubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
@@ -41,7 +41,7 @@ func Test_Session_Sub_UnsubChProposals(t *testing.T) {
 	})
 }
 
-var dummyChCloseNotifier = func(session.ChCloseNotif) {}
+var dummyChCloseNotifier = func(perun.ChCloseNotif) {}
 
 func Test_Session_SubChClose(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {

@@ -44,24 +44,14 @@ type (
 
 		Channels map[string]*channel
 
-		chProposalNotifier    ChProposalNotifier
-		chProposalNotifsCache []ChProposalNotif
+		chProposalNotifier    perun.ChProposalNotifier
+		chProposalNotifsCache []perun.ChProposalNotif
 		chProposalResponders  map[string]ChProposalResponderEntry
 
-		chCloseNotifier    ChCloseNotifier
-		chCloseNotifsCache []ChCloseNotif
+		chCloseNotifier    perun.ChCloseNotifier
+		chCloseNotifsCache []perun.ChCloseNotif
 
 		sync.RWMutex
-	}
-
-	ChProposalNotifier func(ChProposalNotif)
-
-	ChProposalNotif struct {
-		ProposalID string
-		Currency   string
-		Proposal   *pclient.ChannelProposal
-		Parts      []string
-		Expiry     int64
 	}
 
 	ChProposalResponderEntry struct {
@@ -76,16 +66,6 @@ type (
 	ChProposalResponder interface {
 		Accept(context.Context, pclient.ProposalAcc) (*pclient.Channel, error)
 		Reject(ctx context.Context, reason string) error
-	}
-
-	ChCloseNotifier func(ChCloseNotif)
-
-	ChCloseNotif struct {
-		ChannelID string
-		Currency  string
-		ChState   *pchannel.State
-		Parts     []string
-		Error     string
 	}
 )
 
@@ -258,7 +238,7 @@ func (s *Session) HandleClose(chID string, err error) {
 	defer ch.Unlock()
 
 	chInfo := ch.getChInfo()
-	notif := ChCloseNotif{
+	notif := perun.ChCloseNotif{
 		ChannelID: chInfo.ChannelID,
 		Currency:  chInfo.Currency,
 		ChState:   chInfo.State,
@@ -453,7 +433,7 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 
 	// TODO: (mano) Implement a mechanism to exchange currecy of transaction between the two parties.
 	// Currently assume ETH as the currency for incoming channel.
-	notif := ChProposalNotif{
+	notif := perun.ChProposalNotif{
 		ProposalID: proposalIDStr,
 		Currency:   currency.ETH,
 		Proposal:   chProposal,
@@ -469,7 +449,7 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 }
 
-func (s *Session) SubChProposals(notifier ChProposalNotifier) error {
+func (s *Session) SubChProposals(notifier perun.ChProposalNotifier) error {
 	s.Logger.Debug("Received request: session.SubChProposals")
 	s.Lock()
 	defer s.Unlock()
@@ -541,7 +521,7 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 	return nil
 }
 
-func (s *Session) SubChCloses(notifier ChCloseNotifier) error {
+func (s *Session) SubChCloses(notifier perun.ChCloseNotifier) error {
 	s.Logger.Debug("Received request: session.SubChCloses")
 	s.Lock()
 	defer s.Unlock()
