@@ -550,6 +550,19 @@ func (s *session) UnsubChCloses() error {
 	return nil
 }
 
+func (s *session) Close(force bool) error {
+	s.Logger.Debug("Received request: session.Close")
+	s.chProposalNotifier = nil
+	s.chCloseNotifier = nil
+
+	// Currently do force close always.
+	err := s.chClient.Close()
+	if err != nil {
+		s.Logger.Error("Channel client closed with error: ", err)
+	}
+	return perun.GetAPIError(err)
+}
+
 func BytesToHex(b []byte) string {
 	return fmt.Sprintf("0x%x", b)
 }
