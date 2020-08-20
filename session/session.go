@@ -195,7 +195,7 @@ func (s *Session) GetContact(alias string) (perun.Peer, error) {
 
 // OpenCh
 // Panics if the random number generator doesn't return a valid nonce.
-func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error) {
+func (s *Session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.App, challengeDurSecs uint64) (perun.ChannelInfo, error) {
 	s.Logger.Debug("Received request: session.OpenCh")
 	s.Lock()
 	defer s.Unlock()
@@ -203,19 +203,19 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 	peer, isPresent := s.Contacts.ReadByAlias(peerAlias)
 	if !isPresent {
 		s.Logger.Error(perun.ErrUnknownAlias)
-		return ChannelInfo{}, perun.ErrUnknownAlias
+		return perun.ChannelInfo{}, perun.ErrUnknownAlias
 	}
 	s.ChClient.Register(peer.OffChainAddr, peer.CommAddr)
 
 	if !currency.IsSupported(openingBals.Currency) {
 		s.Logger.Error(perun.ErrUnsupportedCurrency.Error)
-		return ChannelInfo{}, perun.ErrUnsupportedCurrency
+		return perun.ChannelInfo{}, perun.ErrUnsupportedCurrency
 	}
 
 	allocations, err := makeAllocation(openingBals, peerAlias, s.ChAsset) // Pass a proper asset.
 	if err != nil {
 		s.Logger.Error(err)
-		return ChannelInfo{}, perun.GetAPIError(err)
+		return perun.ChannelInfo{}, perun.GetAPIError(err)
 	}
 	partAddrs := []wallet.Address{s.User.OffChainAddr, peer.OffChainAddr}
 	parts := []string{perun.OwnAlias, peer.Alias}
@@ -235,7 +235,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals BalInfo, app App, challen
 		if strings.Contains(err.Error(), "channel proposal rejected") {
 			err = perun.ErrPeerRejected
 		}
-		return ChannelInfo{}, perun.GetAPIError(err)
+		return perun.ChannelInfo{}, perun.GetAPIError(err)
 	}
 
 	ch := NewChannel(pch, openingBals.Currency, parts)
@@ -284,7 +284,7 @@ func (s *Session) HandleClose(chID string, err error) {
 // It errors, if the amounts in the balInfo are invalid.
 // It arranges balances in this order: own, peer.
 // PeerAddrs in channel also should be in the same order.
-func makeAllocation(bals BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
+func makeAllocation(bals perun.BalInfo, peerAlias string, chAsset channel.Asset) (*channel.Allocation, error) {
 	ownBalAmount, ok := bals.Bals[perun.OwnAlias]
 	if !ok {
 		return nil, errors.Wrap(perun.ErrMissingBalance, "for self")
@@ -331,12 +331,12 @@ func (s *Session) GetCh(channelID string) (*Channel, error) {
 	return ch, nil
 }
 
-func (s *Session) GetChs() []ChannelInfo {
+func (s *Session) GetChInfos() []perun.ChannelInfo {
 	s.Logger.Debug("Received request: session.GetChannels")
 	s.Lock()
 	defer s.Unlock()
 
-	chInfos := make([]ChannelInfo, len(s.Channels))
+	chInfos := make([]perun.ChannelInfo, len(s.Channels))
 	i := 0
 	for _, ch := range s.Channels {
 		chInfos[i] = ch.GetInfo()
@@ -387,7 +387,7 @@ func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 	ch.chUpdateResponders[updateID] = entry
 
-	notif := ChUpdateNotif{
+	notif := perun.ChUpdateNotif{
 		UpdateID:  updateID,
 		Currency:  ch.Currency,
 		CurrState: ch.CurrState,

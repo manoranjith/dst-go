@@ -7,6 +7,7 @@ import (
 	"perun.network/go-perun/apps/payment"
 	"perun.network/go-perun/channel"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/currency"
 	"github.com/hyperledger-labs/perun-node/session"
 )
@@ -15,7 +16,7 @@ type (
 	PayChProposalNotif struct {
 		ProposalID       string
 		Currency         string
-		OpeningBals      session.BalInfo
+		OpeningBals      perun.BalInfo
 		ChallengeDurSecs uint64
 		Expiry           int64
 	}
@@ -30,8 +31,8 @@ type (
 	PayChCloseNotifier func(PayChCloseNotif)
 )
 
-func OpenPayCh(s *session.Session, peerAlias string, openingBals session.BalInfo, challengeDurSecs uint64) (PayChInfo, error) {
-	paymentApp := session.App{
+func OpenPayCh(s *session.Session, peerAlias string, openingBals perun.BalInfo, challengeDurSecs uint64) (PayChInfo, error) {
+	paymentApp := perun.App{
 		Def:  payment.AppDef(),
 		Data: &payment.NoData{},
 	}
@@ -48,7 +49,7 @@ func OpenPayCh(s *session.Session, peerAlias string, openingBals session.BalInfo
 }
 
 func GetPayChs(s *session.Session) []PayChInfo {
-	chInfos := s.GetChs()
+	chInfos := s.GetChInfos()
 
 	payChInfos := make([]PayChInfo, len(chInfos))
 	for i := range chInfos {
@@ -99,12 +100,12 @@ func UnsubPayChCloses(s *session.Session) error {
 	return s.UnsubChCloses()
 }
 
-func balsFromState(currency string, state *channel.State, parts []string) session.BalInfo {
+func balsFromState(currency string, state *channel.State, parts []string) perun.BalInfo {
 	return balsFromBigInt(currency, state.Balances[0], parts)
 }
 
-func balsFromBigInt(chCurrency string, bigInt []*big.Int, parts []string) session.BalInfo {
-	balInfo := session.BalInfo{
+func balsFromBigInt(chCurrency string, bigInt []*big.Int, parts []string) perun.BalInfo {
+	balInfo := perun.BalInfo{
 		Currency: chCurrency,
 		Bals:     make(map[string]string, len(parts)),
 	}

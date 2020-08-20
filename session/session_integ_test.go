@@ -134,7 +134,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		aliceProposedBals := make(map[string]string)
 		aliceProposedBals["self"] = "1"
 		aliceProposedBals[bobAlias] = "2"
-		aliceProposedBalInfo := session.BalInfo{
+		aliceProposedBalInfo := perun.BalInfo{
 			Currency: "ETH",
 			Bals:     aliceProposedBals}
 		payChInfo, err = paymentAppLib.OpenPayCh(alice, bobAlias, aliceProposedBalInfo, challengeDurSecs)
@@ -175,7 +175,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		aliceProposedBals := make(map[string]string)
 		aliceProposedBals["self"] = "1"
 		aliceProposedBals[aliceAlias] = "2"
-		aliceProposedBalInfo := session.BalInfo{
+		aliceProposedBalInfo := perun.BalInfo{
 			Currency: "ETH",
 			Bals:     aliceProposedBals}
 		_, err = paymentAppLib.OpenPayCh(bob, aliceAlias, aliceProposedBalInfo, challengeDurSecs)
