@@ -13,7 +13,7 @@ import (
 type (
 	PayChInfo struct {
 		ChannelID string
-		BalInfo   session.BalInfo
+		BalInfo   perun.BalInfo
 		Version   string
 	}
 
@@ -21,7 +21,7 @@ type (
 
 	PayChUpdateNotif struct {
 		UpdateID     string
-		ProposedBals session.BalInfo
+		ProposedBals perun.BalInfo
 		Version      string
 		Final        bool
 		Currency     string
@@ -43,20 +43,20 @@ func RespondPayChUpdate(ch *session.Channel, updateID string, accept bool) error
 	return ch.RespondChUpdate(updateID, accept)
 }
 
-func GetBalance(ch *session.Channel) session.BalInfo {
+func GetBalance(ch *session.Channel) perun.BalInfo {
 	chInfo := ch.GetInfo()
 	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
 }
 
-func ClosePayCh(ch *session.Channel) (session.BalInfo, error) {
+func ClosePayCh(ch *session.Channel) (perun.BalInfo, error) {
 	chInfo, err := ch.Close()
 	if err != nil {
-		return session.BalInfo{}, err
+		return perun.BalInfo{}, err
 	}
 	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts), nil
 }
 
-func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amount string) (session.StateUpdater, error) {
+func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amount string) (perun.StateUpdater, error) {
 	parsedAmount, err := currency.NewParser(chCurrency).Parse(amount)
 	if err != nil {
 		return nil, perun.ErrInvalidAmount
@@ -90,7 +90,7 @@ func newUpdater(currState *channel.State, parts []string, chCurrency, payee, amo
 }
 
 func SubPayChUpdates(ch *session.Channel, notifier PayChUpdateNotifier) error {
-	return ch.SubChUpdates(func(notif session.ChUpdateNotif) {
+	return ch.SubChUpdates(func(notif perun.ChUpdateNotif) {
 		notifier(PayChUpdateNotif{
 			UpdateID:     notif.UpdateID,
 			ProposedBals: balsFromState(notif.Currency, notif.Update.State, notif.Parts),

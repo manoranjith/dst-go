@@ -23,6 +23,7 @@ import (
 	"perun.network/go-perun/channel"
 	"perun.network/go-perun/channel/persistence"
 	"perun.network/go-perun/client"
+	pclient "perun.network/go-perun/client"
 	perunLog "perun.network/go-perun/log"
 	"perun.network/go-perun/wallet"
 	"perun.network/go-perun/wire"
@@ -125,6 +126,75 @@ type Session struct {
 
 	ChannelClient ChannelClient
 }
+
+type (
+	ChUpdateNotifier func(ChUpdateNotif)
+
+	ChUpdateNotif struct {
+		UpdateID  string
+		Currency  string
+		CurrState *channel.State
+		Update    *pclient.ChannelUpdate
+		Parts     []string
+		Expiry    int64
+	}
+
+	ChUpdateResponderEntry struct {
+		chUpdateResponder ChUpdateResponder
+		Expiry            int64
+	}
+
+	//go:generate mockery -name ProposalResponder -output ../internal/mocks
+
+	// ChUpdaterResponder represents the methods on channel update responder that will be used the pern node.
+	ChUpdateResponder interface {
+		Accept(ctx context.Context) error
+		Reject(ctx context.Context, reason string) error
+	}
+
+	App struct {
+		Def  wallet.Address
+		Data channel.Data
+	}
+
+	ChannelInfo struct {
+		ChannelID string
+		Currency  string
+		State     *channel.State
+		Parts     []string // List of Alias of channel participants.
+	}
+
+	BalInfo struct {
+		Currency string
+		Bals     map[string]string // Map of alias to balance.
+	}
+
+	StateUpdater func(*channel.State)
+)
+
+type ChannelAPI interface {
+	SendChUpdate(stateUpdater StateUpdater) error
+	SubChUpdates(notifier ChUpdateNotifier) error
+	UnsubChUpdates() error
+	RespondChUpdate(chUpdateID string, accept bool) error
+	GetInfo() ChannelInfo
+	Close() (ChannelInfo, error)
+}
+
+// type SessionAPI interface {
+// 	AddContact(peer Peer) error
+// 	OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error)
+// 	HandleClose(chID string, err error)
+// 	GetCh(channelID string) (*Channel, error)
+// 	GetChInfos() []ChannelInfo
+// 	HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder)
+// 	HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder)
+// 	SubChProposals(notifier ChProposalNotifier) error
+// 	UnsubChProposals() error
+// 	RespondChProposal(chProposalID string, accept bool) error
+// 	SubChCloses(notifier ChCloseNotifier) error
+// 	UnsubChCloses() error
+// }
 
 // Currency represents a parser than can convert between string represetation of a currency and
 // their equivalent value in base unit represented as a big interger.
