@@ -30,13 +30,17 @@ func Test_ParseConfig(t *testing.T) {
 
 var validConfig = perun.NodeConfig{
 	LogFile:         "",
-	LogLevel:        "error",
+	LogLevel:        "debug",
 	ChainAddr:       "ws://127.0.0.1:8545",
 	AdjudicatorAddr: "0x9daEdAcb21dce86Af8604Ba1A1D7F9BFE55ddd63",
 	AssetAddr:       "0x5992089d61cE79B6CF90506F70DD42B8E42FB21d",
 	CommTypes:       []string{"tcp"},
 	ContactTypes:    []string{"yaml"},
 	Currencies:      []string{"ETH"},
+
+	ChainConnTimeout: 30 * time.Second,
+	OnChainTxTimeout: 10 * time.Second,
+	ResponseTimeout:  10 * time.Second,
 }
 
 func Test_New(t *testing.T) {
@@ -84,7 +88,7 @@ func Test_New(t *testing.T) {
 	})
 
 	t.Run("happy_OpenSession_withChainData", func(t *testing.T) {
-		sessionID, err := n.OpenSession("../testdata/session/alice_session.yaml")
+		sessionID, err := n.OpenSession("../testdata/session/session_with_chain.yaml")
 		require.NoError(t, err)
 		assert.NotZero(t, sessionID)
 	})

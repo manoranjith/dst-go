@@ -41,18 +41,8 @@ func New(cfg perun.NodeConfig) (*node, error) {
 		return nil, errors.WithMessage(err, "initializing logger for node")
 	}
 	return &node{
-		Logger: log.NewLoggerWithField("node", 1), // ID of the node is always 1.
-		cfg: perun.NodeConfig{
-			LogLevel: cfg.LogLevel,
-			LogFile:  cfg.LogFile,
-
-			ChainAddr:       cfg.ChainAddr,
-			AdjudicatorAddr: cfg.AdjudicatorAddr,
-			AssetAddr:       cfg.AssetAddr,
-			CommTypes:       []string{"tcp"},
-			ContactTypes:    []string{"yaml"},
-			Currencies:      []string{"ETH"},
-		},
+		Logger:   log.NewLoggerWithField("node", 1), // ID of the node is always 1.
+		cfg:      cfg,
 		sessions: make(map[string]perun.SessionAPI),
 	}, nil
 }
