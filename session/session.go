@@ -32,11 +32,11 @@ func init() {
 }
 
 type (
-	// Session ...
-	Session struct {
+	// session ...
+	session struct {
 		log.Logger
 
-		ID       string
+		id       string
 		User     perun.User
 		ChAsset  pchannel.Asset
 		ChClient perun.ChannelClient
@@ -69,7 +69,7 @@ type (
 	}
 )
 
-func New(cfg Config) (*Session, error) {
+func New(cfg Config) (*session, error) {
 	wb := walletBackend
 
 	user, err := NewUnlockedUser(wb, cfg.User)
@@ -105,9 +105,9 @@ func New(cfg Config) (*Session, error) {
 		return nil, err
 	}
 	sessionID := calcSessionID(user.OffChainAddr.Bytes())
-	sess := &Session{
+	sess := &session{
 		Logger:               log.NewLoggerWithField("session-id", sessionID),
-		ID:                   sessionID,
+		id:                   sessionID,
 		User:                 user,
 		ChAsset:              chAsset,
 		ChClient:             chClient,
@@ -148,7 +148,11 @@ func calcSessionID(userOffChainAddr []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func (s *Session) AddContact(peer perun.Peer) error {
+func (s *session) ID() string {
+	return s.id
+}
+
+func (s *session) AddContact(peer perun.Peer) error {
 	s.Logger.Debug("Received request: session.AddContact")
 	s.Lock()
 	defer s.Unlock()
@@ -160,7 +164,7 @@ func (s *Session) AddContact(peer perun.Peer) error {
 	return perun.GetAPIError(err)
 }
 
-func (s *Session) GetContact(alias string) (perun.Peer, error) {
+func (s *session) GetContact(alias string) (perun.Peer, error) {
 	s.Logger.Debug("Received request: session.GetContact")
 	s.RLock()
 	defer s.RUnlock()
@@ -175,7 +179,7 @@ func (s *Session) GetContact(alias string) (perun.Peer, error) {
 
 // OpenCh
 // Panics if the random number generator doesn't return a valid nonce.
-func (s *Session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.App, challengeDurSecs uint64) (perun.ChannelInfo, error) {
+func (s *session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.App, challengeDurSecs uint64) (perun.ChannelInfo, error) {
 	s.Logger.Debug("Received request: session.OpenCh")
 	s.Lock()
 	defer s.Unlock()
@@ -221,7 +225,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.
 	ch := NewChannel(pch, openingBals.Currency, parts)
 	s.Channels[ch.ID] = ch
 
-	go func(s *Session, chID string) {
+	go func(s *session, chID string) {
 		err := pch.Watch()
 		s.HandleClose(chID, err)
 	}(s, ch.ID)
@@ -229,7 +233,7 @@ func (s *Session) OpenCh(peerAlias string, openingBals perun.BalInfo, app perun.
 	return ch.GetInfo(), nil
 }
 
-func (s *Session) HandleClose(chID string, err error) {
+func (s *session) HandleClose(chID string, err error) {
 	s.Logger.Debug("SDK Callback: Channel watcher returned.")
 
 	// Might be a mutex messup... check later.
@@ -299,8 +303,8 @@ func nonce() *big.Int {
 	return val
 }
 
-func (s *Session) GetCh(channelID string) (*channel, error) {
-	s.Logger.Debug("Internal call to get channel instance.", channelID, "--")
+func (s *session) GetCh(channelID string) (perun.ChannelAPI, error) {
+	s.Logger.Debug("Internal call to get channel instance.")
 	s.Lock()
 	defer s.Unlock()
 
@@ -311,7 +315,7 @@ func (s *Session) GetCh(channelID string) (*channel, error) {
 	return ch, nil
 }
 
-func (s *Session) GetChInfos() []perun.ChannelInfo {
+func (s *session) GetChInfos() []perun.ChannelInfo {
 	s.Logger.Debug("Received request: session.GetChannels")
 	s.Lock()
 	defer s.Unlock()
@@ -325,7 +329,7 @@ func (s *Session) GetChInfos() []perun.ChannelInfo {
 	return chInfos
 }
 
-func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
+func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
 	s.Logger.Debug("SDK Callback: HandleUpdate")
 	s.Lock()
 	defer s.Unlock()
@@ -403,7 +407,7 @@ func validateUpdate(current, proposed *pchannel.State) error {
 	return nil
 }
 
-func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder) {
+func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder) {
 	s.Logger.Debug("SDK Callback: HandleProposal")
 	s.Lock()
 	defer s.Unlock()
@@ -449,7 +453,7 @@ func (s *Session) HandleProposal(chProposal *pclient.ChannelProposal, responder 
 	}
 }
 
-func (s *Session) SubChProposals(notifier perun.ChProposalNotifier) error {
+func (s *session) SubChProposals(notifier perun.ChProposalNotifier) error {
 	s.Logger.Debug("Received request: session.SubChProposals")
 	s.Lock()
 	defer s.Unlock()
@@ -469,7 +473,7 @@ func (s *Session) SubChProposals(notifier perun.ChProposalNotifier) error {
 	return nil
 }
 
-func (s *Session) UnsubChProposals() error {
+func (s *session) UnsubChProposals() error {
 	s.Logger.Debug("Received request: session.UnsubChProposals")
 	s.Lock()
 	defer s.Unlock()
@@ -481,7 +485,7 @@ func (s *Session) UnsubChProposals() error {
 	return nil
 }
 
-func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
+func (s *session) RespondChProposal(chProposalID string, accept bool) error {
 	s.Logger.Debug("Received request: session.RespondChProposal")
 	s.Lock()
 	defer s.Unlock()
@@ -521,7 +525,7 @@ func (s *Session) RespondChProposal(chProposalID string, accept bool) error {
 	return nil
 }
 
-func (s *Session) SubChCloses(notifier perun.ChCloseNotifier) error {
+func (s *session) SubChCloses(notifier perun.ChCloseNotifier) error {
 	s.Logger.Debug("Received request: session.SubChCloses")
 	s.Lock()
 	defer s.Unlock()
@@ -541,7 +545,7 @@ func (s *Session) SubChCloses(notifier perun.ChCloseNotifier) error {
 	return nil
 }
 
-func (s *Session) UnsubChCloses() error {
+func (s *session) UnsubChCloses() error {
 	s.Logger.Debug("Received request: session.UnsubChCloses")
 	s.Lock()
 	defer s.Unlock()

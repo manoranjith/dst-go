@@ -191,6 +191,7 @@ type (
 )
 
 type SessionAPI interface {
+	ID() string
 	AddContact(peer Peer) error
 	OpenCh(peerAlias string, openingBals BalInfo, app App, challengeDurSecs uint64) (ChannelInfo, error)
 	HandleClose(chID string, err error)

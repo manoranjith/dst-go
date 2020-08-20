@@ -9,7 +9,6 @@ import (
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/currency"
-	"github.com/hyperledger-labs/perun-node/session"
 )
 
 type (
@@ -31,7 +30,7 @@ type (
 	PayChCloseNotifier func(PayChCloseNotif)
 )
 
-func OpenPayCh(s *session.Session, peerAlias string, openingBals perun.BalInfo, challengeDurSecs uint64) (PayChInfo, error) {
+func OpenPayCh(s perun.SessionAPI, peerAlias string, openingBals perun.BalInfo, challengeDurSecs uint64) (PayChInfo, error) {
 	paymentApp := perun.App{
 		Def:  payment.AppDef(),
 		Data: &payment.NoData{},
@@ -48,7 +47,7 @@ func OpenPayCh(s *session.Session, peerAlias string, openingBals perun.BalInfo, 
 	}, nil
 }
 
-func GetPayChs(s *session.Session) []PayChInfo {
+func GetPayChs(s perun.SessionAPI) []PayChInfo {
 	chInfos := s.GetChInfos()
 
 	payChInfos := make([]PayChInfo, len(chInfos))
@@ -63,7 +62,7 @@ func GetPayChs(s *session.Session) []PayChInfo {
 	return payChInfos
 }
 
-func SubPayChProposals(s *session.Session, notifier PayChProposalNotifier) error {
+func SubPayChProposals(s perun.SessionAPI, notifier PayChProposalNotifier) error {
 	return s.SubChProposals(func(notif perun.ChProposalNotif) {
 		balsBigInt := notif.Proposal.InitBals.Balances[0]
 		notifier(PayChProposalNotif{
@@ -76,15 +75,15 @@ func SubPayChProposals(s *session.Session, notifier PayChProposalNotifier) error
 	})
 }
 
-func RespondPayChProposal(s *session.Session, proposalID string, accept bool) error {
+func RespondPayChProposal(s perun.SessionAPI, proposalID string, accept bool) error {
 	return s.RespondChProposal(proposalID, accept)
 }
 
-func UnsubPayChProposals(s *session.Session) error {
+func UnsubPayChProposals(s perun.SessionAPI) error {
 	return s.UnsubChProposals()
 }
 
-func SubPayChCloses(s *session.Session, notifier PayChCloseNotifier) error {
+func SubPayChCloses(s perun.SessionAPI, notifier PayChCloseNotifier) error {
 	return s.SubChCloses(func(notif perun.ChCloseNotif) {
 		notifier(PayChCloseNotif{
 			ClosingState: PayChInfo{
@@ -96,7 +95,7 @@ func SubPayChCloses(s *session.Session, notifier PayChCloseNotifier) error {
 	})
 }
 
-func UnsubPayChCloses(s *session.Session) error {
+func UnsubPayChCloses(s perun.SessionAPI) error {
 	return s.UnsubChCloses()
 }
 
