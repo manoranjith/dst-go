@@ -49,12 +49,32 @@ message MsgError {
     string error = 1;
 }
 
-// Node_API is used for accessing the node related functionality.
-service Node_API{
+// Payment_API provides APIs to for a user to open as session and within it
+// open payment channels, send/receive payments and finalize the channels on
+// the blockchain
+service Payment_API{
     rpc GetConfig (GetConfigReq) returns (GetConfigResp){}
     rpc OpenSession (OpenSessionReq) returns (OpenSessionResp) {}
     rpc Time (TimeReq) returns (TimeResp) {}
     rpc Help (HelpReq) returns (HelpResp) {}
+
+    rpc AddContact (AddContactReq) returns (AddContactResp) {}
+    rpc GetContact (GetContactReq) returns (GetContactResp) {}
+    rpc OpenPayCh (OpenPayChReq) returns (OpenPayChResp) {}
+    rpc GetPayChs (GetPayChsReq) returns (GetPayChsResp) {}
+    rpc SubPayChProposals (SubPayChProposalsReq) returns (stream SubPayChProposalsResp) {}
+    rpc UnsubPayChProposals (UnsubPayChProposalsReq) returns (UnsubPayChProposalsResp) {}
+    rpc RespondPayChProposal (RespondPayChProposalReq) returns (RespondPayChProposalResp) {}
+    rpc SubPayChCloses (subPayChClosesReq) returns (stream subPayChClosesResp) {}
+    rpc UnsubPayChClose (UnsubPayChClosesReq) returns (UnsubPayChClosesResp) {}
+    rpc CloseSession (CloseSessionReq) returns (CloseSessionResp) {}
+
+    rpc SendPayChUpdate (SendPayChUpdateReq) returns (SendPayChUpdateResp) {}
+    rpc SubPayChUpdates (SubpayChUpdatesReq) returns (stream SubPayChUpdatesResp) {}
+    rpc UnsubPayChUpdates (UnsubPayChUpdatesReq) returns (UnsubPayChUpdatesResp) {}
+    rpc RespondPayChUpdate (RespondPayChUpdateReq) returns (RespondPayChUpdateResp) {}
+    rpc GetBalance (GetBalanceReq) returns (GetBalanceResp) {}
+    rpc ClosePayCh (ClosePayChReq) returns (ClosePayChResp) {}
 }
 
 message GetConfigReq {
@@ -94,20 +114,6 @@ message HelpReq {
 
 message HelpResp {
     repeated string apis = 1;
-}
-
-// Session_API is used for accessing the session related functionality. 
-service Session_API{
-    rpc AddContact (AddContactReq) returns (AddContactResp) {}
-    rpc GetContact (GetContactReq) returns (GetContactResp) {}
-    rpc OpenPayCh (OpenPayChReq) returns (OpenPayChResp) {}
-    rpc GetPayChs (GetPayChsReq) returns (GetPayChsResp) {}
-    rpc SubPayChProposals (SubPayChProposalsReq) returns (stream SubPayChProposalsResp) {}
-    rpc UnsubPayChProposals (UnsubPayChProposalsReq) returns (UnsubPayChProposalsResp) {}
-    rpc RespondPayChProposal (RespondPayChProposalReq) returns (RespondPayChProposalResp) {}
-    rpc SubPayChCloses (subPayChClosesReq) returns (stream subPayChClosesResp) {}
-    rpc UnsubPayChClose (UnsubPayChClosesReq) returns (UnsubPayChClosesResp) {}
-    rpc CloseSession (CloseSessionReq) returns (CloseSessionResp) {}
 }
 
 message AddContactReq {
@@ -262,16 +268,6 @@ message CloseSessionResp {
     message MsgSuccess {
         repeated PaymentChannel unclosedChannels = 2;
     }
-}
-
-// Channel_API is used for accessing channel related functionality.
-service Channel_API{
-    rpc SendPayChUpdate (SendPayChUpdateReq) returns (SendPayChUpdateResp) {}
-    rpc SubPayChUpdates (SubpayChUpdatesReq) returns (stream SubPayChUpdatesResp) {}
-    rpc UnsubPayChUpdates (UnsubPayChUpdatesReq) returns (UnsubPayChUpdatesResp) {}
-    rpc RespondPayChUpdate (RespondPayChUpdateReq) returns (RespondPayChUpdateResp) {}
-    rpc GetBalance (GetBalanceReq) returns (GetBalanceResp) {}
-    rpc ClosePayCh (ClosePayChReq) returns (ClosePayChResp) {}
 }
 
 message SendPayChUpdateReq {
