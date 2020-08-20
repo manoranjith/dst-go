@@ -4269,72 +4269,75 @@ func file_api_proto_rawDescGZIP() []byte {
 	return file_api_proto_rawDescData
 }
 
-var file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 63)
-var file_api_proto_goTypes = []interface{}{
-	(*Peer)(nil),                                // 0: pb.Peer
-	(*BalanceInfo)(nil),                         // 1: pb.BalanceInfo
-	(*PaymentChannel)(nil),                      // 2: pb.PaymentChannel
-	(*MsgError)(nil),                            // 3: pb.MsgError
-	(*GetConfigReq)(nil),                        // 4: pb.GetConfigReq
-	(*GetConfigResp)(nil),                       // 5: pb.GetConfigResp
-	(*OpenSessionReq)(nil),                      // 6: pb.OpenSessionReq
-	(*OpenSessionResp)(nil),                     // 7: pb.OpenSessionResp
-	(*TimeReq)(nil),                             // 8: pb.TimeReq
-	(*TimeResp)(nil),                            // 9: pb.TimeResp
-	(*HelpReq)(nil),                             // 10: pb.HelpReq
-	(*HelpResp)(nil),                            // 11: pb.HelpResp
-	(*AddContactReq)(nil),                       // 12: pb.AddContactReq
-	(*AddContactResp)(nil),                      // 13: pb.AddContactResp
-	(*GetContactReq)(nil),                       // 14: pb.GetContactReq
-	(*GetContactResp)(nil),                      // 15: pb.GetContactResp
-	(*OpenPayChReq)(nil),                        // 16: pb.OpenPayChReq
-	(*OpenPayChResp)(nil),                       // 17: pb.OpenPayChResp
-	(*GetPayChsReq)(nil),                        // 18: pb.GetPayChsReq
-	(*GetPayChsResp)(nil),                       // 19: pb.GetPayChsResp
-	(*SubPayChProposalsReq)(nil),                // 20: pb.SubPayChProposalsReq
-	(*SubPayChProposalsResp)(nil),               // 21: pb.SubPayChProposalsResp
-	(*UnsubPayChProposalsReq)(nil),              // 22: pb.UnsubPayChProposalsReq
-	(*UnsubPayChProposalsResp)(nil),             // 23: pb.UnsubPayChProposalsResp
-	(*RespondPayChProposalReq)(nil),             // 24: pb.RespondPayChProposalReq
-	(*RespondPayChProposalResp)(nil),            // 25: pb.RespondPayChProposalResp
-	(*SubPayChClosesReq)(nil),                   // 26: pb.subPayChClosesReq
-	(*SubPayChClosesResp)(nil),                  // 27: pb.subPayChClosesResp
-	(*UnsubPayChClosesReq)(nil),                 // 28: pb.UnsubPayChClosesReq
-	(*UnsubPayChClosesResp)(nil),                // 29: pb.UnsubPayChClosesResp
-	(*CloseSessionReq)(nil),                     // 30: pb.CloseSessionReq
-	(*CloseSessionResp)(nil),                    // 31: pb.CloseSessionResp
-	(*SendPayChUpdateReq)(nil),                  // 32: pb.SendPayChUpdateReq
-	(*SendPayChUpdateResp)(nil),                 // 33: pb.SendPayChUpdateResp
-	(*SubpayChUpdatesReq)(nil),                  // 34: pb.SubpayChUpdatesReq
-	(*SubPayChUpdatesResp)(nil),                 // 35: pb.SubPayChUpdatesResp
-	(*UnsubPayChUpdatesReq)(nil),                // 36: pb.UnsubPayChUpdatesReq
-	(*UnsubPayChUpdatesResp)(nil),               // 37: pb.UnsubPayChUpdatesResp
-	(*RespondPayChUpdateReq)(nil),               // 38: pb.RespondPayChUpdateReq
-	(*RespondPayChUpdateResp)(nil),              // 39: pb.RespondPayChUpdateResp
-	(*GetPayChBalanceReq)(nil),                  // 40: pb.GetPayChBalanceReq
-	(*GetPayChBalanceResp)(nil),                 // 41: pb.GetPayChBalanceResp
-	(*ClosePayChReq)(nil),                       // 42: pb.ClosePayChReq
-	(*ClosePayChResp)(nil),                      // 43: pb.ClosePayChResp
-	(*BalanceInfo_AliasBalance)(nil),            // 44: pb.BalanceInfo.AliasBalance
-	nil,                                         // 45: pb.BalanceInfo.AliasBalance.ValueEntry
-	(*OpenSessionResp_MsgSuccess)(nil),          // 46: pb.OpenSessionResp.MsgSuccess
-	(*AddContactResp_MsgSuccess)(nil),           // 47: pb.AddContactResp.MsgSuccess
-	(*GetContactResp_MsgSuccess)(nil),           // 48: pb.GetContactResp.MsgSuccess
-	(*OpenPayChResp_MsgSuccess)(nil),            // 49: pb.OpenPayChResp.MsgSuccess
-	(*GetPayChsResp_MsgSuccess)(nil),            // 50: pb.GetPayChsResp.MsgSuccess
-	(*SubPayChProposalsResp_Notify)(nil),        // 51: pb.SubPayChProposalsResp.Notify
-	(*UnsubPayChProposalsResp_MsgSuccess)(nil),  // 52: pb.UnsubPayChProposalsResp.MsgSuccess
-	(*RespondPayChProposalResp_MsgSuccess)(nil), // 53: pb.RespondPayChProposalResp.MsgSuccess
-	(*SubPayChClosesResp_Notify)(nil),           // 54: pb.subPayChClosesResp.Notify
-	(*UnsubPayChClosesResp_MsgSuccess)(nil),     // 55: pb.UnsubPayChClosesResp.MsgSuccess
-	(*CloseSessionResp_MsgSuccess)(nil),         // 56: pb.CloseSessionResp.MsgSuccess
-	(*SendPayChUpdateResp_MsgSuccess)(nil),      // 57: pb.SendPayChUpdateResp.MsgSuccess
-	(*SubPayChUpdatesResp_Notify)(nil),          // 58: pb.SubPayChUpdatesResp.Notify
-	(*UnsubPayChUpdatesResp_MsgSuccess)(nil),    // 59: pb.UnsubPayChUpdatesResp.MsgSuccess
-	(*RespondPayChUpdateResp_MsgSuccess)(nil),   // 60: pb.RespondPayChUpdateResp.MsgSuccess
-	(*GetPayChBalanceResp_MsgSuccess)(nil),      // 61: pb.GetPayChBalanceResp.MsgSuccess
-	(*ClosePayChResp_MsgSuccess)(nil),           // 62: pb.ClosePayChResp.MsgSuccess
-}
+var (
+	file_api_proto_msgTypes = make([]protoimpl.MessageInfo, 63)
+	file_api_proto_goTypes  = []interface{}{
+		(*Peer)(nil),                                // 0: pb.Peer
+		(*BalanceInfo)(nil),                         // 1: pb.BalanceInfo
+		(*PaymentChannel)(nil),                      // 2: pb.PaymentChannel
+		(*MsgError)(nil),                            // 3: pb.MsgError
+		(*GetConfigReq)(nil),                        // 4: pb.GetConfigReq
+		(*GetConfigResp)(nil),                       // 5: pb.GetConfigResp
+		(*OpenSessionReq)(nil),                      // 6: pb.OpenSessionReq
+		(*OpenSessionResp)(nil),                     // 7: pb.OpenSessionResp
+		(*TimeReq)(nil),                             // 8: pb.TimeReq
+		(*TimeResp)(nil),                            // 9: pb.TimeResp
+		(*HelpReq)(nil),                             // 10: pb.HelpReq
+		(*HelpResp)(nil),                            // 11: pb.HelpResp
+		(*AddContactReq)(nil),                       // 12: pb.AddContactReq
+		(*AddContactResp)(nil),                      // 13: pb.AddContactResp
+		(*GetContactReq)(nil),                       // 14: pb.GetContactReq
+		(*GetContactResp)(nil),                      // 15: pb.GetContactResp
+		(*OpenPayChReq)(nil),                        // 16: pb.OpenPayChReq
+		(*OpenPayChResp)(nil),                       // 17: pb.OpenPayChResp
+		(*GetPayChsReq)(nil),                        // 18: pb.GetPayChsReq
+		(*GetPayChsResp)(nil),                       // 19: pb.GetPayChsResp
+		(*SubPayChProposalsReq)(nil),                // 20: pb.SubPayChProposalsReq
+		(*SubPayChProposalsResp)(nil),               // 21: pb.SubPayChProposalsResp
+		(*UnsubPayChProposalsReq)(nil),              // 22: pb.UnsubPayChProposalsReq
+		(*UnsubPayChProposalsResp)(nil),             // 23: pb.UnsubPayChProposalsResp
+		(*RespondPayChProposalReq)(nil),             // 24: pb.RespondPayChProposalReq
+		(*RespondPayChProposalResp)(nil),            // 25: pb.RespondPayChProposalResp
+		(*SubPayChClosesReq)(nil),                   // 26: pb.subPayChClosesReq
+		(*SubPayChClosesResp)(nil),                  // 27: pb.subPayChClosesResp
+		(*UnsubPayChClosesReq)(nil),                 // 28: pb.UnsubPayChClosesReq
+		(*UnsubPayChClosesResp)(nil),                // 29: pb.UnsubPayChClosesResp
+		(*CloseSessionReq)(nil),                     // 30: pb.CloseSessionReq
+		(*CloseSessionResp)(nil),                    // 31: pb.CloseSessionResp
+		(*SendPayChUpdateReq)(nil),                  // 32: pb.SendPayChUpdateReq
+		(*SendPayChUpdateResp)(nil),                 // 33: pb.SendPayChUpdateResp
+		(*SubpayChUpdatesReq)(nil),                  // 34: pb.SubpayChUpdatesReq
+		(*SubPayChUpdatesResp)(nil),                 // 35: pb.SubPayChUpdatesResp
+		(*UnsubPayChUpdatesReq)(nil),                // 36: pb.UnsubPayChUpdatesReq
+		(*UnsubPayChUpdatesResp)(nil),               // 37: pb.UnsubPayChUpdatesResp
+		(*RespondPayChUpdateReq)(nil),               // 38: pb.RespondPayChUpdateReq
+		(*RespondPayChUpdateResp)(nil),              // 39: pb.RespondPayChUpdateResp
+		(*GetPayChBalanceReq)(nil),                  // 40: pb.GetPayChBalanceReq
+		(*GetPayChBalanceResp)(nil),                 // 41: pb.GetPayChBalanceResp
+		(*ClosePayChReq)(nil),                       // 42: pb.ClosePayChReq
+		(*ClosePayChResp)(nil),                      // 43: pb.ClosePayChResp
+		(*BalanceInfo_AliasBalance)(nil),            // 44: pb.BalanceInfo.AliasBalance
+		nil,                                         // 45: pb.BalanceInfo.AliasBalance.ValueEntry
+		(*OpenSessionResp_MsgSuccess)(nil),          // 46: pb.OpenSessionResp.MsgSuccess
+		(*AddContactResp_MsgSuccess)(nil),           // 47: pb.AddContactResp.MsgSuccess
+		(*GetContactResp_MsgSuccess)(nil),           // 48: pb.GetContactResp.MsgSuccess
+		(*OpenPayChResp_MsgSuccess)(nil),            // 49: pb.OpenPayChResp.MsgSuccess
+		(*GetPayChsResp_MsgSuccess)(nil),            // 50: pb.GetPayChsResp.MsgSuccess
+		(*SubPayChProposalsResp_Notify)(nil),        // 51: pb.SubPayChProposalsResp.Notify
+		(*UnsubPayChProposalsResp_MsgSuccess)(nil),  // 52: pb.UnsubPayChProposalsResp.MsgSuccess
+		(*RespondPayChProposalResp_MsgSuccess)(nil), // 53: pb.RespondPayChProposalResp.MsgSuccess
+		(*SubPayChClosesResp_Notify)(nil),           // 54: pb.subPayChClosesResp.Notify
+		(*UnsubPayChClosesResp_MsgSuccess)(nil),     // 55: pb.UnsubPayChClosesResp.MsgSuccess
+		(*CloseSessionResp_MsgSuccess)(nil),         // 56: pb.CloseSessionResp.MsgSuccess
+		(*SendPayChUpdateResp_MsgSuccess)(nil),      // 57: pb.SendPayChUpdateResp.MsgSuccess
+		(*SubPayChUpdatesResp_Notify)(nil),          // 58: pb.SubPayChUpdatesResp.Notify
+		(*UnsubPayChUpdatesResp_MsgSuccess)(nil),    // 59: pb.UnsubPayChUpdatesResp.MsgSuccess
+		(*RespondPayChUpdateResp_MsgSuccess)(nil),   // 60: pb.RespondPayChUpdateResp.MsgSuccess
+		(*GetPayChBalanceResp_MsgSuccess)(nil),      // 61: pb.GetPayChBalanceResp.MsgSuccess
+		(*ClosePayChResp_MsgSuccess)(nil),           // 62: pb.ClosePayChResp.MsgSuccess
+	}
+)
+
 var file_api_proto_depIdxs = []int32{
 	44, // 0: pb.BalanceInfo.balances:type_name -> pb.BalanceInfo.AliasBalance
 	1,  // 1: pb.PaymentChannel.balanceinfo:type_name -> pb.BalanceInfo
@@ -5271,8 +5274,10 @@ func file_api_proto_init() {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -5592,60 +5597,79 @@ type UnimplementedPayment_APIServer struct {
 func (*UnimplementedPayment_APIServer) GetConfig(context.Context, *GetConfigReq) (*GetConfigResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetConfig not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) OpenSession(context.Context, *OpenSessionReq) (*OpenSessionResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method OpenSession not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) Time(context.Context, *TimeReq) (*TimeResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Time not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) Help(context.Context, *HelpReq) (*HelpResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Help not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) AddContact(context.Context, *AddContactReq) (*AddContactResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddContact not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) GetContact(context.Context, *GetContactReq) (*GetContactResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetContact not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) OpenPayCh(context.Context, *OpenPayChReq) (*OpenPayChResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method OpenPayCh not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) GetPayChs(context.Context, *GetPayChsReq) (*GetPayChsResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPayChs not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) SubPayChProposals(*SubPayChProposalsReq, Payment_API_SubPayChProposalsServer) error {
 	return status.Errorf(codes.Unimplemented, "method SubPayChProposals not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) UnsubPayChProposals(context.Context, *UnsubPayChProposalsReq) (*UnsubPayChProposalsResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnsubPayChProposals not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) RespondPayChProposal(context.Context, *RespondPayChProposalReq) (*RespondPayChProposalResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RespondPayChProposal not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) SubPayChCloses(*SubPayChClosesReq, Payment_API_SubPayChClosesServer) error {
 	return status.Errorf(codes.Unimplemented, "method SubPayChCloses not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) UnsubPayChClose(context.Context, *UnsubPayChClosesReq) (*UnsubPayChClosesResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnsubPayChClose not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) CloseSession(context.Context, *CloseSessionReq) (*CloseSessionResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CloseSession not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) SendPayChUpdate(context.Context, *SendPayChUpdateReq) (*SendPayChUpdateResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendPayChUpdate not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) SubPayChUpdates(*SubpayChUpdatesReq, Payment_API_SubPayChUpdatesServer) error {
 	return status.Errorf(codes.Unimplemented, "method SubPayChUpdates not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) UnsubPayChUpdates(context.Context, *UnsubPayChUpdatesReq) (*UnsubPayChUpdatesResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UnsubPayChUpdates not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) RespondPayChUpdate(context.Context, *RespondPayChUpdateReq) (*RespondPayChUpdateResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RespondPayChUpdate not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) GetPayChBalance(context.Context, *GetPayChBalanceReq) (*GetPayChBalanceResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPayChBalance not implemented")
 }
+
 func (*UnimplementedPayment_APIServer) ClosePayCh(context.Context, *ClosePayChReq) (*ClosePayChResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClosePayCh not implemented")
 }

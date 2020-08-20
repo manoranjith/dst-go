@@ -86,7 +86,6 @@ func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, am
 		state.Allocation.Balances[0][payerIdx] = bals[payerIdx]
 		state.Allocation.Balances[0][payeeIdx] = bals[payeeIdx]
 	}, nil
-
 }
 
 func SubPayChUpdates(ch perun.ChannelAPI, notifier PayChUpdateNotifier) error {

@@ -99,7 +99,6 @@ func Test_Integ_New(t *testing.T) {
 }
 
 func Test_Integ_Role_Bob(t *testing.T) {
-
 	wg := sync.WaitGroup{}
 	ctx := context.Background()
 
@@ -133,7 +132,8 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		aliceProposedBals[bobAlias] = "2"
 		aliceProposedBalInfo := perun.BalInfo{
 			Currency: "ETH",
-			Bals:     aliceProposedBals}
+			Bals:     aliceProposedBals,
+		}
 		payChInfo, err = paymentAppLib.OpenPayCh(ctx, alice, bobAlias, aliceProposedBalInfo, challengeDurSecs)
 		require.NoError(t, err)
 		t.Log("Alice opened payment channel", payChInfo)
@@ -174,11 +174,11 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		aliceProposedBals[aliceAlias] = "2"
 		aliceProposedBalInfo := perun.BalInfo{
 			Currency: "ETH",
-			Bals:     aliceProposedBals}
+			Bals:     aliceProposedBals,
+		}
 		_, err = paymentAppLib.OpenPayCh(ctx, bob, aliceAlias, aliceProposedBalInfo, challengeDurSecs)
 		require.True(t, errors.Is(err, perun.ErrPeerRejected))
 		t.Log(" payment channel rejected by peer")
-
 	}()
 	propNotif2 := make(chan paymentAppLib.PayChProposalNotif)
 	proposalNotifier2 := func(notif paymentAppLib.PayChProposalNotif) {
@@ -220,7 +220,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	var updateNotifFrom1 = make(chan paymentAppLib.PayChUpdateNotif)
+	updateNotifFrom1 := make(chan paymentAppLib.PayChUpdateNotif)
 	PayChUpdateNotifAccept := func(notif paymentAppLib.PayChUpdateNotif) {
 		fmt.Printf("\n Update Notification from 1: %+v\n", notif)
 		updateNotifFrom1 <- notif
@@ -255,7 +255,7 @@ func Test_Integ_Role_Bob(t *testing.T) {
 	fmt.Println("Update was accepted")
 
 	// 1 subs from chClose
-	var closeNotifFrom2 = make(chan paymentAppLib.PayChCloseNotif)
+	closeNotifFrom2 := make(chan paymentAppLib.PayChCloseNotif)
 	PayChCloseNotifier := func(notif paymentAppLib.PayChCloseNotif) {
 		fmt.Printf("\n Close Notification in session 1: %+v\n", notif)
 		closeNotifFrom2 <- notif

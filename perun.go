@@ -284,6 +284,7 @@ type NodeConfig struct {
 	OnChainTxTimeout time.Duration // Timeout to wait for confirmation of on-chain tx.
 	ResponseTimeout  time.Duration // Timeout to wait for a response from the peer / user.
 }
+
 type NodeAPI interface {
 	Time() int64
 	GetConfig() NodeConfig

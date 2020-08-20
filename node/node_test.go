@@ -40,7 +40,6 @@ var validConfig = perun.NodeConfig{
 }
 
 func Test_New(t *testing.T) {
-
 	t.Run("err_invalid_log_level", func(t *testing.T) {
 		cfg := validConfig
 		cfg.LogLevel = ""

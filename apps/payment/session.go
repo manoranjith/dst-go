@@ -58,7 +58,6 @@ func GetPayChs(s perun.SessionAPI) []PayChInfo {
 			BalInfo:   balsFromState(chInfos[i].Currency, chInfos[i].State, chInfos[i].Parts),
 			Version:   fmt.Sprintf("%d", chInfos[i].State.Version),
 		}
-
 	}
 	return payChInfos
 }

@@ -23,6 +23,7 @@ func (t timeoutConfig) respChProposalAccept(challegeDurSecs uint64) time.Duratio
 func (t timeoutConfig) respChProposalReject() time.Duration {
 	return t.response + processingTime
 }
+
 func (t timeoutConfig) chUpdate() time.Duration {
 	return t.response + processingTime
 }

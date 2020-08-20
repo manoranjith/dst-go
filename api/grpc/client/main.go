@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-
 	conn, err := grpc.Dial(":50001", grpc.WithInsecure())
 
 	if err != nil {
@@ -20,7 +19,7 @@ func main() {
 	}
 
 	// Init
-	var client = pb.NewPayment_APIClient(conn)
+	client := pb.NewPayment_APIClient(conn)
 	ctx := context.Background()
 
 	// Node.Time
