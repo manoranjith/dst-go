@@ -226,7 +226,7 @@ func Test_Integ_Role(t *testing.T) {
 			aliceChUpdateNotif <- notif
 		}
 		err := aliceCh.SubChUpdates(aliceChUpdateNotifier)
-		require.NoError(t, err, "alice subscribing channel proposals")
+		require.NoError(t, err, "alice subscribing channel updates")
 
 		notif := <-aliceChUpdateNotif
 		err = aliceCh.RespondChUpdate(ctx, notif.UpdateID, true)
@@ -270,7 +270,7 @@ func Test_Integ_Role(t *testing.T) {
 			bobChUpdateNotif <- notif
 		}
 		err := bobCh.SubChUpdates(bobChUpdateNotifier)
-		require.NoError(t, err, "bob subscribing channel proposals")
+		require.NoError(t, err, "bob subscribing channel updates")
 
 		notif := <-bobChUpdateNotif
 		err = bobCh.RespondChUpdate(ctx, notif.UpdateID, false)
@@ -278,6 +278,45 @@ func Test_Integ_Role(t *testing.T) {
 
 		err = bobCh.UnsubChUpdates()
 		require.NoError(t, err, "bob unsubscribing channel updates")
+		wg.Wait()
+	})
+
+	t.Run("Collaborative channel close", func(t *testing.T) {
+		// Send close by bob.
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			closingChInfo, err := aliceCh.Close(ctx)
+			require.NoError(t, err)
+			t.Log("alice", closingChInfo)
+		}()
+
+		// Accept final channel by bob.
+		bobChUpdateNotif := make(chan perun.ChUpdateNotif)
+		bobChUpdateNotifier := func(notif perun.ChUpdateNotif) {
+			bobChUpdateNotif <- notif
+		}
+		err := bobCh.SubChUpdates(bobChUpdateNotifier)
+		require.NoError(t, err, "bob subscribing channel updates")
+
+		notif := <-bobChUpdateNotif
+		err = bobCh.RespondChUpdate(ctx, notif.UpdateID, true)
+		require.NoError(t, err, "bob accepting channel update")
+
+		err = bobCh.UnsubChUpdates()
+		require.NoError(t, err, "bob unsubscribing channel updates")
+
+		// Sub, receive, unsub channel close notifs.
+		aliceChCloseNotif := make(chan perun.ChCloseNotif)
+		aliceChCloseNotifier := func(notif perun.ChCloseNotif) {
+			aliceChCloseNotif <- notif
+		}
+		err = alice.SubChCloses(aliceChCloseNotifier)
+		require.NoError(t, err, "alice subscribing channel closes")
+
+		chCloseNotif := <-aliceChCloseNotif
+		t.Log("alice", chCloseNotif)
+
 		wg.Wait()
 	})
 }
