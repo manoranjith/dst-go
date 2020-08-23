@@ -32,19 +32,21 @@ import (
 const (
 	open      chLockState = "open"
 	finalized chLockState = "finalized"
+	closed    chLockState = "closed"
 )
 
 type (
 	channel struct {
 		log.Logger
 
-		id         string
-		pchannel   *pclient.Channel
-		lockState  chLockState
-		currency   string
-		parts      []string
-		timeoutCfg timeoutConfig
-		currState  *pchannel.State
+		id               string
+		pchannel         *pclient.Channel
+		lockState        chLockState
+		currency         string
+		parts            []string
+		timeoutCfg       timeoutConfig
+		currState        *pchannel.State
+		challengeDurSecs uint64 // challenge duration for the channel in seconds.
 
 		chUpdateNotifier   perun.ChUpdateNotifier
 		chUpdateNotifCache []perun.ChUpdateNotif
@@ -70,13 +72,15 @@ type (
 )
 
 // NewChannel sets up a channel object from the passed pchannel.
-func NewChannel(pch *pclient.Channel, currency string, parts []string, timeoutCfg timeoutConfig) *channel {
+func NewChannel(pch *pclient.Channel, currency string, parts []string, challengeDurSecs uint64,
+	tConf timeoutConfig) *channel {
 	ch := &channel{
 		id:                 fmt.Sprintf("%x", pch.ID()),
 		pchannel:           pch,
 		lockState:          open,
 		currState:          pch.State().Clone(),
-		timeoutCfg:         timeoutCfg,
+		challengeDurSecs:   challengeDurSecs,
+		timeoutCfg:         tConf,
 		currency:           currency,
 		parts:              parts,
 		chUpdateResponders: make(map[string]chUpdateResponderEntry),
@@ -94,9 +98,12 @@ func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater
 	ch.Lock()
 	defer ch.Unlock()
 
-	if ch.lockState != open {
+	if ch.lockState == finalized {
 		ch.Error("Dropping update request as the channel is " + ch.lockState)
-		return perun.ErrChNotOpen
+		return perun.ErrChFinalized
+	} else if ch.lockState == closed {
+		ch.Error("Dropping update request as the channel is " + ch.lockState)
+		return perun.ErrChClosed
 	}
 
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
@@ -206,6 +213,47 @@ func (ch *channel) getChInfo() perun.ChannelInfo {
 	}
 }
 
-func (ch *channel) Close(ctx context.Context) (perun.ChannelInfo, error) {
-	return perun.ChannelInfo{}, nil
+func (ch *channel) Close(pctx context.Context) (perun.ChannelInfo, error) {
+	ch.Debug("Received request channel.RespondChUpdate")
+	ch.Lock()
+	defer ch.Unlock()
+
+	switch ch.lockState {
+	case open:
+		ch.lockState = closed
+		// Try to finalize state, so that channel can be settled directly without waiting for challenge duration
+		// to expire. If this fails, channel will still be settled but by registering the state on-chain
+		// and waiting for challenge duration to expire.
+		chFinalizer := func(state *pchannel.State) {
+			state.IsFinal = true
+		}
+		upCtx, upCancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
+		defer upCancel()
+		if err := ch.pchannel.UpdateBy(upCtx, chFinalizer); err != nil {
+			ch.Logger.Info("Error when trying to finalize state for closing:", err)
+			ch.Logger.Info("Opting for non collaborative close")
+		} else {
+			ch.currState = ch.pchannel.State().Clone()
+		}
+		fallthrough
+
+	case finalized:
+		ch.lockState = closed
+		clCtx, clCancel := context.WithTimeout(pctx, ch.timeoutCfg.closeCh(ch.challengeDurSecs))
+		defer clCancel()
+		err := ch.pchannel.Settle(clCtx)
+
+		if cerr := ch.pchannel.Close(); err != nil {
+			ch.Logger.Error("Settling channel", err)
+			return perun.ChannelInfo{}, perun.GetAPIError(err)
+		} else if cerr != nil {
+			ch.Logger.Error("Closing channel", cerr)
+		}
+		return ch.getChInfo(), nil
+
+	case closed:
+		return ch.getChInfo(), perun.ErrChClosed
+	}
+	ch.Error("Program reached unknonwn state")
+	return ch.getChInfo(), perun.ErrInternalServer
 }
