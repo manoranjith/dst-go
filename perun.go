@@ -206,6 +206,8 @@ type NodeConfig struct {
 	ResponseTimeout  time.Duration // Timeout to wait for a response from the peer / user.
 }
 
+//go:generate mockery -name NodeAPI -output ./internal/mocks
+
 // NodeAPI represents the APIs that can be accessed in the context of a perun node.
 // Multiple sessions can be opened in a single node. Each instance will have a dedicated
 // keystore and contacts provider.
@@ -219,6 +221,8 @@ type NodeAPI interface {
 	// Should not be exposed via userAPI.
 	GetSession(string) (SessionAPI, error)
 }
+
+//go:generate mockery -name SessionAPI -output ./internal/mocks
 
 // SessionAPI represents the APIs that can be accessed in the context of a perun node.
 // First a session has to be instantiated using the NodeAPI. The session can then be used
@@ -268,6 +272,8 @@ type (
 		Error     string
 	}
 )
+
+//go:generate mockery -name ChannelAPI -output ./internal/mocks
 
 // ChannelAPI represents the APIs that can be accessed in the context of a perun channel.
 // First a channel has to be initialized using the SessionAPI. The channel can then be used
