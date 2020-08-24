@@ -86,6 +86,8 @@ func Test_Integ_Role(t *testing.T) {
 
 	prng := rand.New(rand.NewSource(1729))
 	var aliceSessionID, bobSessionID string
+	var alicePeer, bobPeer *pb.Peer
+	var aliceAlias, bobAlias = "alice", "bob"
 
 	t.Run("Node.OpenSession_Alice", func(t *testing.T) {
 		aliceCfg := sessiontest.NewConfig(t, prng)
@@ -111,6 +113,73 @@ func Test_Integ_Role(t *testing.T) {
 		t.Logf("Bob session id: %s", bobSessionID)
 	})
 
+	t.Run("Session.GetContact_Alice", func(t *testing.T) {
+		getContactReq := pb.GetContactReq{
+			SessionID: aliceSessionID,
+			Alias:     perun.OwnAlias,
+		}
+		getContactResp, err := client.GetContact(ctx, &getContactReq)
+		t.Logf("\nResponse: %+v, Error: %+v", getContactResp, err)
+		successResponse, ok := getContactResp.Response.(*pb.GetContactResp_MsgSuccess_)
+		if !ok {
+			errorResponse := getContactResp.Response.(*pb.GetContactResp_Error)
+			t.Errorf("Error response: %+v", errorResponse)
+		} else {
+			alicePeer = successResponse.MsgSuccess.Peer
+			alicePeer.Alias = aliceAlias
+			t.Logf("Alice Peer is: %+v", alicePeer)
+		}
+	})
+
+	t.Run("Session.GetContact_Bob", func(t *testing.T) {
+		getContactReq := pb.GetContactReq{
+			SessionID: bobSessionID,
+			Alias:     perun.OwnAlias,
+		}
+		getContactResp, err := client.GetContact(ctx, &getContactReq)
+		t.Logf("\nResponse: %+v, Error: %+v", getContactResp, err)
+		successResponse, ok := getContactResp.Response.(*pb.GetContactResp_MsgSuccess_)
+		if !ok {
+			errorResponse := getContactResp.Response.(*pb.GetContactResp_Error)
+			t.Errorf("Error response: %+v", errorResponse)
+		} else {
+			bobPeer = successResponse.MsgSuccess.Peer
+			bobPeer.Alias = bobAlias
+			t.Logf("Alice Peer is: %+v", bobPeer)
+		}
+	})
+
+	t.Run("Session.AddContact_Alice", func(t *testing.T) {
+		addContactReq := pb.AddContactReq{
+			SessionID: aliceSessionID,
+			Peer:      bobPeer,
+		}
+		addContactResp, err := client.AddContact(ctx, &addContactReq)
+		t.Logf("\nResponse: %+v, Error: %+v", addContactResp, err)
+		_, ok := addContactResp.Response.(*pb.AddContactResp_MsgSuccess_)
+		if !ok {
+			errorResponse := addContactResp.Response.(*pb.AddContactResp_Error)
+			t.Errorf("Error response: %+v", errorResponse)
+		} else {
+			t.Logf("Alice added bob to contacts")
+		}
+	})
+
+	t.Run("Session.AddContact_Bob", func(t *testing.T) {
+		addContactReq := pb.AddContactReq{
+			SessionID: bobSessionID,
+			Peer:      alicePeer,
+		}
+		addContactResp, err := client.AddContact(ctx, &addContactReq)
+		t.Logf("\nResponse: %+v, Error: %+v", addContactResp, err)
+		_, ok := addContactResp.Response.(*pb.AddContactResp_MsgSuccess_)
+		if !ok {
+			errorResponse := addContactResp.Response.(*pb.AddContactResp_Error)
+			t.Errorf("Error response: %+v", errorResponse)
+		} else {
+			t.Logf("Bob added alice to contacts")
+		}
+	})
 }
 
 func StartServer(t *testing.T) {

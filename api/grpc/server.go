@@ -80,12 +80,78 @@ func (a *PaymentAPI) Help(context.Context, *pb.HelpReq) (*pb.HelpResp, error) {
 	}, nil
 }
 
-func (a *PaymentAPI) AddContact(context.Context, *pb.AddContactReq) (*pb.AddContactResp, error) {
-	return nil, nil
+func (a *PaymentAPI) AddContact(ctx context.Context, req *pb.AddContactReq) (*pb.AddContactResp, error) {
+	fmt.Println("Received request: AddContact")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.AddContactResp{
+			Response: &pb.AddContactResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	peer := perun.Peer{
+		Alias:              req.Peer.Alias,
+		OffChainAddrString: req.Peer.OffChainAddress,
+		CommAddr:           req.Peer.CommAddress,
+		CommType:           req.Peer.CommType,
+	}
+	err = sess.AddContact(peer)
+	if err != nil {
+		return &pb.AddContactResp{
+			Response: &pb.AddContactResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	return &pb.AddContactResp{
+		Response: &pb.AddContactResp_MsgSuccess_{
+			MsgSuccess: &pb.AddContactResp_MsgSuccess{
+				Success: true,
+			},
+		},
+	}, nil
 }
 
-func (a *PaymentAPI) GetContact(context.Context, *pb.GetContactReq) (*pb.GetContactResp, error) {
-	return nil, nil
+func (a *PaymentAPI) GetContact(ctx context.Context, req *pb.GetContactReq) (*pb.GetContactResp, error) {
+	fmt.Println("Received request: GetContact")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.GetContactResp{
+			Response: &pb.GetContactResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	peer, err := sess.GetContact(req.Alias)
+	peer_ := pb.Peer{
+		Alias:           peer.Alias,
+		OffChainAddress: peer.OffChainAddrString,
+		CommAddress:     peer.CommAddr,
+		CommType:        peer.CommType,
+	}
+	if err != nil {
+		return &pb.GetContactResp{
+			Response: &pb.GetContactResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	return &pb.GetContactResp{
+		Response: &pb.GetContactResp_MsgSuccess_{
+			MsgSuccess: &pb.GetContactResp_MsgSuccess{
+				Peer: &peer_,
+			},
+		},
+	}, nil
 }
 
 func (a *PaymentAPI) OpenPayCh(context.Context, *pb.OpenPayChReq) (*pb.OpenPayChResp, error) {
