@@ -49,3 +49,79 @@ func Test_SendPayChUpdate(t *testing.T) {
 		require.Error(t, gotErr)
 	})
 }
+
+func Test_GetBalInfo(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("GetInfo").Return(chInfo)
+
+		gotBalInfo := payment.GetBalInfo(channelAPI)
+		assert.Equal(t, wantBalInfo, gotBalInfo)
+	})
+}
+
+// nolint: dupl	// not duplicate of Test_SubPayChProposals.
+func Test_SubPayChUpdates(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("SubChUpdates", mock.Anything).Return(nil)
+
+		dummyNotifier := func(notif payment.PayChUpdateNotif) {}
+		gotErr := payment.SubPayChUpdates(channelAPI, dummyNotifier)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("SubChUpdates", mock.Anything).Return(assert.AnError)
+
+		dummyNotifier := func(notif payment.PayChUpdateNotif) {}
+		gotErr := payment.SubPayChUpdates(channelAPI, dummyNotifier)
+		assert.Error(t, gotErr)
+	})
+}
+
+func Test_UnsubPayChUpdates(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("UnsubChUpdates").Return(nil)
+
+		gotErr := payment.UnsubPayChUpdates(channelAPI)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("UnsubChUpdates").Return(assert.AnError)
+
+		gotErr := payment.UnsubPayChUpdates(channelAPI)
+		assert.Error(t, gotErr)
+	})
+}
+
+// nolint: dupl	// not duplicate of Test_RespondPayChProposal.
+func Test_RespondPayChUpdate(t *testing.T) {
+	updateID := "update-id-1"
+	t.Run("happy_accept", func(t *testing.T) {
+		accept := true
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(nil)
+
+		gotErr := payment.RespondPayChUpdate(context.Background(), channelAPI, updateID, accept)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("happy_reject", func(t *testing.T) {
+		accept := false
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(nil)
+
+		gotErr := payment.RespondPayChUpdate(context.Background(), channelAPI, updateID, accept)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		accept := true
+		channelAPI := &mocks.ChannelAPI{}
+		channelAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(assert.AnError)
+
+		gotErr := payment.RespondPayChUpdate(context.Background(), channelAPI, updateID, accept)
+		assert.Error(t, gotErr)
+	})
+}

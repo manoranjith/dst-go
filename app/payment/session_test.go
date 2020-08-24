@@ -108,6 +108,7 @@ func Test_GetPayChs(t *testing.T) {
 	})
 }
 
+// nolint: dupl	// not duplicate of Test_SubPayChUpdates.
 func Test_SubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}
@@ -144,6 +145,7 @@ func Test_UnsubPayChProposals(t *testing.T) {
 	})
 }
 
+// nolint: dupl	// not duplicate of Test_RespondPayChUpdate.
 func Test_RespondPayChProposal(t *testing.T) {
 	proposalID := "proposal-id-1"
 	t.Run("happy_accept", func(t *testing.T) {

@@ -18,6 +18,7 @@ package payment
 
 import (
 	"context"
+	"fmt"
 
 	pchannel "perun.network/go-perun/channel"
 
@@ -46,6 +47,12 @@ type (
 		Timeout      int64
 	}
 )
+
+// GetBalInfo returns the balance information for this channel.
+func GetBalInfo(ch perun.ChannelAPI) perun.BalInfo {
+	chInfo := ch.GetInfo()
+	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
+}
 
 // SendPayChUpdate send the given amount to the payee. Payee should be one of the channel participants.
 // Use "self" to request payments.
@@ -89,4 +96,27 @@ func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, am
 		state.Allocation.Balances[0][payerIdx] = bals[payerIdx]
 		state.Allocation.Balances[0][payeeIdx] = bals[payeeIdx]
 	}, nil
+}
+
+// SubPayChUpdates registers a subscription for updates on this channel.
+func SubPayChUpdates(ch perun.ChannelAPI, notifier PayChUpdateNotifier) error {
+	return ch.SubChUpdates(func(notif perun.ChUpdateNotif) {
+		notifier(PayChUpdateNotif{
+			UpdateID:     notif.UpdateID,
+			ProposedBals: balsFromState(notif.Currency, notif.Update.State, notif.Parts),
+			Version:      fmt.Sprintf("%d", notif.Update.State.Version),
+			Final:        notif.Update.State.IsFinal,
+			Timeout:      notif.Expiry,
+		})
+	})
+}
+
+// UnsubPayChUpdates unregisters a subscription for updates on this channel.
+func UnsubPayChUpdates(ch perun.ChannelAPI) error {
+	return ch.UnsubChUpdates()
+}
+
+// RespondPayChUpdate sends a response for a channel update notification.
+func RespondPayChUpdate(pctx context.Context, ch perun.ChannelAPI, updateID string, accept bool) error {
+	return ch.RespondChUpdate(pctx, updateID, accept)
 }
