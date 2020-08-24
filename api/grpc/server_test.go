@@ -18,6 +18,7 @@ package grpc_test
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"testing"
 	"time"
@@ -29,6 +30,7 @@ import (
 	pngrpc "github.com/hyperledger-labs/perun-node/api/grpc"
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 	"github.com/hyperledger-labs/perun-node/cmd/perunnode"
+	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
 var (
@@ -51,14 +53,13 @@ var (
 )
 
 func Test_Integ_Role(t *testing.T) {
-
 	StartServer(t)
 
 	conn, err := grpc.Dial(grpcPort, grpc.WithInsecure())
 	require.NoError(t, err, "dialing to grpc server")
 	t.Log("connected to server")
 
-	// Init
+	// Inititalize client.
 	client := pb.NewPayment_APIClient(conn)
 	ctx := context.Background()
 
@@ -82,6 +83,34 @@ func Test_Integ_Role(t *testing.T) {
 		require.NoError(t, err)
 		t.Logf("\nResponse: %+v, Error: %+v", helpResp, err)
 	})
+
+	prng := rand.New(rand.NewSource(1729))
+	var aliceSessionID, bobSessionID string
+
+	t.Run("Node.OpenSession_Alice", func(t *testing.T) {
+		aliceCfg := sessiontest.NewConfig(t, prng)
+		openSessionReq := pb.OpenSessionReq{
+			ConfigFile: sessiontest.NewConfigFile(t, aliceCfg),
+		}
+		openSessionResp, err := client.OpenSession(ctx, &openSessionReq)
+		t.Logf("\nResponse: %+v, Error: %+v", openSessionResp, err)
+		successResponse := openSessionResp.Response.(*pb.OpenSessionResp_MsgSuccess_)
+		aliceSessionID = successResponse.MsgSuccess.SessionID
+		t.Logf("Bob session id: %s", aliceSessionID)
+	})
+
+	t.Run("Node.OpenSession_Bob", func(t *testing.T) {
+		bobCfg := sessiontest.NewConfig(t, prng)
+		openSessionReq := pb.OpenSessionReq{
+			ConfigFile: sessiontest.NewConfigFile(t, bobCfg),
+		}
+		openSessionResp, err := client.OpenSession(ctx, &openSessionReq)
+		t.Logf("\nResponse: %+v, Error: %+v", openSessionResp, err)
+		successResponse := openSessionResp.Response.(*pb.OpenSessionResp_MsgSuccess_)
+		bobSessionID = successResponse.MsgSuccess.SessionID
+		t.Logf("Bob session id: %s", bobSessionID)
+	})
+
 }
 
 func StartServer(t *testing.T) {
