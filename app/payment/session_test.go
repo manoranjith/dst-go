@@ -33,22 +33,28 @@ import (
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 )
 
-const peerAlias = "peer"
+var (
+	bals, wantBals       map[string]string
+	balInfo, wantBalInfo perun.BalInfo
+	app                  perun.App
+	chInfo               perun.ChannelInfo
+	challengeDurSecs     uint64 = 10
+	peerAlias                   = "peer"
+)
 
-func Test_OpenPayCh(t *testing.T) {
-	bals := make(map[string]string)
+func init() {
+	bals = make(map[string]string)
 	bals[perun.OwnAlias] = "1"
 	bals[peerAlias] = "2"
-	balInfo := perun.BalInfo{
+	balInfo = perun.BalInfo{
 		Currency: "ETH",
 		Bals:     bals,
 	}
-	app := perun.App{
+	app = perun.App{
 		Def:  ppayment.AppDef(),
 		Data: &ppayment.NoData{},
 	}
-	var challengeDurSecs uint64 = 10
-	chInfo := perun.ChannelInfo{
+	chInfo = perun.ChannelInfo{
 		ChannelID: "channel1",
 		Currency:  currency.ETH,
 		State: &pchannel.State{
@@ -58,18 +64,19 @@ func Test_OpenPayCh(t *testing.T) {
 		},
 		Parts: []string{perun.OwnAlias, peerAlias},
 	}
+	wantBals = make(map[string]string)
+	wantBals[perun.OwnAlias] = "1.000000"
+	wantBals[peerAlias] = "2.000000"
+	wantBalInfo = perun.BalInfo{
+		Currency: "ETH",
+		Bals:     wantBals,
+	}
+}
 
+func Test_OpenPayCh(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}
 		sessionAPI.On("OpenCh", context.Background(), peerAlias, balInfo, app, challengeDurSecs).Return(chInfo, nil)
-
-		wantBals := make(map[string]string)
-		wantBals[perun.OwnAlias] = "1.000000"
-		wantBals[peerAlias] = "2.000000"
-		wantBalInfo := perun.BalInfo{
-			Currency: "ETH",
-			Bals:     wantBals,
-		}
 
 		gotPayChInfo, gotErr := payment.OpenPayCh(context.Background(), sessionAPI, peerAlias, balInfo, challengeDurSecs)
 		require.NoError(t, gotErr)
@@ -85,5 +92,18 @@ func Test_OpenPayCh(t *testing.T) {
 
 		_, gotErr := payment.OpenPayCh(context.Background(), sessionAPI, peerAlias, balInfo, challengeDurSecs)
 		require.Error(t, gotErr)
+	})
+}
+
+func Test_GetPayChs(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("GetChInfos").Return([]perun.ChannelInfo{chInfo})
+
+		gotPayChInfos := payment.GetPayChs(sessionAPI)
+		require.Len(t, gotPayChInfos, 1)
+		assert.Equal(t, "0", gotPayChInfos[0].Version)
+		assert.Equal(t, wantBalInfo, gotPayChInfos[0].BalInfo)
+		assert.NotZero(t, gotPayChInfos[0].ChannelID)
 	})
 }

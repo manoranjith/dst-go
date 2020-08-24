@@ -84,6 +84,21 @@ func OpenPayCh(pctx context.Context,
 	}, nil
 }
 
+// GetPayChs returns a list of payment channel info for all the channels in this session.
+func GetPayChs(s perun.SessionAPI) []PayChInfo {
+	chInfos := s.GetChInfos()
+
+	payChInfos := make([]PayChInfo, len(chInfos))
+	for i := range chInfos {
+		payChInfos[i] = PayChInfo{
+			ChannelID: chInfos[i].ChannelID,
+			BalInfo:   balsFromState(chInfos[i].Currency, chInfos[i].State, chInfos[i].Parts),
+			Version:   fmt.Sprintf("%d", chInfos[i].State.Version),
+		}
+	}
+	return payChInfos
+}
+
 func balsFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
 	return balsFromBigInt(currency, state.Balances[0], parts)
 }
