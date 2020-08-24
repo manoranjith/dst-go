@@ -309,6 +309,73 @@ func Test_Integ_Role(t *testing.T) {
 		wg.Wait()
 	})
 
+	t.Run("Channel.ClosePayCh_Sub_Unsub", func(t *testing.T) {
+		wg.Add(1)
+		// Bob sends payment channel to alice.
+		go func() {
+			closePayChReq := pb.ClosePayChReq{
+				SessionID: bobSessionID,
+				ChannelID: channel1ID,
+			}
+			closePayChResp, err := client.ClosePayCh(ctx, &closePayChReq)
+			t.Logf("\nResponse: %+v, Error: %+v", closePayChResp, err)
+			_, ok := closePayChResp.Response.(*pb.ClosePayChResp_MsgSuccess_)
+			if !ok {
+				errorResponse := closePayChResp.Response.(*pb.ClosePayChResp_Error)
+				t.Errorf("Error response: %+v", errorResponse)
+			} else {
+				t.Logf("Bob closed payment channel")
+			}
+			wg.Done()
+		}()
+
+		// Alice subscribes to channel close notifications.
+		subpayChClosesReq := pb.SubPayChClosesReq{
+			SessionID: aliceSessionID,
+		}
+		payChClosesSubClient, err := client.SubPayChCloses(ctx, &subpayChClosesReq)
+		require.NoErrorf(t, err, "subscribing to payment channel updates")
+
+		subPayChClosesResp, err := payChClosesSubClient.Recv()
+		require.NoErrorf(t, err, "receiving payment channel update notification")
+		notif, ok := subPayChClosesResp.Response.(*pb.SubPayChClosesResp_Notify_)
+		if !ok {
+			t.Errorf("Error receiving notifications")
+		}
+		t.Logf("Alice received payment channel close notification: %+v", notif.Notify)
+
+		// Alice unsubscribes to channel close notifications.
+		unsubPayChClosesReq := pb.UnsubPayChClosesReq{
+			SessionID: aliceSessionID,
+		}
+		_, err = client.UnsubPayChClose(ctx, &unsubPayChClosesReq)
+		require.NoErrorf(t, err, "unsubscribing to payment channel proposals")
+
+		// This doesn't work on payment branch... but will work on develop for new channel close logic.
+		// // Bob subscribes to channel close notifications.
+		// subpayChClosesReq = pb.SubPayChClosesReq{
+		// 	SessionID: bobSessionID,
+		// }
+		// payChClosesSubClient, err = client.SubPayChCloses(ctx, &subpayChClosesReq)
+		// require.NoErrorf(t, err, "subscribing to payment channel updates")
+
+		// subPayChClosesResp, err = payChClosesSubClient.Recv()
+		// require.NoErrorf(t, err, "receiving payment channel update notification")
+		// notif, ok = subPayChClosesResp.Response.(*pb.SubPayChClosesResp_Notify_)
+		// if !ok {
+		// 	t.Errorf("Error receiving notifications")
+		// }
+		// t.Logf("Bob received payment channel close notification: %+v", notif.Notify)
+
+		// // Bob unsubscribes to channel close notifications.
+		// unsubPayChClosesReq = pb.UnsubPayChClosesReq{
+		// 	SessionID: bobSessionID,
+		// }
+		// _, err = client.UnsubPayChClose(ctx, &unsubPayChClosesReq)
+		// require.NoErrorf(t, err, "unsubscribing to payment channel proposals")
+		wg.Wait()
+	})
+
 }
 
 func StartServer(t *testing.T) {
