@@ -99,6 +99,30 @@ func GetPayChs(s perun.SessionAPI) []PayChInfo {
 	return payChInfos
 }
 
+// SubPayChProposals registers a subscription for payment channel proposals.
+func SubPayChProposals(s perun.SessionAPI, notifier PayChProposalNotifier) error {
+	return s.SubChProposals(func(notif perun.ChProposalNotif) {
+		balsBigInt := notif.Proposal.InitBals.Balances[0]
+		notifier(PayChProposalNotif{
+			ProposalID:       notif.ProposalID,
+			Currency:         notif.Currency,
+			OpeningBals:      balsFromBigInt("ETH", balsBigInt, notif.Parts),
+			ChallengeDurSecs: notif.Proposal.ChallengeDuration,
+			Expiry:           notif.Expiry,
+		})
+	})
+}
+
+// RespondPayChProposal sends the response to a payment channel proposal notification.
+func RespondPayChProposal(pctx context.Context, s perun.SessionAPI, proposalID string, accept bool) error {
+	return s.RespondChProposal(pctx, proposalID, accept)
+}
+
+// UnsubPayChProposals unregisters a subscription for payment channel proposals.
+func UnsubPayChProposals(s perun.SessionAPI) error {
+	return s.UnsubChProposals()
+}
+
 func balsFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
 	return balsFromBigInt(currency, state.Balances[0], parts)
 }

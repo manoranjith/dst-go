@@ -107,3 +107,67 @@ func Test_GetPayChs(t *testing.T) {
 		assert.NotZero(t, gotPayChInfos[0].ChannelID)
 	})
 }
+
+func Test_SubPayChProposals(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("SubChProposals", mock.Anything).Return(nil)
+
+		dummyNotifier := func(notif payment.PayChProposalNotif) {}
+		gotErr := payment.SubPayChProposals(sessionAPI, dummyNotifier)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("SubChProposals", mock.Anything).Return(assert.AnError)
+
+		dummyNotifier := func(notif payment.PayChProposalNotif) {}
+		gotErr := payment.SubPayChProposals(sessionAPI, dummyNotifier)
+		assert.Error(t, gotErr)
+	})
+}
+
+func Test_UnsubPayChProposals(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("UnsubChProposals", mock.Anything).Return(nil)
+
+		gotErr := payment.UnsubPayChProposals(sessionAPI)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("UnsubChProposals", mock.Anything).Return(assert.AnError)
+
+		gotErr := payment.UnsubPayChProposals(sessionAPI)
+		assert.Error(t, gotErr)
+	})
+}
+
+func Test_RespondPayChProposal(t *testing.T) {
+	proposalID := "proposal-id-1"
+	t.Run("happy_accept", func(t *testing.T) {
+		accept := true
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(nil)
+
+		gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("happy_reject", func(t *testing.T) {
+		accept := false
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(nil)
+
+		gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		accept := true
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(assert.AnError)
+
+		gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
+		assert.Error(t, gotErr)
+	})
+}
