@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/rand"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -89,30 +90,33 @@ func Test_Integ_Role(t *testing.T) {
 	var aliceSessionID, bobSessionID string
 	var alicePeer, bobPeer *pb.Peer
 	var aliceAlias, bobAlias = "alice", "bob"
+	wg := &sync.WaitGroup{}
 
-	t.Run("Node.OpenSession_Alice", func(t *testing.T) {
-		aliceCfg := sessiontest.NewConfig(t, prng)
-		openSessionReq := pb.OpenSessionReq{
-			ConfigFile: sessiontest.NewConfigFile(t, aliceCfg),
-		}
-		openSessionResp, err := client.OpenSession(ctx, &openSessionReq)
-		t.Logf("\nResponse: %+v, Error: %+v", openSessionResp, err)
-		successResponse := openSessionResp.Response.(*pb.OpenSessionResp_MsgSuccess_)
-		aliceSessionID = successResponse.MsgSuccess.SessionID
-		t.Logf("Bob session id: %s", aliceSessionID)
-	})
+	// Run OpenSession for Alice, Bob in top level test, because cleaup functions
+	// for removing the keystore directory, contacts file are registered to this
+	// testing.T.
 
-	t.Run("Node.OpenSession_Bob", func(t *testing.T) {
-		bobCfg := sessiontest.NewConfig(t, prng)
-		openSessionReq := pb.OpenSessionReq{
-			ConfigFile: sessiontest.NewConfigFile(t, bobCfg),
-		}
-		openSessionResp, err := client.OpenSession(ctx, &openSessionReq)
-		t.Logf("\nResponse: %+v, Error: %+v", openSessionResp, err)
-		successResponse := openSessionResp.Response.(*pb.OpenSessionResp_MsgSuccess_)
-		bobSessionID = successResponse.MsgSuccess.SessionID
-		t.Logf("Bob session id: %s", bobSessionID)
-	})
+	// Alice Open Session
+	aliceCfg := sessiontest.NewConfig(t, prng)
+	aliceOpenSessionReq := pb.OpenSessionReq{
+		ConfigFile: sessiontest.NewConfigFile(t, aliceCfg),
+	}
+	aliceOpenSessionResp, err := client.OpenSession(ctx, &aliceOpenSessionReq)
+	t.Logf("\nResponse: %+v, Error: %+v", aliceOpenSessionResp, err)
+	aliceSuccessResponse := aliceOpenSessionResp.Response.(*pb.OpenSessionResp_MsgSuccess_)
+	aliceSessionID = aliceSuccessResponse.MsgSuccess.SessionID
+	t.Logf("Alice session id: %s", aliceSessionID)
+
+	// Bob Open Session
+	bobCfg := sessiontest.NewConfig(t, prng)
+	bobOpenSessionReq := pb.OpenSessionReq{
+		ConfigFile: sessiontest.NewConfigFile(t, bobCfg),
+	}
+	bobOpenSessionResp, err := client.OpenSession(ctx, &bobOpenSessionReq)
+	t.Logf("\nResponse: %+v, Error: %+v", bobOpenSessionResp, err)
+	bobSuccessResponse := bobOpenSessionResp.Response.(*pb.OpenSessionResp_MsgSuccess_)
+	bobSessionID = bobSuccessResponse.MsgSuccess.SessionID
+	t.Logf("Bob session id: %s", bobSessionID)
 
 	t.Run("Session.GetContact_Alice", func(t *testing.T) {
 		getContactReq := pb.GetContactReq{
@@ -182,36 +186,68 @@ func Test_Integ_Role(t *testing.T) {
 		}
 	})
 
-	t.Run("Session.OpenPayCh_Alice", func(t *testing.T) {
-		balInfo := &pb.BalanceInfo{
-			Currency: currency.ETH,
-			Balances: make([]*pb.BalanceInfo_AliasBalance, 2),
-		}
-		balInfo.Balances[0] = &pb.BalanceInfo_AliasBalance{
-			Value: make(map[string]string),
-		}
-		balInfo.Balances[0].Value[perun.OwnAlias] = "1"
-		balInfo.Balances[1] = &pb.BalanceInfo_AliasBalance{
-			Value: make(map[string]string),
-		}
-		balInfo.Balances[1].Value[bobAlias] = "2"
+	t.Run("Session.OpenPayCh_Sub_Unsub_Respond", func(t *testing.T) {
+		wg.Add(1)
+		// Alice proposes payment channel to bob.
+		go func() {
+			balInfo_ := perun.BalInfo{
+				Currency: currency.ETH,
+				Bals:     make(map[string]string),
+			}
+			balInfo_.Bals[perun.OwnAlias] = "1"
+			balInfo_.Bals[bobAlias] = "2"
+			openPayChReq := pb.OpenPayChReq{
+				SessionID:        aliceSessionID,
+				PeerAlias:        bobAlias,
+				OpeningBalance:   pngrpc.ToGrpcBalInfo(balInfo_),
+				ChallengeDurSecs: 10,
+			}
+			openPayChResp, err := client.OpenPayCh(ctx, &openPayChReq)
+			t.Logf("\nResponse: %+v, Error: %+v", openPayChResp, err)
+			_, ok := openPayChResp.Resp.(*pb.OpenPayChResp_MsgSuccess_)
+			if !ok {
+				errorResponse := openPayChResp.Resp.(*pb.OpenPayChResp_Error)
+				t.Errorf("Error response: %+v", errorResponse)
+			} else {
+				t.Logf("Bob added alice to contacts")
+			}
+			wg.Done()
+		}()
 
-		openPayChReq := pb.OpenPayChReq{
-			SessionID:        aliceSessionID,
-			PeerAlias:        bobAlias,
-			OpeningBalance:   balInfo,
-			ChallengeDurSecs: 10,
+		// Bob subscribes to channel proposal notifications.
+		subPayChProposalsReq := pb.SubPayChProposalsReq{
+			SessionID: bobSessionID,
 		}
-		openPayChResp, err := client.OpenPayCh(ctx, &openPayChReq)
-		t.Logf("\nResponse: %+v, Error: %+v", openPayChResp, err)
-		_, ok := openPayChResp.Resp.(*pb.OpenPayChResp_MsgSuccess_)
+		payChProposalsSubClient, err := client.SubPayChProposals(ctx, &subPayChProposalsReq)
+		require.NoErrorf(t, err, "subscribing to payment channel proposals")
+
+		subPayChProposalsResp, err := payChProposalsSubClient.Recv()
+		require.NoErrorf(t, err, "receiving payment channel proposal notification")
+		notif, ok := subPayChProposalsResp.Response.(*pb.SubPayChProposalsResp_Notify_)
 		if !ok {
-			errorResponse := openPayChResp.Resp.(*pb.OpenPayChResp_Error)
-			t.Errorf("Error response: %+v", errorResponse)
-		} else {
-			t.Logf("Bob added alice to contacts")
+			t.Errorf("Error receiving notifications")
 		}
+		t.Logf("Bob received payment channel proposal notification: %+v", notif.Notify)
+
+		// Bob accepts channel proposal.
+		respondChProposalReq := pb.RespondPayChProposalReq{
+			SessionID:  bobSessionID,
+			ProposalID: notif.Notify.ProposalID,
+			Accept:     true,
+		}
+		_, err = client.RespondPayChProposal(ctx, &respondChProposalReq)
+		require.NoErrorf(t, err, "responding to payment channel proposal")
+
+		// Bob unsubscribes to channel proposal notifications.
+		unsubPayChProposalsReq := pb.UnsubPayChProposalsReq{
+			SessionID: bobSessionID,
+		}
+		_, err = client.UnsubPayChProposals(ctx, &unsubPayChProposalsReq)
+		require.NoErrorf(t, err, "unsubscribing to payment channel proposals")
+
+		wg.Wait()
 	})
+
 }
 
 func StartServer(t *testing.T) {

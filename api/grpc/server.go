@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pkg/errors"
+	psync "perun.network/go-perun/pkg/sync"
+
 	"github.com/hyperledger-labs/perun-node/app/payment"
 
 	"github.com/hyperledger-labs/perun-node"
@@ -28,10 +31,24 @@ import (
 
 type PaymentAPI struct {
 	n perun.NodeAPI
+
+	// The mutex should be used when accessing the map data structures in this API.
+	psync.Mutex
+
+	// chProposalsNotif holds a unbuffered boolean channel for each active subscription.
+	// When a subscription is registered, subsription routine will add an entry to this map
+	// with the session ID as they key. It will then wait indefinitely on this channel.
+	//
+	// The unsubscription call should retreive the channel from the map and close it, which
+	// will signal the subscription routine to end.
+	chProposalsNotif map[string]chan bool
 }
 
 func NewPaymentAPI(n perun.NodeAPI) *PaymentAPI {
-	return &PaymentAPI{n}
+	return &PaymentAPI{
+		n:                n,
+		chProposalsNotif: make(map[string]chan bool),
+	}
 }
 
 func (a *PaymentAPI) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfigResp, error) {
@@ -168,15 +185,7 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 			},
 		}, nil
 	}
-	balInfo := perun.BalInfo{
-		Currency: req.OpeningBalance.Currency,
-		Bals:     make(map[string]string, len(req.OpeningBalance.Balances)),
-	}
-	for _, aliasBalance := range req.OpeningBalance.Balances {
-		for key, value := range aliasBalance.Value {
-			balInfo.Bals[key] = value
-		}
-	}
+	balInfo := FromGrpcBalInfo(req.OpeningBalance)
 	payChInfo, err := payment.OpenPayCh(ctx, sess, req.PeerAlias, balInfo, req.ChallengeDurSecs)
 	payChInfo_ := pb.PaymentChannel{
 		ChannelID: payChInfo.ChannelID,
@@ -200,20 +209,144 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 	}, nil
 }
 
+func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalInfo {
+	balInfo := perun.BalInfo{
+		Currency: src.Currency,
+		Bals:     make(map[string]string, len(src.Balances)),
+	}
+	for _, aliasBalance := range src.Balances {
+		for key, value := range aliasBalance.Value {
+			balInfo.Bals[key] = value
+		}
+	}
+	return balInfo
+}
+
+func ToGrpcBalInfo(src perun.BalInfo) *pb.BalanceInfo {
+	balInfo := &pb.BalanceInfo{
+		Currency: src.Currency,
+		Balances: make([]*pb.BalanceInfo_AliasBalance, len(src.Bals)),
+	}
+	i := 0
+	for key, value := range src.Bals {
+		balInfo.Balances[i] = &pb.BalanceInfo_AliasBalance{
+			Value: make(map[string]string),
+		}
+		balInfo.Balances[i].Value[key] = value
+		i++
+	}
+	return balInfo
+}
+
 func (a *PaymentAPI) GetPayChs(context.Context, *pb.GetPayChsReq) (*pb.GetPayChsResp, error) {
 	return nil, nil
 }
 
-func (a *PaymentAPI) SubPayChProposals(*pb.SubPayChProposalsReq, pb.Payment_API_SubPayChProposalsServer) error {
+func (a *PaymentAPI) SubPayChProposals(req *pb.SubPayChProposalsReq, srv pb.Payment_API_SubPayChProposalsServer) error {
+	fmt.Println("Received request: SubPayChProposals")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		// TODO: (mano) Return a error response and not a protocol error
+		return errors.WithMessage(err, "cannot register subscription")
+	}
+
+	notifier := func(notif payment.PayChProposalNotif) {
+		notif_ := pb.SubPayChProposalsResp_Notify_{
+			Notify: &pb.SubPayChProposalsResp_Notify{
+				ProposalID:       notif.ProposalID,
+				OpeningBalance:   ToGrpcBalInfo(notif.OpeningBals),
+				ChallengeDurSecs: notif.ChallengeDurSecs,
+				Expiry:           notif.Expiry,
+			},
+		}
+		notifResponse := pb.SubPayChProposalsResp{Response: &notif_}
+		err := srv.Send(&notifResponse)
+		if err != nil {
+			// TODO: (mano) Error handling when sending notification.
+			fmt.Println("Error sending notification")
+		}
+	}
+
+	err = payment.SubPayChProposals(sess, notifier)
+	if err != nil {
+		return err
+	}
+	signal := make(chan bool)
+	a.Lock()
+	a.chProposalsNotif[req.SessionID] = signal
+	a.Unlock()
+
+	<-signal
+	fmt.Println("Channel Proposal Subscription ended for" + req.SessionID)
 	return nil
 }
 
-func (a *PaymentAPI) UnsubPayChProposals(context.Context, *pb.UnsubPayChProposalsReq) (*pb.UnsubPayChProposalsResp, error) {
-	return nil, nil
+func (a *PaymentAPI) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayChProposalsReq) (*pb.UnsubPayChProposalsResp, error) {
+	fmt.Println("Received request: UnsubPayChProposals")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.UnsubPayChProposalsResp{
+			Response: &pb.UnsubPayChProposalsResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	err = payment.UnsubPayChProposals(sess)
+	if err != nil {
+		return &pb.UnsubPayChProposalsResp{
+			Response: &pb.UnsubPayChProposalsResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+
+	a.Lock()
+	signal := a.chProposalsNotif[req.SessionID]
+	a.Unlock()
+
+	close(signal)
+	return &pb.UnsubPayChProposalsResp{
+		Response: &pb.UnsubPayChProposalsResp_MsgSuccess_{
+			MsgSuccess: &pb.UnsubPayChProposalsResp_MsgSuccess{
+				Success: true,
+			},
+		},
+	}, nil
 }
 
-func (a *PaymentAPI) RespondPayChProposal(context.Context, *pb.RespondPayChProposalReq) (*pb.RespondPayChProposalResp, error) {
-	return nil, nil
+func (a *PaymentAPI) RespondPayChProposal(ctx context.Context, req *pb.RespondPayChProposalReq) (*pb.RespondPayChProposalResp, error) {
+	fmt.Println("Received request: RespondPayChProposal")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.RespondPayChProposalResp{
+			Response: &pb.RespondPayChProposalResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	err = payment.RespondPayChProposal(ctx, sess, req.ProposalID, req.Accept)
+	if err != nil {
+		return &pb.RespondPayChProposalResp{
+			Response: &pb.RespondPayChProposalResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	return &pb.RespondPayChProposalResp{
+		Response: &pb.RespondPayChProposalResp_MsgSuccess_{
+			MsgSuccess: &pb.RespondPayChProposalResp_MsgSuccess{
+				Success: true,
+			},
+		},
+	}, nil
 }
 
 func (a *PaymentAPI) SubPayChCloses(*pb.SubPayChClosesReq, pb.Payment_API_SubPayChClosesServer) error {
