@@ -186,6 +186,7 @@ func Test_Integ_Role(t *testing.T) {
 		}
 	})
 
+	var channel1ID string
 	t.Run("Session.OpenPayCh_Sub_Unsub_Respond", func(t *testing.T) {
 		wg.Add(1)
 		// Alice proposes payment channel to bob.
@@ -204,11 +205,12 @@ func Test_Integ_Role(t *testing.T) {
 			}
 			openPayChResp, err := client.OpenPayCh(ctx, &openPayChReq)
 			t.Logf("\nResponse: %+v, Error: %+v", openPayChResp, err)
-			_, ok := openPayChResp.Resp.(*pb.OpenPayChResp_MsgSuccess_)
+			successResponse, ok := openPayChResp.Resp.(*pb.OpenPayChResp_MsgSuccess_)
 			if !ok {
 				errorResponse := openPayChResp.Resp.(*pb.OpenPayChResp_Error)
 				t.Errorf("Error response: %+v", errorResponse)
 			} else {
+				channel1ID = successResponse.MsgSuccess.Channel.ChannelID
 				t.Logf("Bob added alice to contacts")
 			}
 			wg.Done()
@@ -243,6 +245,65 @@ func Test_Integ_Role(t *testing.T) {
 			SessionID: bobSessionID,
 		}
 		_, err = client.UnsubPayChProposals(ctx, &unsubPayChProposalsReq)
+		require.NoErrorf(t, err, "unsubscribing to payment channel proposals")
+
+		wg.Wait()
+	})
+
+	t.Run("Channel.SendPayChUpdate_Sub_Unsub_Respond", func(t *testing.T) {
+		wg.Add(1)
+		// Bob sends payment channel to alice.
+		go func() {
+			sendPayChUpdateReq := pb.SendPayChUpdateReq{
+				SessionID: bobSessionID,
+				ChannelID: channel1ID,
+				Payee:     aliceAlias,
+				Amount:    "0.5",
+			}
+			sendPayChUpdateResp, err := client.SendPayChUpdate(ctx, &sendPayChUpdateReq)
+			t.Logf("\nResponse: %+v, Error: %+v", sendPayChUpdateResp, err)
+			_, ok := sendPayChUpdateResp.Response.(*pb.SendPayChUpdateResp_MsgSuccess_)
+			if !ok {
+				errorResponse := sendPayChUpdateResp.Response.(*pb.SendPayChUpdateResp_Error)
+				t.Errorf("Error response: %+v", errorResponse)
+			} else {
+				t.Logf("Bob send payment to alice")
+			}
+			wg.Done()
+		}()
+
+		// Alice subscribes to channel proposal notifications.
+		subpayChUpdatesReq := pb.SubpayChUpdatesReq{
+			SessionID: aliceSessionID,
+			ChannelID: channel1ID,
+		}
+		payChUpdatesSubClient, err := client.SubPayChUpdates(ctx, &subpayChUpdatesReq)
+		require.NoErrorf(t, err, "subscribing to payment channel updates")
+
+		subPayChUpdatesResp, err := payChUpdatesSubClient.Recv()
+		require.NoErrorf(t, err, "receiving payment channel update notification")
+		notif, ok := subPayChUpdatesResp.Response.(*pb.SubPayChUpdatesResp_Notify_)
+		if !ok {
+			t.Errorf("Error receiving notifications")
+		}
+		t.Logf("Bob received payment channel update notification: %+v", notif.Notify)
+
+		// Alice accepts channel proposal.
+		respondChUpdateReq := pb.RespondPayChUpdateReq{
+			SessionID: aliceSessionID,
+			UpdateID:  notif.Notify.UpdateID,
+			ChannelID: channel1ID,
+			Accept:    true,
+		}
+		_, err = client.RespondPayChUpdate(ctx, &respondChUpdateReq)
+		require.NoErrorf(t, err, "responding to payment channel proposal")
+
+		// Alice unsubscribes to channel proposal notifications.
+		unsubPayChUpdatesReq := pb.UnsubPayChUpdatesReq{
+			SessionID: aliceSessionID,
+			ChannelID: channel1ID,
+		}
+		_, err = client.UnsubPayChUpdates(ctx, &unsubPayChUpdatesReq)
 		require.NoErrorf(t, err, "unsubscribing to payment channel proposals")
 
 		wg.Wait()

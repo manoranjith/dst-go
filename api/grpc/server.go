@@ -42,12 +42,17 @@ type PaymentAPI struct {
 	// The unsubscription call should retreive the channel from the map and close it, which
 	// will signal the subscription routine to end.
 	chProposalsNotif map[string]chan bool
+
+	// chUpdatesNotif holds signalling channels for update notifiers.
+	// it is map of session id to channel id to signaling channel.
+	chUpdatesNotif map[string]map[string]chan bool
 }
 
 func NewPaymentAPI(n perun.NodeAPI) *PaymentAPI {
 	return &PaymentAPI{
 		n:                n,
 		chProposalsNotif: make(map[string]chan bool),
+		chUpdatesNotif:   make(map[string]map[string]chan bool),
 	}
 }
 
@@ -75,6 +80,10 @@ func (a *PaymentAPI) OpenSession(ctx context.Context, req *pb.OpenSessionReq) (*
 			},
 		}, nil
 	}
+
+	a.Lock()
+	a.chUpdatesNotif[sessionID] = make(map[string]chan bool)
+	a.Unlock()
 
 	return &pb.OpenSessionResp{
 		Response: &pb.OpenSessionResp_MsgSuccess_{
@@ -188,8 +197,9 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 	balInfo := FromGrpcBalInfo(req.OpeningBalance)
 	payChInfo, err := payment.OpenPayCh(ctx, sess, req.PeerAlias, balInfo, req.ChallengeDurSecs)
 	payChInfo_ := pb.PaymentChannel{
-		ChannelID: payChInfo.ChannelID,
-		Version:   payChInfo.Version,
+		ChannelID:   payChInfo.ChannelID,
+		Balanceinfo: ToGrpcBalInfo(payChInfo.BalInfo),
+		Version:     payChInfo.Version,
 	}
 	if err != nil {
 		return &pb.OpenPayChResp{
@@ -361,20 +371,176 @@ func (a *PaymentAPI) CloseSession(context.Context, *pb.CloseSessionReq) (*pb.Clo
 	return nil, nil
 }
 
-func (a *PaymentAPI) SendPayChUpdate(context.Context, *pb.SendPayChUpdateReq) (*pb.SendPayChUpdateResp, error) {
-	return nil, nil
+func (a *PaymentAPI) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpdateReq) (*pb.SendPayChUpdateResp, error) {
+	fmt.Println("Received request: SendPayChUpdate")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.SendPayChUpdateResp{
+			Response: &pb.SendPayChUpdateResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	channel, err := sess.GetCh(req.ChannelID)
+	if err != nil {
+		return &pb.SendPayChUpdateResp{
+			Response: &pb.SendPayChUpdateResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	err = payment.SendPayChUpdate(ctx, channel, req.Payee, req.Amount)
+	if err != nil {
+		return &pb.SendPayChUpdateResp{
+			Response: &pb.SendPayChUpdateResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	return &pb.SendPayChUpdateResp{
+		Response: &pb.SendPayChUpdateResp_MsgSuccess_{
+			MsgSuccess: &pb.SendPayChUpdateResp_MsgSuccess{
+				Success: true,
+			},
+		},
+	}, nil
 }
 
-func (a *PaymentAPI) SubPayChUpdates(*pb.SubpayChUpdatesReq, pb.Payment_API_SubPayChUpdatesServer) error {
+func (a *PaymentAPI) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment_API_SubPayChUpdatesServer) error {
+	fmt.Println("Received request: SendPayChUpdate")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		// TODO: (mano) Return a error response and not a protocol error
+		return errors.WithMessage(err, "cannot register subscription")
+	}
+	channel, err := sess.GetCh(req.ChannelID)
+	if err != nil {
+		return errors.WithMessage(err, "cannot register subscription")
+	}
+
+	notifier := func(notif payment.PayChUpdateNotif) {
+		notif_ := pb.SubPayChUpdatesResp_Notify_{
+			Notify: &pb.SubPayChUpdatesResp_Notify{
+				ProposedBalance: ToGrpcBalInfo(notif.ProposedBals),
+				UpdateID:        notif.UpdateID,
+				Final:           notif.Final,
+				Expiry:          notif.Timeout,
+			},
+		}
+		notifResponse := pb.SubPayChUpdatesResp{Response: &notif_}
+		err := srv.Send(&notifResponse)
+		if err != nil {
+			// TODO: (mano) Error handling when sending notification.
+			fmt.Println("Error sending notification")
+		}
+	}
+
+	err = payment.SubPayChUpdates(channel, notifier)
+	if err != nil {
+		return err
+	}
+	signal := make(chan bool)
+	a.Lock()
+	a.chUpdatesNotif[req.SessionID][req.ChannelID] = signal
+	a.Unlock()
+
+	<-signal
+	fmt.Println("Channel Update Subscription ended for" + req.SessionID)
 	return nil
 }
 
-func (a *PaymentAPI) UnsubPayChUpdates(context.Context, *pb.UnsubPayChUpdatesReq) (*pb.UnsubPayChUpdatesResp, error) {
-	return nil, nil
+func (a *PaymentAPI) UnsubPayChUpdates(ctx context.Context, req *pb.UnsubPayChUpdatesReq) (*pb.UnsubPayChUpdatesResp, error) {
+	fmt.Println("Received request: UnsubPayChUpdates")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.UnsubPayChUpdatesResp{
+			Response: &pb.UnsubPayChUpdatesResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	channel, err := sess.GetCh(req.ChannelID)
+	if err != nil {
+		return &pb.UnsubPayChUpdatesResp{
+			Response: &pb.UnsubPayChUpdatesResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	err = payment.UnsubPayChUpdates(channel)
+	if err != nil {
+		return &pb.UnsubPayChUpdatesResp{
+			Response: &pb.UnsubPayChUpdatesResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+
+	a.Lock()
+	signal := a.chUpdatesNotif[req.SessionID][req.ChannelID]
+	a.Unlock()
+
+	close(signal)
+	return &pb.UnsubPayChUpdatesResp{
+		Response: &pb.UnsubPayChUpdatesResp_MsgSuccess_{
+			MsgSuccess: &pb.UnsubPayChUpdatesResp_MsgSuccess{
+				Success: true,
+			},
+		},
+	}, nil
 }
 
-func (a *PaymentAPI) RespondPayChUpdate(context.Context, *pb.RespondPayChUpdateReq) (*pb.RespondPayChUpdateResp, error) {
-	return nil, nil
+func (a *PaymentAPI) RespondPayChUpdate(ctx context.Context, req *pb.RespondPayChUpdateReq) (*pb.RespondPayChUpdateResp, error) {
+	fmt.Println("Received request: RespondPayChUpdate")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.RespondPayChUpdateResp{
+			Response: &pb.RespondPayChUpdateResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	channel, err := sess.GetCh(req.ChannelID)
+	if err != nil {
+		return &pb.RespondPayChUpdateResp{
+			Response: &pb.RespondPayChUpdateResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	err = payment.RespondPayChUpdate(ctx, channel, req.UpdateID, req.Accept)
+	if err != nil {
+		return &pb.RespondPayChUpdateResp{
+			Response: &pb.RespondPayChUpdateResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	return &pb.RespondPayChUpdateResp{
+		Response: &pb.RespondPayChUpdateResp_MsgSuccess_{
+			MsgSuccess: &pb.RespondPayChUpdateResp_MsgSuccess{
+				Success: true,
+			},
+		},
+	}, nil
 }
 
 func (a *PaymentAPI) GetPayChBalance(context.Context, *pb.GetPayChBalanceReq) (*pb.GetPayChBalanceResp, error) {
