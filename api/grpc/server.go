@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hyperledger-labs/perun-node/app/payment"
+
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 )
@@ -154,8 +156,48 @@ func (a *PaymentAPI) GetContact(ctx context.Context, req *pb.GetContactReq) (*pb
 	}, nil
 }
 
-func (a *PaymentAPI) OpenPayCh(context.Context, *pb.OpenPayChReq) (*pb.OpenPayChResp, error) {
-	return nil, nil
+func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.OpenPayChResp, error) {
+	fmt.Println("Received request: OpenPayCh")
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return &pb.OpenPayChResp{
+			Resp: &pb.OpenPayChResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	balInfo := perun.BalInfo{
+		Currency: req.OpeningBalance.Currency,
+		Bals:     make(map[string]string, len(req.OpeningBalance.Balances)),
+	}
+	for _, aliasBalance := range req.OpeningBalance.Balances {
+		for key, value := range aliasBalance.Value {
+			balInfo.Bals[key] = value
+		}
+	}
+	payChInfo, err := payment.OpenPayCh(ctx, sess, req.PeerAlias, balInfo, req.ChallengeDurSecs)
+	payChInfo_ := pb.PaymentChannel{
+		ChannelID: payChInfo.ChannelID,
+		Version:   payChInfo.Version,
+	}
+	if err != nil {
+		return &pb.OpenPayChResp{
+			Resp: &pb.OpenPayChResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}, nil
+	}
+	return &pb.OpenPayChResp{
+		Resp: &pb.OpenPayChResp_MsgSuccess_{
+			MsgSuccess: &pb.OpenPayChResp_MsgSuccess{
+				Channel: &payChInfo_,
+			},
+		},
+	}, nil
 }
 
 func (a *PaymentAPI) GetPayChs(context.Context, *pb.GetPayChsReq) (*pb.GetPayChsResp, error) {

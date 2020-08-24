@@ -30,6 +30,7 @@ import (
 	pngrpc "github.com/hyperledger-labs/perun-node/api/grpc"
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 	"github.com/hyperledger-labs/perun-node/cmd/perunnode"
+	"github.com/hyperledger-labs/perun-node/currency"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
@@ -175,6 +176,37 @@ func Test_Integ_Role(t *testing.T) {
 		_, ok := addContactResp.Response.(*pb.AddContactResp_MsgSuccess_)
 		if !ok {
 			errorResponse := addContactResp.Response.(*pb.AddContactResp_Error)
+			t.Errorf("Error response: %+v", errorResponse)
+		} else {
+			t.Logf("Bob added alice to contacts")
+		}
+	})
+
+	t.Run("Session.OpenPayCh_Alice", func(t *testing.T) {
+		balInfo := &pb.BalanceInfo{
+			Currency: currency.ETH,
+			Balances: make([]*pb.BalanceInfo_AliasBalance, 2),
+		}
+		balInfo.Balances[0] = &pb.BalanceInfo_AliasBalance{
+			Value: make(map[string]string),
+		}
+		balInfo.Balances[0].Value[perun.OwnAlias] = "1"
+		balInfo.Balances[1] = &pb.BalanceInfo_AliasBalance{
+			Value: make(map[string]string),
+		}
+		balInfo.Balances[1].Value[bobAlias] = "2"
+
+		openPayChReq := pb.OpenPayChReq{
+			SessionID:        aliceSessionID,
+			PeerAlias:        bobAlias,
+			OpeningBalance:   balInfo,
+			ChallengeDurSecs: 10,
+		}
+		openPayChResp, err := client.OpenPayCh(ctx, &openPayChReq)
+		t.Logf("\nResponse: %+v, Error: %+v", openPayChResp, err)
+		_, ok := openPayChResp.Resp.(*pb.OpenPayChResp_MsgSuccess_)
+		if !ok {
+			errorResponse := openPayChResp.Resp.(*pb.OpenPayChResp_Error)
 			t.Errorf("Error response: %+v", errorResponse)
 		} else {
 			t.Logf("Bob added alice to contacts")
