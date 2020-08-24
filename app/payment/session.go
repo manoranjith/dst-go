@@ -123,6 +123,24 @@ func UnsubPayChProposals(s perun.SessionAPI) error {
 	return s.UnsubChProposals()
 }
 
+// SubPayChCloses registers a subscription for payment channel closes.
+func SubPayChCloses(s perun.SessionAPI, notifier PayChCloseNotifier) error {
+	return s.SubChCloses(func(notif perun.ChCloseNotif) {
+		notifier(PayChCloseNotif{
+			ClosingState: PayChInfo{
+				ChannelID: notif.ChannelID,
+				BalInfo:   balsFromState(notif.Currency, notif.ChState, notif.Parts),
+				Version:   fmt.Sprintf("%d", notif.ChState.Version),
+			},
+		})
+	})
+}
+
+// UnsubPayChCloses unregisters a subscription for payment channel closes.
+func UnsubPayChCloses(s perun.SessionAPI) error {
+	return s.UnsubChCloses()
+}
+
 func balsFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
 	return balsFromBigInt(currency, state.Balances[0], parts)
 }

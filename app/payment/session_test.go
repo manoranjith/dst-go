@@ -173,3 +173,40 @@ func Test_RespondPayChProposal(t *testing.T) {
 		assert.Error(t, gotErr)
 	})
 }
+
+// nolint: dupl	// not duplicate of Test_SubPayChUpdates.
+func Test_SubPayChCloses(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("SubChCloses", mock.Anything).Return(nil)
+
+		dummyNotifier := func(notif payment.PayChCloseNotif) {}
+		gotErr := payment.SubPayChCloses(sessionAPI, dummyNotifier)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("SubChCloses", mock.Anything).Return(assert.AnError)
+
+		dummyNotifier := func(notif payment.PayChCloseNotif) {}
+		gotErr := payment.SubPayChCloses(sessionAPI, dummyNotifier)
+		assert.Error(t, gotErr)
+	})
+}
+
+func Test_UnsubPayChCloses(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("UnsubChCloses", mock.Anything).Return(nil)
+
+		gotErr := payment.UnsubPayChCloses(sessionAPI)
+		assert.NoError(t, gotErr)
+	})
+	t.Run("error", func(t *testing.T) {
+		sessionAPI := &mocks.SessionAPI{}
+		sessionAPI.On("UnsubChCloses", mock.Anything).Return(assert.AnError)
+
+		gotErr := payment.UnsubPayChCloses(sessionAPI)
+		assert.Error(t, gotErr)
+	})
+}
