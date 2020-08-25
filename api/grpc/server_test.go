@@ -89,7 +89,7 @@ func Test_Integ_Role(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))
 	var aliceSessionID, bobSessionID string
 	var alicePeer, bobPeer *pb.Peer
-	var aliceAlias, bobAlias = "alice", "bob"
+	aliceAlias, bobAlias := "alice", "bob"
 	wg := &sync.WaitGroup{}
 
 	// Run OpenSession for Alice, Bob in top level test, because cleaup functions
@@ -375,7 +375,6 @@ func Test_Integ_Role(t *testing.T) {
 		// require.NoErrorf(t, err, "unsubscribing to payment channel proposals")
 		wg.Wait()
 	})
-
 }
 
 func StartServer(t *testing.T) {

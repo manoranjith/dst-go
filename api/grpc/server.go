@@ -62,7 +62,6 @@ func NewPaymentAPI(n perun.NodeAPI) *PaymentAPI {
 }
 
 func (a *PaymentAPI) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfigResp, error) {
-	fmt.Println("Received request: GetConfig")
 	cfg := a.n.GetConfig()
 	return &pb.GetConfigResp{
 		ChainAddress:       cfg.ChainURL,
@@ -74,16 +73,19 @@ func (a *PaymentAPI) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfig
 }
 
 func (a *PaymentAPI) OpenSession(ctx context.Context, req *pb.OpenSessionReq) (*pb.OpenSessionResp, error) {
-	fmt.Println("Received request: OpenSession")
-	sessionID, err := a.n.OpenSession(req.ConfigFile)
-	if err != nil {
+	errResponse := func(err error) *pb.OpenSessionResp {
 		return &pb.OpenSessionResp{
 			Response: &pb.OpenSessionResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
 			},
-		}, nil
+		}
+	}
+
+	sessionID, err := a.n.OpenSession(req.ConfigFile)
+	if err != nil {
+		return errResponse(err), nil
 	}
 
 	a.Lock()
@@ -114,33 +116,29 @@ func (a *PaymentAPI) Help(context.Context, *pb.HelpReq) (*pb.HelpResp, error) {
 }
 
 func (a *PaymentAPI) AddContact(ctx context.Context, req *pb.AddContactReq) (*pb.AddContactResp, error) {
-	fmt.Println("Received request: AddContact")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.AddContactResp {
 		return &pb.AddContactResp{
 			Response: &pb.AddContactResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
+					Error: err.Error()},
 			},
-		}, nil
+		}
 	}
-	peer := perun.Peer{
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
+	}
+	err = sess.AddContact(perun.Peer{
 		Alias:              req.Peer.Alias,
 		OffChainAddrString: req.Peer.OffChainAddress,
 		CommAddr:           req.Peer.CommAddress,
 		CommType:           req.Peer.CommType,
-	}
-	err = sess.AddContact(peer)
+	})
 	if err != nil {
-		return &pb.AddContactResp{
-			Response: &pb.AddContactResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	return &pb.AddContactResp{
 		Response: &pb.AddContactResp_MsgSuccess_{
 			MsgSuccess: &pb.AddContactResp_MsgSuccess{
@@ -151,53 +149,50 @@ func (a *PaymentAPI) AddContact(ctx context.Context, req *pb.AddContactReq) (*pb
 }
 
 func (a *PaymentAPI) GetContact(ctx context.Context, req *pb.GetContactReq) (*pb.GetContactResp, error) {
-	fmt.Println("Received request: GetContact")
+	errResponse := func(err error) *pb.GetContactResp {
+		return &pb.GetContactResp{
+			Response: &pb.GetContactResp_Error{
+				Error: &pb.MsgError{
+					Error: err.Error()},
+			},
+		}
+	}
+
 	sess, err := a.n.GetSession(req.SessionID)
 	if err != nil {
-		return &pb.GetContactResp{
-			Response: &pb.GetContactResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 	peer, err := sess.GetContact(req.Alias)
-	peer_ := pb.Peer{
-		Alias:           peer.Alias,
-		OffChainAddress: peer.OffChainAddrString,
-		CommAddress:     peer.CommAddr,
-		CommType:        peer.CommType,
-	}
 	if err != nil {
-		return &pb.GetContactResp{
-			Response: &pb.GetContactResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	return &pb.GetContactResp{
 		Response: &pb.GetContactResp_MsgSuccess_{
 			MsgSuccess: &pb.GetContactResp_MsgSuccess{
-				Peer: &peer_,
+				Peer: &pb.Peer{
+					Alias:           peer.Alias,
+					OffChainAddress: peer.OffChainAddrString,
+					CommAddress:     peer.CommAddr,
+					CommType:        peer.CommType,
+				},
 			},
 		},
 	}, nil
 }
 
 func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.OpenPayChResp, error) {
-	fmt.Println("Received request: OpenPayCh")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.OpenPayChResp {
 		return &pb.OpenPayChResp{
 			Response: &pb.OpenPayChResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
+				Error: &pb.MsgError{Error: err.Error()},
 			},
-		}, nil
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	balInfo := FromGrpcBalInfo(req.OpeningBalance)
 	payChInfo, err := payment.OpenPayCh(ctx, sess, req.PeerAlias, balInfo, req.ChallengeDurSecs)
@@ -207,14 +202,9 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 		Version:     payChInfo.Version,
 	}
 	if err != nil {
-		return &pb.OpenPayChResp{
-			Response: &pb.OpenPayChResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	return &pb.OpenPayChResp{
 		Response: &pb.OpenPayChResp_MsgSuccess_{
 			MsgSuccess: &pb.OpenPayChResp_MsgSuccess{
@@ -222,35 +212,6 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 			},
 		},
 	}, nil
-}
-
-func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalInfo {
-	balInfo := perun.BalInfo{
-		Currency: src.Currency,
-		Bals:     make(map[string]string, len(src.Balances)),
-	}
-	for _, aliasBalance := range src.Balances {
-		for key, value := range aliasBalance.Value {
-			balInfo.Bals[key] = value
-		}
-	}
-	return balInfo
-}
-
-func ToGrpcBalInfo(src perun.BalInfo) *pb.BalanceInfo {
-	balInfo := &pb.BalanceInfo{
-		Currency: src.Currency,
-		Balances: make([]*pb.BalanceInfo_AliasBalance, len(src.Bals)),
-	}
-	i := 0
-	for key, value := range src.Bals {
-		balInfo.Balances[i] = &pb.BalanceInfo_AliasBalance{
-			Value: make(map[string]string),
-		}
-		balInfo.Balances[i].Value[key] = value
-		i++
-	}
-	return balInfo
 }
 
 func (a *PaymentAPI) GetPayChs(context.Context, *pb.GetPayChsReq) (*pb.GetPayChsResp, error) {
@@ -296,34 +257,31 @@ func (a *PaymentAPI) SubPayChProposals(req *pb.SubPayChProposalsReq, srv pb.Paym
 	return nil
 }
 
-func (a *PaymentAPI) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayChProposalsReq) (*pb.UnsubPayChProposalsResp, error) {
-	fmt.Println("Received request: UnsubPayChProposals")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+func (a *PaymentAPI) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayChProposalsReq) (
+	*pb.UnsubPayChProposalsResp, error) {
+	errResponse := func(err error) *pb.UnsubPayChProposalsResp {
 		return &pb.UnsubPayChProposalsResp{
 			Response: &pb.UnsubPayChProposalsResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
+					Error: err.Error()},
 			},
-		}, nil
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	err = payment.UnsubPayChProposals(sess)
 	if err != nil {
-		return &pb.UnsubPayChProposalsResp{
-			Response: &pb.UnsubPayChProposalsResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 
 	a.Lock()
 	signal := a.chProposalsNotif[req.SessionID]
 	a.Unlock()
-
 	close(signal)
+
 	return &pb.UnsubPayChProposalsResp{
 		Response: &pb.UnsubPayChProposalsResp_MsgSuccess_{
 			MsgSuccess: &pb.UnsubPayChProposalsResp_MsgSuccess{
@@ -333,28 +291,26 @@ func (a *PaymentAPI) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayCh
 	}, nil
 }
 
-func (a *PaymentAPI) RespondPayChProposal(ctx context.Context, req *pb.RespondPayChProposalReq) (*pb.RespondPayChProposalResp, error) {
-	fmt.Println("Received request: RespondPayChProposal")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+func (a *PaymentAPI) RespondPayChProposal(ctx context.Context, req *pb.RespondPayChProposalReq) (
+	*pb.RespondPayChProposalResp, error) {
+	errResponse := func(err error) *pb.RespondPayChProposalResp {
 		return &pb.RespondPayChProposalResp{
 			Response: &pb.RespondPayChProposalResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
+					Error: err.Error()},
 			},
-		}, nil
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	err = payment.RespondPayChProposal(ctx, sess, req.ProposalID, req.Accept)
 	if err != nil {
-		return &pb.RespondPayChProposalResp{
-			Response: &pb.RespondPayChProposalResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	return &pb.RespondPayChProposalResp{
 		Response: &pb.RespondPayChProposalResp_MsgSuccess_{
 			MsgSuccess: &pb.RespondPayChProposalResp_MsgSuccess{
@@ -406,33 +362,29 @@ func (a *PaymentAPI) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_AP
 }
 
 func (a *PaymentAPI) UnsubPayChClose(ctx context.Context, req *pb.UnsubPayChClosesReq) (*pb.UnsubPayChClosesResp, error) {
-	fmt.Println("Received request: UnsubPayChClose")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.UnsubPayChClosesResp {
 		return &pb.UnsubPayChClosesResp{
 			Response: &pb.UnsubPayChClosesResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
 			},
-		}, nil
+		}
+	}
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	err = payment.UnsubPayChCloses(sess)
 	if err != nil {
-		return &pb.UnsubPayChClosesResp{
-			Response: &pb.UnsubPayChClosesResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 
 	a.Lock()
 	signal := a.chClosesNotif[req.SessionID]
 	a.Unlock()
-
 	close(signal)
+
 	return &pb.UnsubPayChClosesResp{
 		Response: &pb.UnsubPayChClosesResp_MsgSuccess_{
 			MsgSuccess: &pb.UnsubPayChClosesResp_MsgSuccess{
@@ -447,37 +399,29 @@ func (a *PaymentAPI) CloseSession(context.Context, *pb.CloseSessionReq) (*pb.Clo
 }
 
 func (a *PaymentAPI) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpdateReq) (*pb.SendPayChUpdateResp, error) {
-	fmt.Println("Received request: SendPayChUpdate")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.SendPayChUpdateResp {
 		return &pb.SendPayChUpdateResp{
 			Response: &pb.SendPayChUpdateResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
 			},
-		}, nil
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	channel, err := sess.GetCh(req.ChannelID)
 	if err != nil {
-		return &pb.SendPayChUpdateResp{
-			Response: &pb.SendPayChUpdateResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 	err = payment.SendPayChUpdate(ctx, channel, req.Payee, req.Amount)
 	if err != nil {
-		return &pb.SendPayChUpdateResp{
-			Response: &pb.SendPayChUpdateResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	return &pb.SendPayChUpdateResp{
 		Response: &pb.SendPayChUpdateResp_MsgSuccess_{
 			MsgSuccess: &pb.SendPayChUpdateResp_MsgSuccess{
@@ -531,43 +475,33 @@ func (a *PaymentAPI) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment_
 }
 
 func (a *PaymentAPI) UnsubPayChUpdates(ctx context.Context, req *pb.UnsubPayChUpdatesReq) (*pb.UnsubPayChUpdatesResp, error) {
-	fmt.Println("Received request: UnsubPayChUpdates")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.UnsubPayChUpdatesResp {
 		return &pb.UnsubPayChUpdatesResp{
 			Response: &pb.UnsubPayChUpdatesResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
 			},
-		}, nil
+		}
+	}
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	channel, err := sess.GetCh(req.ChannelID)
 	if err != nil {
-		return &pb.UnsubPayChUpdatesResp{
-			Response: &pb.UnsubPayChUpdatesResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 	err = payment.UnsubPayChUpdates(channel)
 	if err != nil {
-		return &pb.UnsubPayChUpdatesResp{
-			Response: &pb.UnsubPayChUpdatesResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 
 	a.Lock()
 	signal := a.chUpdatesNotif[req.SessionID][req.ChannelID]
 	a.Unlock()
-
 	close(signal)
+
 	return &pb.UnsubPayChUpdatesResp{
 		Response: &pb.UnsubPayChUpdatesResp_MsgSuccess_{
 			MsgSuccess: &pb.UnsubPayChUpdatesResp_MsgSuccess{
@@ -578,37 +512,29 @@ func (a *PaymentAPI) UnsubPayChUpdates(ctx context.Context, req *pb.UnsubPayChUp
 }
 
 func (a *PaymentAPI) RespondPayChUpdate(ctx context.Context, req *pb.RespondPayChUpdateReq) (*pb.RespondPayChUpdateResp, error) {
-	fmt.Println("Received request: RespondPayChUpdate")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.RespondPayChUpdateResp {
 		return &pb.RespondPayChUpdateResp{
 			Response: &pb.RespondPayChUpdateResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
 			},
-		}, nil
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	channel, err := sess.GetCh(req.ChannelID)
 	if err != nil {
-		return &pb.RespondPayChUpdateResp{
-			Response: &pb.RespondPayChUpdateResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 	err = payment.RespondPayChUpdate(ctx, channel, req.UpdateID, req.Accept)
 	if err != nil {
-		return &pb.RespondPayChUpdateResp{
-			Response: &pb.RespondPayChUpdateResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	return &pb.RespondPayChUpdateResp{
 		Response: &pb.RespondPayChUpdateResp_MsgSuccess_{
 			MsgSuccess: &pb.RespondPayChUpdateResp_MsgSuccess{
@@ -623,26 +549,23 @@ func (a *PaymentAPI) GetPayChBalance(context.Context, *pb.GetPayChBalanceReq) (*
 }
 
 func (a *PaymentAPI) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*pb.ClosePayChResp, error) {
-	fmt.Println("Received request: ClosePayCh")
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
+	errResponse := func(err error) *pb.ClosePayChResp {
 		return &pb.ClosePayChResp{
 			Response: &pb.ClosePayChResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
 			},
-		}, nil
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
 	}
 	channel, err := sess.GetCh(req.ChannelID)
 	if err != nil {
-		return &pb.ClosePayChResp{
-			Response: &pb.ClosePayChResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
 	payChInfo, err := payment.ClosePayCh(ctx, channel)
 	payChInfo_ := pb.PaymentChannel{
@@ -651,14 +574,9 @@ func (a *PaymentAPI) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*pb
 		Version:     payChInfo.Version,
 	}
 	if err != nil {
-		return &pb.ClosePayChResp{
-			Response: &pb.ClosePayChResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}, nil
+		return errResponse(err), nil
 	}
+
 	_ = payChInfo_
 	return &pb.ClosePayChResp{
 		Response: &pb.ClosePayChResp_MsgSuccess_{
@@ -669,4 +587,33 @@ func (a *PaymentAPI) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*pb
 			},
 		},
 	}, nil
+}
+
+func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalInfo {
+	balInfo := perun.BalInfo{
+		Currency: src.Currency,
+		Bals:     make(map[string]string, len(src.Balances)),
+	}
+	for _, aliasBalance := range src.Balances {
+		for key, value := range aliasBalance.Value {
+			balInfo.Bals[key] = value
+		}
+	}
+	return balInfo
+}
+
+func ToGrpcBalInfo(src perun.BalInfo) *pb.BalanceInfo {
+	balInfo := &pb.BalanceInfo{
+		Currency: src.Currency,
+		Balances: make([]*pb.BalanceInfo_AliasBalance, len(src.Bals)),
+	}
+	i := 0
+	for key, value := range src.Bals {
+		balInfo.Balances[i] = &pb.BalanceInfo_AliasBalance{
+			Value: make(map[string]string),
+		}
+		balInfo.Balances[i].Value[key] = value
+		i++
+	}
+	return balInfo
 }
