@@ -438,9 +438,8 @@ func (a *GrpcPayChServer) UnsubPayChClose(ctx context.Context, req *pb.UnsubPayC
 	}, nil
 }
 
-// CloseSession wraps session.CloseSession.
+// CloseSession wraps session.CloseSession. For now, this is just a stub.
 func (a *GrpcPayChServer) CloseSession(context.Context, *pb.CloseSessionReq) (*pb.CloseSessionResp, error) {
-	return nil, nil
 }
 
 // SendPayChUpdate wraps channel.SendPayChUpdate.
@@ -596,7 +595,37 @@ func (a *GrpcPayChServer) RespondPayChUpdate(ctx context.Context, req *pb.Respon
 
 // GetPayChBalance wraps channel.GetPayChBalance.
 func (a *GrpcPayChServer) GetPayChBalance(context.Context, *pb.GetPayChBalanceReq) (*pb.GetPayChBalanceResp, error) {
-	return nil, nil
+	errResponse := func(err error) *pb.GetPayChBalanceResp {
+		return &pb.GetPayChBalanceResp{
+			Response: &pb.GetPayChBalanceResp{
+				Error: &pb.MsgError{
+					Error: err.Error(),
+				},
+			},
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
+	}
+	channel, err := sess.GetCh(req.ChannelID)
+	if err != nil {
+		return errResponse(err), nil
+	}
+	balInfo, err := payment.GetBalInfo(channel)
+	if err != nil {
+		return errResponse(err), nil
+	}
+
+	return &pb.GetPayChBalanceResp{
+		Response: &pb.GetPayChsResp_MsgSuccess_{
+			MsgSuccess: &pb.GetPayChsResp_MsgSuccess{
+				CurrentBalance: ToGrpcBalInfo(balInfo),
+				CurrentVersion: "",
+			},
+		},
+	}, nil
 }
 
 // ClosePayCh wraps channel.ClosePayCh.
