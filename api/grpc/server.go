@@ -620,21 +620,14 @@ func (a *GrpcPayChServer) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq)
 		return errResponse(err), nil
 	}
 	payChInfo, err := payment.ClosePayCh(ctx, channel)
-	payChInfo_ := pb.PaymentChannel{
-		ChannelID:   payChInfo.ChannelID,
-		Balanceinfo: ToGrpcBalInfo(payChInfo.BalInfo),
-		Version:     payChInfo.Version,
-	}
 	if err != nil {
 		return errResponse(err), nil
 	}
 
-	_ = payChInfo_
 	return &pb.ClosePayChResp{
 		Response: &pb.ClosePayChResp_MsgSuccess_{
 			MsgSuccess: &pb.ClosePayChResp_MsgSuccess{
-				// TODO: PArse this.
-				// ClosingBalance: []*pb.BalanceInfo{ToGrpcBalInfo(payChInfo)},
+				ClosingBalance: ToGrpcBalInfo(payChInfo.BalInfo),
 				ClosingVersion: payChInfo.Version,
 			},
 		},
