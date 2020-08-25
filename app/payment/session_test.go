@@ -68,6 +68,8 @@ func init() {
 		ChannelID: "channel1",
 		Currency:  currency.ETH,
 		State: &pchannel.State{
+			App:  &ppayment.App{},
+			Data: &ppayment.NoData{},
 			Allocation: pchannel.Allocation{
 				Balances: [][]*big.Int{{big.NewInt(1e18), big.NewInt(2e18)}},
 			},
