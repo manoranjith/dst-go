@@ -60,7 +60,6 @@ func Test_GetBalInfo(t *testing.T) {
 	})
 }
 
-// nolint: dupl	// not duplicate of Test_SubPayChProposals.
 func Test_SubPayChUpdates(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		channelAPI := &mocks.ChannelAPI{}

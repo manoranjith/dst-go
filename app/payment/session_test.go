@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	ppayment "perun.network/go-perun/apps/payment"
 	pchannel "perun.network/go-perun/channel"
+	pclient "perun.network/go-perun/client"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/app/payment"
@@ -34,15 +35,21 @@ import (
 )
 
 var (
+	parts                []string
 	bals, wantBals       map[string]string
 	balInfo, wantBalInfo perun.BalInfo
+	version              uint64 = 1
+	versionString        string = "1"
 	app                  perun.App
 	chInfo               perun.ChannelInfo
 	challengeDurSecs     uint64 = 10
 	peerAlias                   = "peer"
+	chProposalNotif      perun.ChProposalNotif
+	chCloseNotif         perun.ChCloseNotif
 )
 
 func init() {
+	parts = []string{perun.OwnAlias, peerAlias}
 	bals = make(map[string]string)
 	bals[perun.OwnAlias] = "1"
 	bals[peerAlias] = "2"
@@ -70,6 +77,32 @@ func init() {
 	wantBalInfo = perun.BalInfo{
 		Currency: "ETH",
 		Bals:     wantBals,
+	}
+
+	chProposalNotif = perun.ChProposalNotif{
+		ProposalID: "proposal1",
+		Currency:   currency.ETH,
+		Proposal: &pclient.ChannelProposal{
+			ChallengeDuration: challengeDurSecs,
+			InitBals: &pchannel.Allocation{
+				Balances: [][]*big.Int{{big.NewInt(1e18), big.NewInt(2e18)}},
+			},
+		},
+		Parts:  []string{perun.OwnAlias, peerAlias},
+		Expiry: 1597946401,
+	}
+
+	chCloseNotif = perun.ChCloseNotif{
+		ChannelID: "channel1",
+		Currency:  currency.ETH,
+		ChState: &pchannel.State{
+			Allocation: pchannel.Allocation{
+				Balances: [][]*big.Int{{big.NewInt(1e18), big.NewInt(2e18)}},
+			},
+			Version: version,
+		},
+		Parts: parts,
+		Error: "",
 	}
 }
 
@@ -108,15 +141,30 @@ func Test_GetPayChs(t *testing.T) {
 	})
 }
 
-// nolint: dupl	// not duplicate of Test_SubPayChUpdates.
 func Test_SubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
+		var notifier perun.ChProposalNotifier
+		var notif payment.PayChProposalNotif
+		dummyNotifier := func(gotNotif payment.PayChProposalNotif) {
+			notif = gotNotif
+		}
 		sessionAPI := &mocks.SessionAPI{}
-		sessionAPI.On("SubChProposals", mock.Anything).Return(nil)
+		sessionAPI.On("SubChProposals", mock.MatchedBy(func(gotNotifier perun.ChProposalNotifier) bool {
+			notifier = gotNotifier
+			return true
+		})).Return(nil)
 
-		dummyNotifier := func(notif payment.PayChProposalNotif) {}
 		gotErr := payment.SubPayChProposals(sessionAPI, dummyNotifier)
-		assert.NoError(t, gotErr)
+		require.NoError(t, gotErr)
+		require.NotNil(t, notifier)
+
+		notifier(chProposalNotif)
+		require.NotZero(t, notif)
+		assert.Equal(t, chProposalNotif.ProposalID, notif.ProposalID)
+		assert.Equal(t, chProposalNotif.Currency, notif.Currency)
+		assert.Equal(t, wantBalInfo, notif.OpeningBals)
+		assert.Equal(t, chProposalNotif.Proposal.ChallengeDuration, notif.ChallengeDurSecs)
+		assert.Equal(t, chProposalNotif.Expiry, notif.Expiry)
 	})
 	t.Run("error", func(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}
@@ -128,6 +176,7 @@ func Test_SubPayChProposals(t *testing.T) {
 	})
 }
 
+// nolint: dupl	// not duplicate of Test_UnsubPayChCloses.
 func Test_UnsubPayChProposals(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}
@@ -174,15 +223,27 @@ func Test_RespondPayChProposal(t *testing.T) {
 	})
 }
 
-// nolint: dupl	// not duplicate of Test_SubPayChUpdates.
 func Test_SubPayChCloses(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
+		var notifier perun.ChCloseNotifier
+		var notif payment.PayChCloseNotif
+		dummyNotifier := func(gotNotif payment.PayChCloseNotif) {
+			notif = gotNotif
+		}
 		sessionAPI := &mocks.SessionAPI{}
-		sessionAPI.On("SubChCloses", mock.Anything).Return(nil)
+		sessionAPI.On("SubChCloses", mock.MatchedBy(func(gotNotifier perun.ChCloseNotifier) bool {
+			notifier = gotNotifier
+			return true
+		})).Return(nil)
 
-		dummyNotifier := func(notif payment.PayChCloseNotif) {}
 		gotErr := payment.SubPayChCloses(sessionAPI, dummyNotifier)
-		assert.NoError(t, gotErr)
+		require.NoError(t, gotErr)
+		require.NotNil(t, notifier)
+		notifier(chCloseNotif)
+		require.NotZero(t, notif)
+		assert.Equal(t, chCloseNotif.ChannelID, notif.ClosingState.ChannelID)
+		assert.Equal(t, wantBalInfo, notif.ClosingState.BalInfo)
+		assert.Equal(t, versionString, notif.ClosingState.Version)
 	})
 	t.Run("error", func(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}
@@ -194,6 +255,7 @@ func Test_SubPayChCloses(t *testing.T) {
 	})
 }
 
+// nolint: dupl	// not duplicate of Test_UnsubPayChProposals.
 func Test_UnsubPayChCloses(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}

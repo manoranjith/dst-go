@@ -248,6 +248,9 @@ type SessionAPI interface {
 }
 
 type (
+
+	//go:generate mockery --name ChProposalNotifier --output ./internal/mocks
+
 	// ChProposalNotifier is the notifier function that is used for sending channel proposal notifications.
 	ChProposalNotifier func(ChProposalNotif)
 
@@ -259,6 +262,8 @@ type (
 		Parts      []string
 		Expiry     int64
 	}
+
+	//go:generate mockery --name ChCloseNotifier --output ./internal/mocks
 
 	// ChCloseNotifier is the notifier function that is used for sending channel close notifications.
 	ChCloseNotifier func(ChCloseNotif)
@@ -289,6 +294,8 @@ type ChannelAPI interface {
 }
 
 type (
+	//go:generate mockery --name ChUpdateNotifier --output ./internal/mocks
+
 	// ChUpdateNotifier is the notifier function that is used for sending channel update notifications.
 	ChUpdateNotifier func(ChUpdateNotif)
 
