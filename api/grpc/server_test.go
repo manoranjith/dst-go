@@ -160,7 +160,7 @@ func Test_Integ_Role(t *testing.T) {
 			channelID = OpenPayCh(t, aliceSessionID, bobAlias, "1", "2")
 			wg.Done()
 		}()
-		SubRespondUnsub_PayChProposal(t, bobSessionID, true)
+		SubRespondUnsubPayChProposal(t, bobSessionID, true)
 		wg.Wait()
 		_ = channelID
 	})
@@ -220,7 +220,7 @@ func OpenPayCh(t *testing.T, sessionID string, peerAlias string, ownBal, peerBal
 	return msg.MsgSuccess.Channel.ChannelID
 }
 
-func SubRespondUnsub_PayChProposal(t *testing.T, sessionID string, accept bool) {
+func SubRespondUnsubPayChProposal(t *testing.T, sessionID string, accept bool) {
 	// Subscribe to payment channel proposal notifications.
 	subReq := pb.SubPayChProposalsReq{
 		SessionID: sessionID,
@@ -243,9 +243,9 @@ func SubRespondUnsub_PayChProposal(t *testing.T, sessionID string, accept bool) 
 	require.NoErrorf(t, err, "RespondPayChProposal")
 
 	// Unsubscribes to channel proposal notifications.
-	unsubPayChProposalsReq := pb.UnsubPayChProposalsReq{
+	unsubReq := pb.UnsubPayChProposalsReq{
 		SessionID: sessionID,
 	}
-	_, err = client.UnsubPayChProposals(ctx, &unsubPayChProposalsReq)
+	_, err = client.UnsubPayChProposals(ctx, &unsubReq)
 	require.NoErrorf(t, err, "UnsubPayChProposals")
 }
