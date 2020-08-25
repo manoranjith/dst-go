@@ -192,7 +192,7 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 	sess, err := a.n.GetSession(req.SessionID)
 	if err != nil {
 		return &pb.OpenPayChResp{
-			Resp: &pb.OpenPayChResp_Error{
+			Response: &pb.OpenPayChResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
@@ -208,7 +208,7 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 	}
 	if err != nil {
 		return &pb.OpenPayChResp{
-			Resp: &pb.OpenPayChResp_Error{
+			Response: &pb.OpenPayChResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
@@ -216,7 +216,7 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 		}, nil
 	}
 	return &pb.OpenPayChResp{
-		Resp: &pb.OpenPayChResp_MsgSuccess_{
+		Response: &pb.OpenPayChResp_MsgSuccess_{
 			MsgSuccess: &pb.OpenPayChResp_MsgSuccess{
 				Channel: &payChInfo_,
 			},

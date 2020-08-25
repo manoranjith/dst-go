@@ -205,9 +205,9 @@ func Test_Integ_Role(t *testing.T) {
 			}
 			openPayChResp, err := client.OpenPayCh(ctx, &openPayChReq)
 			t.Logf("\nResponse: %+v, Error: %+v", openPayChResp, err)
-			successResponse, ok := openPayChResp.Resp.(*pb.OpenPayChResp_MsgSuccess_)
+			successResponse, ok := openPayChResp.Response.(*pb.OpenPayChResp_MsgSuccess_)
 			if !ok {
-				errorResponse := openPayChResp.Resp.(*pb.OpenPayChResp_Error)
+				errorResponse := openPayChResp.Response.(*pb.OpenPayChResp_Error)
 				t.Errorf("Error response: %+v", errorResponse)
 			} else {
 				channel1ID = successResponse.MsgSuccess.Channel.ChannelID
