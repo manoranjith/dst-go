@@ -385,7 +385,7 @@ func StartServer(t *testing.T) {
 	// Initializr a grpc payment API/
 	nodeAPI, err := perunnode.New(nodeCfg)
 	require.NoErrorf(t, err, "initializing nodeAPI")
-	grpcPaymentAPI := pngrpc.NewPaymentAPI(nodeAPI)
+	grpcPaymentAPI := pngrpc.NewGrpcPayChServer(nodeAPI)
 
 	// create grpc server
 	grpcServer := grpc.NewServer()
@@ -399,5 +399,4 @@ func StartServer(t *testing.T) {
 			t.Logf("failed to serve: %v", err)
 		}
 	}()
-	return
 }

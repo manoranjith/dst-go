@@ -29,31 +29,32 @@ import (
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 )
 
-type PaymentAPI struct {
+// GrpcPayChServer represents a GRPC Payment API server.
+type GrpcPayChServer struct {
 	n perun.NodeAPI
 
 	// The mutex should be used when accessing the map data structures in this API.
 	psync.Mutex
 
-	// chProposalsNotif holds a unbuffered boolean channel for each active subscription.
-	// When a subscription is registered, subsription routine will add an entry to this map
-	// with the session ID as they key. It will then wait indefinitely on this channel.
-	//
-	// The unsubscription call should retreive the channel from the map and close it, which
+	// These maps are used to hold an signal channel for each active subscription.
+	// When a subscription is registered, subscribe function will add an entry to the
+	// map corresponding to the subscription type.
+	// The unsubscribe call should retrieve the channel from the map and close it, which
 	// will signal the subscription routine to end.
+	//
+	// chProposalsNotif & chCloseNotifs work on per session basis and hence this is a map
+	// of session id to signaling channel.
+	// chUpdatesNotif work on a per channel basis and hence this is a map of session id to
+	// channel id to signaling channel.
+
 	chProposalsNotif map[string]chan bool
-
-	// chUpdatesNotif holds signalling channels for update notifiers.
-	// it is map of session id to channel id to signaling channel.
-	chUpdatesNotif map[string]map[string]chan bool
-
-	// chClosesNotif holds signalling channels for close notifiers.
-	// it is map of session id to signaling channel.
-	chClosesNotif map[string]chan bool
+	chUpdatesNotif   map[string]map[string]chan bool
+	chClosesNotif    map[string]chan bool
 }
 
-func NewPaymentAPI(n perun.NodeAPI) *PaymentAPI {
-	return &PaymentAPI{
+// NewGrpcPayChServer returns a new grpc payment api server.
+func NewGrpcPayChServer(n perun.NodeAPI) *GrpcPayChServer {
+	return &GrpcPayChServer{
 		n:                n,
 		chProposalsNotif: make(map[string]chan bool),
 		chUpdatesNotif:   make(map[string]map[string]chan bool),
@@ -61,7 +62,8 @@ func NewPaymentAPI(n perun.NodeAPI) *PaymentAPI {
 	}
 }
 
-func (a *PaymentAPI) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfigResp, error) {
+// GetConfig wraps GetConfig.
+func (a *GrpcPayChServer) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfigResp, error) {
 	cfg := a.n.GetConfig()
 	return &pb.GetConfigResp{
 		ChainAddress:       cfg.ChainURL,
@@ -72,7 +74,8 @@ func (a *PaymentAPI) GetConfig(context.Context, *pb.GetConfigReq) (*pb.GetConfig
 	}, nil
 }
 
-func (a *PaymentAPI) OpenSession(ctx context.Context, req *pb.OpenSessionReq) (*pb.OpenSessionResp, error) {
+// OpenSession wraps node.OpenSession.
+func (a *GrpcPayChServer) OpenSession(ctx context.Context, req *pb.OpenSessionReq) (*pb.OpenSessionResp, error) {
 	errResponse := func(err error) *pb.OpenSessionResp {
 		return &pb.OpenSessionResp{
 			Response: &pb.OpenSessionResp_Error{
@@ -101,26 +104,28 @@ func (a *PaymentAPI) OpenSession(ctx context.Context, req *pb.OpenSessionReq) (*
 	}, nil
 }
 
-func (a *PaymentAPI) Time(context.Context, *pb.TimeReq) (*pb.TimeResp, error) {
-	fmt.Println("Received request: Time")
+// Time wraps node.Time.
+func (a *GrpcPayChServer) Time(context.Context, *pb.TimeReq) (*pb.TimeResp, error) {
 	return &pb.TimeResp{
 		Time: a.n.Time(),
 	}, nil
 }
 
-func (a *PaymentAPI) Help(context.Context, *pb.HelpReq) (*pb.HelpResp, error) {
-	fmt.Println("Received request: Help")
+// Help wraps node.Help.
+func (a *GrpcPayChServer) Help(context.Context, *pb.HelpReq) (*pb.HelpResp, error) {
 	return &pb.HelpResp{
 		Apis: a.n.Help(),
 	}, nil
 }
 
-func (a *PaymentAPI) AddContact(ctx context.Context, req *pb.AddContactReq) (*pb.AddContactResp, error) {
+// AddContact wraps session.AddContact.
+func (a *GrpcPayChServer) AddContact(ctx context.Context, req *pb.AddContactReq) (*pb.AddContactResp, error) {
 	errResponse := func(err error) *pb.AddContactResp {
 		return &pb.AddContactResp{
 			Response: &pb.AddContactResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error()},
+					Error: err.Error(),
+				},
 			},
 		}
 	}
@@ -148,12 +153,14 @@ func (a *PaymentAPI) AddContact(ctx context.Context, req *pb.AddContactReq) (*pb
 	}, nil
 }
 
-func (a *PaymentAPI) GetContact(ctx context.Context, req *pb.GetContactReq) (*pb.GetContactResp, error) {
+// GetContact wraps session.GetContact.
+func (a *GrpcPayChServer) GetContact(ctx context.Context, req *pb.GetContactReq) (*pb.GetContactResp, error) {
 	errResponse := func(err error) *pb.GetContactResp {
 		return &pb.GetContactResp{
 			Response: &pb.GetContactResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error()},
+					Error: err.Error(),
+				},
 			},
 		}
 	}
@@ -181,7 +188,8 @@ func (a *PaymentAPI) GetContact(ctx context.Context, req *pb.GetContactReq) (*pb
 	}, nil
 }
 
-func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.OpenPayChResp, error) {
+// OpenPayCh wraps session.OpenPayCh.
+func (a *GrpcPayChServer) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.OpenPayChResp, error) {
 	errResponse := func(err error) *pb.OpenPayChResp {
 		return &pb.OpenPayChResp{
 			Response: &pb.OpenPayChResp_Error{
@@ -196,11 +204,6 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 	}
 	balInfo := FromGrpcBalInfo(req.OpeningBalance)
 	payChInfo, err := payment.OpenPayCh(ctx, sess, req.PeerAlias, balInfo, req.ChallengeDurSecs)
-	payChInfo_ := pb.PaymentChannel{
-		ChannelID:   payChInfo.ChannelID,
-		Balanceinfo: ToGrpcBalInfo(payChInfo.BalInfo),
-		Version:     payChInfo.Version,
-	}
 	if err != nil {
 		return errResponse(err), nil
 	}
@@ -208,18 +211,55 @@ func (a *PaymentAPI) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.O
 	return &pb.OpenPayChResp{
 		Response: &pb.OpenPayChResp_MsgSuccess_{
 			MsgSuccess: &pb.OpenPayChResp_MsgSuccess{
-				Channel: &payChInfo_,
+				Channel: &pb.PaymentChannel{
+					ChannelID:   payChInfo.ChannelID,
+					Balanceinfo: ToGrpcBalInfo(payChInfo.BalInfo),
+					Version:     payChInfo.Version,
+				},
 			},
 		},
 	}, nil
 }
 
-func (a *PaymentAPI) GetPayChs(context.Context, *pb.GetPayChsReq) (*pb.GetPayChsResp, error) {
-	return nil, nil
+// GetPayChs wraps session.GetPayChs.
+func (a *GrpcPayChServer) GetPayChs(ctx context.Context, req *pb.GetPayChsReq) (*pb.GetPayChsResp, error) {
+	errResponse := func(err error) *pb.GetPayChsResp {
+		return &pb.GetPayChsResp{
+			Response: &pb.GetPayChsResp_Error{
+				Error: &pb.MsgError{Error: err.Error()},
+			},
+		}
+	}
+
+	sess, err := a.n.GetSession(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
+	}
+	payChInfos := payment.GetPayChs(sess)
+	if err != nil {
+		return errResponse(err), nil
+	}
+	payChInfosGrpc := make([]*pb.PaymentChannel, len(payChInfos))
+	for i := 0; i < len(payChInfosGrpc); i++ {
+		payChInfosGrpc[i] = &pb.PaymentChannel{
+			ChannelID:   payChInfos[i].ChannelID,
+			Balanceinfo: ToGrpcBalInfo(payChInfos[i].BalInfo),
+			Version:     payChInfos[i].Version,
+		}
+	}
+
+	return &pb.GetPayChsResp{
+		Response: &pb.GetPayChsResp_MsgSuccess_{
+			MsgSuccess: &pb.GetPayChsResp_MsgSuccess{
+				OpenChannels: payChInfosGrpc,
+			},
+		},
+	}, nil
 }
 
-func (a *PaymentAPI) SubPayChProposals(req *pb.SubPayChProposalsReq, srv pb.Payment_API_SubPayChProposalsServer) error {
-	fmt.Println("Received request: SubPayChProposals")
+// SubPayChProposals wraps session.SubPayChProposals.
+func (a *GrpcPayChServer) SubPayChProposals(req *pb.SubPayChProposalsReq,
+	srv pb.Payment_API_SubPayChProposalsServer) error {
 	sess, err := a.n.GetSession(req.SessionID)
 	if err != nil {
 		// TODO: (mano) Return a error response and not a protocol error
@@ -227,43 +267,44 @@ func (a *PaymentAPI) SubPayChProposals(req *pb.SubPayChProposalsReq, srv pb.Paym
 	}
 
 	notifier := func(notif payment.PayChProposalNotif) {
-		notif_ := pb.SubPayChProposalsResp_Notify_{
+		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
+		err := srv.Send(&pb.SubPayChProposalsResp{Response: &pb.SubPayChProposalsResp_Notify_{
 			Notify: &pb.SubPayChProposalsResp_Notify{
 				ProposalID:       notif.ProposalID,
 				OpeningBalance:   ToGrpcBalInfo(notif.OpeningBals),
 				ChallengeDurSecs: notif.ChallengeDurSecs,
 				Expiry:           notif.Expiry,
 			},
-		}
-		notifResponse := pb.SubPayChProposalsResp{Response: &notif_}
-		err := srv.Send(&notifResponse)
-		if err != nil {
-			// TODO: (mano) Error handling when sending notification.
-			fmt.Println("Error sending notification")
-		}
+		}})
+		_ = err
+		// if err != nil {
+		// TODO: (mano) Handle error while sending.
+		// }
 	}
-
 	err = payment.SubPayChProposals(sess, notifier)
 	if err != nil {
-		return err
+		// TODO: (mano) Return a error response and not a protocol error
+		return errors.WithMessage(err, "cannot register subscription")
 	}
+
 	signal := make(chan bool)
 	a.Lock()
 	a.chProposalsNotif[req.SessionID] = signal
 	a.Unlock()
 
 	<-signal
-	fmt.Println("Channel Proposal Subscription ended for" + req.SessionID)
 	return nil
 }
 
-func (a *PaymentAPI) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayChProposalsReq) (
+// UnsubPayChProposals wraps session.UnsubPayChProposals.
+func (a *GrpcPayChServer) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayChProposalsReq) (
 	*pb.UnsubPayChProposalsResp, error) {
 	errResponse := func(err error) *pb.UnsubPayChProposalsResp {
 		return &pb.UnsubPayChProposalsResp{
 			Response: &pb.UnsubPayChProposalsResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error()},
+					Error: err.Error(),
+				},
 			},
 		}
 	}
@@ -291,13 +332,15 @@ func (a *PaymentAPI) UnsubPayChProposals(ctx context.Context, req *pb.UnsubPayCh
 	}, nil
 }
 
-func (a *PaymentAPI) RespondPayChProposal(ctx context.Context, req *pb.RespondPayChProposalReq) (
+// RespondPayChProposal wraps session.RespondPayChProposal.
+func (a *GrpcPayChServer) RespondPayChProposal(ctx context.Context, req *pb.RespondPayChProposalReq) (
 	*pb.RespondPayChProposalResp, error) {
 	errResponse := func(err error) *pb.RespondPayChProposalResp {
 		return &pb.RespondPayChProposalResp{
 			Response: &pb.RespondPayChProposalResp_Error{
 				Error: &pb.MsgError{
-					Error: err.Error()},
+					Error: err.Error(),
+				},
 			},
 		}
 	}
@@ -320,8 +363,8 @@ func (a *PaymentAPI) RespondPayChProposal(ctx context.Context, req *pb.RespondPa
 	}, nil
 }
 
-func (a *PaymentAPI) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_API_SubPayChClosesServer) error {
-	fmt.Println("Received request: SubPayChCloses")
+// SubPayChCloses wraps session.SubPayChCloses.
+func (a *GrpcPayChServer) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_API_SubPayChClosesServer) error {
 	sess, err := a.n.GetSession(req.SessionID)
 	if err != nil {
 		// TODO: (mano) Return a error response and not a protocol error
@@ -329,7 +372,8 @@ func (a *PaymentAPI) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_AP
 	}
 
 	notifier := func(notif payment.PayChCloseNotif) {
-		notif_ := pb.SubPayChClosesResp_Notify_{
+		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
+		err := srv.Send(&pb.SubPayChClosesResp{Response: &pb.SubPayChClosesResp_Notify_{
 			Notify: &pb.SubPayChClosesResp_Notify{
 				ClosingState: &pb.PaymentChannel{
 					ChannelID:   notif.ClosingState.ChannelID,
@@ -337,20 +381,18 @@ func (a *PaymentAPI) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_AP
 					Version:     notif.ClosingState.Version,
 				},
 				Error: notif.Error,
-			},
-		}
-		notifResponse := pb.SubPayChClosesResp{Response: &notif_}
-		err := srv.Send(&notifResponse)
-		if err != nil {
-			// TODO: (mano) Error handling when sending notification.
-			fmt.Println("Error sending notification")
-		}
+			}}})
+		_ = err
+		// if err != nil {
+		// TODO: (mano) Handle error while sending.
+		// }
 	}
-
 	err = payment.SubPayChCloses(sess, notifier)
 	if err != nil {
-		return err
+		// TODO: (mano) Return a error response and not a protocol error
+		return errors.WithMessage(err, "cannot register subscription")
 	}
+
 	signal := make(chan bool)
 	a.Lock()
 	a.chClosesNotif[req.SessionID] = signal
@@ -361,7 +403,9 @@ func (a *PaymentAPI) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_AP
 	return nil
 }
 
-func (a *PaymentAPI) UnsubPayChClose(ctx context.Context, req *pb.UnsubPayChClosesReq) (*pb.UnsubPayChClosesResp, error) {
+// UnsubPayChClose wraps session.UnsubPayChClose.
+func (a *GrpcPayChServer) UnsubPayChClose(ctx context.Context, req *pb.UnsubPayChClosesReq) (
+	*pb.UnsubPayChClosesResp, error) {
 	errResponse := func(err error) *pb.UnsubPayChClosesResp {
 		return &pb.UnsubPayChClosesResp{
 			Response: &pb.UnsubPayChClosesResp_Error{
@@ -394,11 +438,14 @@ func (a *PaymentAPI) UnsubPayChClose(ctx context.Context, req *pb.UnsubPayChClos
 	}, nil
 }
 
-func (a *PaymentAPI) CloseSession(context.Context, *pb.CloseSessionReq) (*pb.CloseSessionResp, error) {
+// CloseSession wraps session.CloseSession.
+func (a *GrpcPayChServer) CloseSession(context.Context, *pb.CloseSessionReq) (*pb.CloseSessionResp, error) {
 	return nil, nil
 }
 
-func (a *PaymentAPI) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpdateReq) (*pb.SendPayChUpdateResp, error) {
+// SendPayChUpdate wraps channel.SendPayChUpdate.
+func (a *GrpcPayChServer) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpdateReq) (
+	*pb.SendPayChUpdateResp, error) {
 	errResponse := func(err error) *pb.SendPayChUpdateResp {
 		return &pb.SendPayChUpdateResp{
 			Response: &pb.SendPayChUpdateResp_Error{
@@ -431,11 +478,11 @@ func (a *PaymentAPI) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpdat
 	}, nil
 }
 
-func (a *PaymentAPI) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment_API_SubPayChUpdatesServer) error {
-	fmt.Println("Received request: SendPayChUpdate")
+// SubPayChUpdates wraps channel.SubPayChUpdates.
+func (a *GrpcPayChServer) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment_API_SubPayChUpdatesServer) error {
 	sess, err := a.n.GetSession(req.SessionID)
 	if err != nil {
-		// TODO: (mano) Return a error response and not a protocol error
+		// TODO: (mano) Return a error response and not a protocol error.
 		return errors.WithMessage(err, "cannot register subscription")
 	}
 	channel, err := sess.GetCh(req.ChannelID)
@@ -444,37 +491,38 @@ func (a *PaymentAPI) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment_
 	}
 
 	notifier := func(notif payment.PayChUpdateNotif) {
-		notif_ := pb.SubPayChUpdatesResp_Notify_{
+		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
+		err := srv.Send(&pb.SubPayChUpdatesResp{Response: &pb.SubPayChUpdatesResp_Notify_{
 			Notify: &pb.SubPayChUpdatesResp_Notify{
 				ProposedBalance: ToGrpcBalInfo(notif.ProposedBals),
 				UpdateID:        notif.UpdateID,
 				Final:           notif.Final,
 				Expiry:          notif.Timeout,
 			},
-		}
-		notifResponse := pb.SubPayChUpdatesResp{Response: &notif_}
-		err := srv.Send(&notifResponse)
+		}})
 		if err != nil {
 			// TODO: (mano) Error handling when sending notification.
 			fmt.Println("Error sending notification")
 		}
 	}
-
 	err = payment.SubPayChUpdates(channel, notifier)
 	if err != nil {
-		return err
+		// TODO: (mano) Error handling when sending notification.
+		return errors.WithMessage(err, "cannot register subscription")
 	}
+
 	signal := make(chan bool)
 	a.Lock()
 	a.chUpdatesNotif[req.SessionID][req.ChannelID] = signal
 	a.Unlock()
 
 	<-signal
-	fmt.Println("Channel Update Subscription ended for" + req.SessionID)
 	return nil
 }
 
-func (a *PaymentAPI) UnsubPayChUpdates(ctx context.Context, req *pb.UnsubPayChUpdatesReq) (*pb.UnsubPayChUpdatesResp, error) {
+// UnsubPayChUpdates wraps channel.UnsubPayChUpdates.
+func (a *GrpcPayChServer) UnsubPayChUpdates(ctx context.Context, req *pb.UnsubPayChUpdatesReq) (
+	*pb.UnsubPayChUpdatesResp, error) {
 	errResponse := func(err error) *pb.UnsubPayChUpdatesResp {
 		return &pb.UnsubPayChUpdatesResp{
 			Response: &pb.UnsubPayChUpdatesResp_Error{
@@ -511,7 +559,9 @@ func (a *PaymentAPI) UnsubPayChUpdates(ctx context.Context, req *pb.UnsubPayChUp
 	}, nil
 }
 
-func (a *PaymentAPI) RespondPayChUpdate(ctx context.Context, req *pb.RespondPayChUpdateReq) (*pb.RespondPayChUpdateResp, error) {
+// RespondPayChUpdate wraps channel.RespondPayChUpdate.
+func (a *GrpcPayChServer) RespondPayChUpdate(ctx context.Context, req *pb.RespondPayChUpdateReq) (
+	*pb.RespondPayChUpdateResp, error) {
 	errResponse := func(err error) *pb.RespondPayChUpdateResp {
 		return &pb.RespondPayChUpdateResp{
 			Response: &pb.RespondPayChUpdateResp_Error{
@@ -544,11 +594,13 @@ func (a *PaymentAPI) RespondPayChUpdate(ctx context.Context, req *pb.RespondPayC
 	}, nil
 }
 
-func (a *PaymentAPI) GetPayChBalance(context.Context, *pb.GetPayChBalanceReq) (*pb.GetPayChBalanceResp, error) {
+// GetPayChBalance wraps channel.GetPayChBalance.
+func (a *GrpcPayChServer) GetPayChBalance(context.Context, *pb.GetPayChBalanceReq) (*pb.GetPayChBalanceResp, error) {
 	return nil, nil
 }
 
-func (a *PaymentAPI) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*pb.ClosePayChResp, error) {
+// ClosePayCh wraps channel.ClosePayCh.
+func (a *GrpcPayChServer) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*pb.ClosePayChResp, error) {
 	errResponse := func(err error) *pb.ClosePayChResp {
 		return &pb.ClosePayChResp{
 			Response: &pb.ClosePayChResp_Error{
@@ -589,6 +641,8 @@ func (a *PaymentAPI) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*pb
 	}, nil
 }
 
+// FromGrpcBalInfo is a helper function to convert BalInfo struct defined in grpc package
+// to BalInfo struct defined in perun-node. It is exported for use in tests.
 func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalInfo {
 	balInfo := perun.BalInfo{
 		Currency: src.Currency,
@@ -602,6 +656,8 @@ func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalInfo {
 	return balInfo
 }
 
+// ToGrpcBalInfo is a helper function to convert BalInfo struct defined in perun-node
+// to BalInfo struct defined in grpc package. It is exported for use in tests.
 func ToGrpcBalInfo(src perun.BalInfo) *pb.BalanceInfo {
 	balInfo := &pb.BalanceInfo{
 		Currency: src.Currency,
