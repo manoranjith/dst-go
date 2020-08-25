@@ -35,17 +35,20 @@ import (
 )
 
 var (
-	parts                []string
-	bals, wantBals       map[string]string
-	balInfo, wantBalInfo perun.BalInfo
-	version              uint64 = 1
-	versionString        string = "1"
-	app                  perun.App
-	chInfo               perun.ChannelInfo
-	challengeDurSecs     uint64 = 10
-	peerAlias                   = "peer"
-	chProposalNotif      perun.ChProposalNotif
-	chCloseNotif         perun.ChCloseNotif
+	parts                                    []string
+	bals, wantBals, wantUpdatedBals          map[string]string
+	balInfo, wantBalInfo, wantUpdatedBalInfo perun.BalInfo
+	version                                  uint64 = 1
+	versionString                            string = "1"
+	app                                      perun.App
+	chInfo                                   perun.ChannelInfo
+	challengeDurSecs                         uint64 = 10
+	peerAlias                                       = "peer"
+	chProposalNotif                          perun.ChProposalNotif
+	chCloseNotif                             perun.ChCloseNotif
+
+	amountToSend  = "0.5"
+	chUpdateNotif perun.ChUpdateNotif
 )
 
 func init() {
@@ -88,7 +91,7 @@ func init() {
 				Balances: [][]*big.Int{{big.NewInt(1e18), big.NewInt(2e18)}},
 			},
 		},
-		Parts:  []string{perun.OwnAlias, peerAlias},
+		Parts:  parts,
 		Expiry: 1597946401,
 	}
 
@@ -103,6 +106,30 @@ func init() {
 		},
 		Parts: parts,
 		Error: "",
+	}
+
+	wantUpdatedBals = make(map[string]string)
+	wantUpdatedBals[perun.OwnAlias] = "0.500000"
+	wantUpdatedBals[peerAlias] = "2.500000"
+	wantUpdatedBalInfo = perun.BalInfo{
+		Currency: "ETH",
+		Bals:     wantUpdatedBals,
+	}
+
+	chUpdateNotif = perun.ChUpdateNotif{
+		UpdateID: "update1",
+		Currency: currency.ETH,
+		Update: &pclient.ChannelUpdate{
+			State: &pchannel.State{
+				Allocation: pchannel.Allocation{
+					Balances: [][]*big.Int{{big.NewInt(0.5e18), big.NewInt(2.5e18)}},
+				},
+				IsFinal: true,
+				Version: version,
+			},
+		},
+		Parts:  parts,
+		Expiry: 1597946401,
 	}
 }
 
