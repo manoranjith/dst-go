@@ -193,12 +193,12 @@ func Test_RespondPayChUpdate(t *testing.T) {
 func Test_ClosePayCh(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		channelAPI := &mocks.ChannelAPI{}
-		channelAPI.On("Close", context.Background()).Return(chInfo, nil)
+		channelAPI.On("Close", context.Background()).Return(updatedChInfo, nil)
 
 		gotPayChInfo, err := payment.ClosePayCh(context.Background(), channelAPI)
 		require.NoError(t, err)
-		assert.Equal(t, wantBalInfo, gotPayChInfo.BalInfo)
-		assert.Equal(t, "0", gotPayChInfo.Version)
+		assert.Equal(t, wantUpdatedBalInfo, gotPayChInfo.BalInfo)
+		assert.Equal(t, versionString, gotPayChInfo.Version)
 		assert.NotZero(t, gotPayChInfo.ChannelID)
 	})
 	t.Run("error", func(t *testing.T) {
