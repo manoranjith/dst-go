@@ -27,10 +27,8 @@ import (
 	pethchannel "perun.network/go-perun/backend/ethereum/channel"
 	pethchanneltest "perun.network/go-perun/backend/ethereum/channel/test"
 	pethwallet "perun.network/go-perun/backend/ethereum/wallet"
-	pethkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
 	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
 	pwallet "perun.network/go-perun/wallet"
-	wallettest "perun.network/go-perun/wallet/test"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/internal"
@@ -55,7 +53,7 @@ type ChainBackendSetup struct {
 func NewChainBackendSetup(t *testing.T, rng *rand.Rand, numAccs uint) *ChainBackendSetup {
 	walletSetup := NewWalletSetup(t, rng, numAccs)
 
-	cbEth := newSimContractBackend(walletSetup.Accs, walletSetup.Keystore)
+	cbEth := newSimContractBackend(t, walletSetup.Accs, walletSetup.Keystore)
 	cb := &internal.ChainBackend{Cb: &cbEth, TxTimeout: ChainTxTimeout}
 
 	adjudicator, err := cb.DeployAdjudicator()
@@ -74,7 +72,7 @@ func NewChainBackendSetup(t *testing.T, rng *rand.Rand, numAccs uint) *ChainBack
 
 // newSimContractBackend sets up a simulated contract backend with the first entry (index 0) in accs
 // as the user account. All accounts are funded with 10 ethers.
-func newSimContractBackend(accs []pwallet.Account, ks *keystore.KeyStore) pethchannel.ContractBackend {
+func newSimContractBackend(t *testing.T, accs []pwallet.Account, ks *keystore.KeyStore) pethchannel.ContractBackend {
 	simBackend := pethchanneltest.NewSimulatedBackend()
 	ctx, cancel := context.WithTimeout(context.Background(), ChainTxTimeout)
 	defer cancel()
@@ -82,8 +80,10 @@ func newSimContractBackend(accs []pwallet.Account, ks *keystore.KeyStore) pethch
 		simBackend.FundAddress(ctx, pethwallet.AsEthAddr(acc.Address()))
 	}
 
-	ksWallet := wallettest.RandomWallet().(*pkeystore.Wallet)
+	ksWallet, err := pkeystore.NewWallet(ks, "") // Password for test accounts is always empty string.
+	require.NoError(t, err)
+
 	tr := pkeystore.NewTransactor(*ksWallet)
-	onChainAcc := &accs[0].(*pethkeystore.Account).Account
+	onChainAcc := &accs[0].(*pkeystore.Account).Account
 	return pethchannel.NewContractBackend(simBackend, tr, onChainAcc)
 }
