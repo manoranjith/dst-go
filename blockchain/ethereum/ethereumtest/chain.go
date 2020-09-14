@@ -27,7 +27,10 @@ import (
 	pethchannel "perun.network/go-perun/backend/ethereum/channel"
 	pethchanneltest "perun.network/go-perun/backend/ethereum/channel/test"
 	pethwallet "perun.network/go-perun/backend/ethereum/wallet"
+	pethkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
+	pkeystore "perun.network/go-perun/backend/ethereum/wallet/keystore"
 	pwallet "perun.network/go-perun/wallet"
+	wallettest "perun.network/go-perun/wallet/test"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/internal"
@@ -79,6 +82,8 @@ func newSimContractBackend(accs []pwallet.Account, ks *keystore.KeyStore) pethch
 		simBackend.FundAddress(ctx, pethwallet.AsEthAddr(acc.Address()))
 	}
 
-	onChainAcc := &accs[0].(*pethwallet.Account).Account
-	return pethchannel.NewContractBackend(simBackend, ks, onChainAcc)
+	ksWallet := wallettest.RandomWallet().(*pkeystore.Wallet)
+	tr := pkeystore.NewTransactor(*ksWallet)
+	onChainAcc := &accs[0].(*pethkeystore.Account).Account
+	return pethchannel.NewContractBackend(simBackend, tr, onChainAcc)
 }

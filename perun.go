@@ -96,8 +96,9 @@ type Registerer interface {
 
 // Credential represents the parameters required to access the keys and make signatures for a given address.
 type Credential struct {
-	Addr     pwallet.Address
-	Wallet   pwallet.Wallet
+	Addr   pwallet.Address
+	Wallet pwallet.Wallet
+	//TODO: Remove keystore from Credentials
 	Keystore string
 	Password string
 }
