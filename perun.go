@@ -254,7 +254,7 @@ type (
 	ChProposalNotif struct {
 		ProposalID string
 		Currency   string
-		Proposal   *pclient.ChannelProposal
+		Proposal   *pclient.BaseChannelProposal
 		Parts      []string
 		Expiry     int64
 	}

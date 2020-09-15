@@ -235,7 +235,7 @@ func (s *session) OpenCh(
 	}
 	partAddrs := []pwallet.Address{s.user.OffChainAddr, peer.OffChainAddr}
 	parts := []string{perun.OwnAlias, peer.Alias}
-	proposal := &pclient.ChannelProposal{ // Make proposal.
+	proposal := &pclient.BaseChannelProposal{ // Make proposal.
 		ChallengeDuration: challengeDurSecs,
 		Nonce:             nonce(),
 		ParticipantAddr:   s.user.OffChainAddr,
@@ -308,7 +308,7 @@ func nonce() *big.Int {
 	return val
 }
 
-func (s *session) HandleProposal(chProposal *pclient.ChannelProposal, responder *pclient.ProposalResponder) {
+func (s *session) HandleProposal(chProposal *pclient.BaseChannelProposal, responder *pclient.ProposalResponder) {
 	s.Debugf("SDK Callback: HandleProposal. Params: %+v", chProposal)
 	s.Lock()
 	defer s.Unlock()
