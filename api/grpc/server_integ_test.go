@@ -159,7 +159,7 @@ func Test_Integ_Role(t *testing.T) {
 		// Alice proposes a channel and bob accepts.
 		wg.Add(1)
 		go func() {
-			channelID = OpenPayCh(t, aliceSessionID, bobAlias, "1", "2")
+			channelID = OpenPayCh(t, aliceSessionID, []string{perun.OwnAlias, bobAlias}, []string{"1", "2"})
 			wg.Done()
 		}()
 		SubRespondUnsubPayChProposal(t, bobSessionID, true)
@@ -218,24 +218,21 @@ func AddContact(t *testing.T, sessionID string, peer *pb.Peer) {
 	require.True(t, ok, "AddContact returned error response")
 }
 
-func OpenPayCh(t *testing.T, sessionID string, peerAlias string, ownBal, peerBal string) string {
-	balInfo := perun.BalInfo{
-		Currency: currency.ETH,
-		Bals:     make(map[string]string),
-	}
-	balInfo.Bals[perun.OwnAlias] = ownBal
-	balInfo.Bals[peerAlias] = peerBal
+func OpenPayCh(t *testing.T, sessionID string, aliases, balance []string) string {
 	req := pb.OpenPayChReq{
-		SessionID:        sessionID,
-		PeerAlias:        peerAlias,
-		OpeningBalance:   grpc.ToGrpcBalInfo(balInfo),
+		SessionID: sessionID,
+		OpeningBalanceInfo: &pb.BalanceInfo{
+			Currency: currency.ETH,
+			Aliases:  aliases,
+			Balance:  balance,
+		},
 		ChallengeDurSecs: 10,
 	}
 	resp, err := client.OpenPayCh(ctx, &req)
 	require.NoErrorf(t, err, "OpenPayCh")
 	msg, ok := resp.Response.(*pb.OpenPayChResp_MsgSuccess_)
 	require.True(t, ok, "OpenPayCh returned error response")
-	return msg.MsgSuccess.Channel.ChannelID
+	return msg.MsgSuccess.OpenedPayChInfo.ChannelID
 }
 
 func SubRespondUnsubPayChProposal(t *testing.T, sessionID string, accept bool) {

@@ -43,6 +43,7 @@ func Test_ethParser_Parse(t *testing.T) {
 		{"happy_3_exp_form", "5e-18", big.NewInt(5), false},
 		{"happy_3_exp_form_upper_case", "5E-18", big.NewInt(5), false},
 
+		{"err_negative", "-2", nil, true},
 		{"err_too_small_exp_form", "5e-19", nil, true},
 		{"err_too_small_exp_form_upper_case", "5E-19", nil, true},
 		{"err_too_small", "0.0000000000000000005", nil, true},

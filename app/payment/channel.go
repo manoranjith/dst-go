@@ -30,7 +30,7 @@ type (
 	// PayChInfo represents the interpretation of channelInfo for payment app.
 	PayChInfo struct {
 		ChannelID string
-		BalInfo   perun.BalInfo
+		BalInfo   perun.BalanceInfo
 		Version   string
 	}
 	// PayChUpdateNotifier represents the channel update notification function for payment app.
@@ -39,7 +39,7 @@ type (
 	// PayChUpdateNotif represents the channel update notification data for payment app.
 	PayChUpdateNotif struct {
 		UpdateID     string
-		ProposedBals perun.BalInfo
+		ProposedBals perun.BalanceInfo
 		Version      string
 		Final        bool
 		Currency     string
@@ -93,9 +93,9 @@ func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, am
 }
 
 // GetBalInfo returns the balance information for this channel.
-func GetBalInfo(ch perun.ChannelAPI) perun.BalInfo {
+func GetBalInfo(ch perun.ChannelAPI) perun.BalanceInfo {
 	chInfo := ch.GetInfo()
-	return balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
+	return balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
 }
 
 // SubPayChUpdates sets up a subscription for updates on this channel.
@@ -103,7 +103,7 @@ func SubPayChUpdates(ch perun.ChannelAPI, notifier PayChUpdateNotifier) error {
 	return ch.SubChUpdates(func(notif perun.ChUpdateNotif) {
 		notifier(PayChUpdateNotif{
 			UpdateID:     notif.UpdateID,
-			ProposedBals: balsFromState(notif.Currency, notif.Update.State, notif.Parts),
+			ProposedBals: balInfoFromState(notif.Currency, notif.Update.State, notif.Parts),
 			Version:      fmt.Sprintf("%d", notif.Update.State.Version),
 			Final:        notif.Update.State.IsFinal,
 			Expiry:       notif.Expiry,
@@ -129,7 +129,7 @@ func ClosePayCh(pctx context.Context, ch perun.ChannelAPI) (PayChInfo, error) {
 	}
 	return PayChInfo{
 		ChannelID: chInfo.ChannelID,
-		BalInfo:   balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
+		BalInfo:   balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
 		Version:   fmt.Sprintf("%d", chInfo.State.Version),
 	}, nil
 }

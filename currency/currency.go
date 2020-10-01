@@ -70,6 +70,9 @@ func (p ethParser) Parse(input string) (*big.Int, error) {
 	}
 
 	amountBaseUnit := amount.Mul(p.multiplier)
+	if amountBaseUnit.LessThan(decimal.NewFromInt(0)) {
+		return nil, errors.New("amount is negative")
+	}
 	if amountBaseUnit.LessThan(decimal.NewFromInt(1)) {
 		return nil, errors.New("amount is too small, should be larger than 1e-18")
 	}

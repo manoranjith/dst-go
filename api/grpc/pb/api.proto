@@ -32,13 +32,11 @@ message Peer {
 // and the currency used for specifying the amount.
 message BalanceInfo {
     string currency=1;
-    message AliasBalance {
-    map<string, string> value = 1;
-    }
-    repeated AliasBalance balances=2;
+    repeated string aliases=2;
+    repeated string balance=3;
 }
 
-message PaymentChannel {
+message PaymentChannelInfo {
     string channelID = 1;
     BalanceInfo balanceinfo = 2;
     string version=3;
@@ -147,9 +145,8 @@ message  GetContactResp {
 
 message OpenPayChReq {
     string sessionID = 1;
-    string peerAlias = 2;
-    BalanceInfo openingBalance = 3;
-    uint64 challengeDurSecs = 4;
+    BalanceInfo openingBalanceInfo = 2;
+    uint64 challengeDurSecs = 3;
 }
 
 message OpenPayChResp {
@@ -158,7 +155,7 @@ message OpenPayChResp {
         MsgError error = 2;
     }
     message MsgSuccess {
-        PaymentChannel channel = 1;
+        PaymentChannelInfo openedPayChInfo = 1;
     }
 }
 
@@ -172,7 +169,7 @@ message GetPayChsResp {
         MsgError error = 2;
     }
     message MsgSuccess {
-        repeated PaymentChannel openChannels = 1;
+        repeated PaymentChannelInfo openChannels = 1;
     }
 }
 
@@ -220,7 +217,7 @@ message RespondPayChProposalResp {
     }
     message MsgSuccess {
         bool success=1;
-        PaymentChannel channel=2;
+        PaymentChannelInfo channel=2;
     }
 }
 
@@ -234,7 +231,7 @@ message subPayChClosesResp {
         MsgError error = 2;
     }
     message Notify {
-        PaymentChannel closingState = 1;
+        PaymentChannelInfo closingState = 1;
         string error = 2;
     }
 }
@@ -264,7 +261,7 @@ message CloseSessionResp {
         string erro = 2;
     }
     message MsgSuccess {
-        repeated PaymentChannel unclosedChannels = 2;
+        repeated PaymentChannelInfo unclosedChannels = 2;
     }
 }
 

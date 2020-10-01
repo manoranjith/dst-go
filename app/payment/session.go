@@ -34,7 +34,7 @@ type (
 	PayChProposalNotif struct {
 		ProposalID       string
 		Currency         string
-		OpeningBals      perun.BalInfo
+		OpeningBals      perun.BalanceInfo
 		ChallengeDurSecs uint64
 		Expiry           int64
 	}
@@ -65,21 +65,20 @@ func init() {
 // OpenPayCh opens a payment channel using the given sessionAPI instance with the specified parameters.
 func OpenPayCh(pctx context.Context,
 	s perun.SessionAPI,
-	peerAlias string,
-	openingBals perun.BalInfo,
+	openingBalInfo perun.BalanceInfo,
 	challengeDurSecs uint64) (PayChInfo, error) {
 	paymentApp := perun.App{
 		Def:  ppayment.NewApp(),
 		Data: pchannel.NoData(),
 	}
 
-	chInfo, err := s.OpenCh(pctx, peerAlias, openingBals, paymentApp, challengeDurSecs)
+	chInfo, err := s.OpenCh(pctx, openingBalInfo, paymentApp, challengeDurSecs)
 	if err != nil {
 		return PayChInfo{}, err
 	}
 	return PayChInfo{
 		ChannelID: chInfo.ChannelID,
-		BalInfo:   balsFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
+		BalInfo:   balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
 		Version:   fmt.Sprintf("%d", chInfo.State.Version),
 	}, nil
 }
@@ -92,7 +91,7 @@ func GetPayChs(s perun.SessionAPI) []PayChInfo {
 	for i := range chInfos {
 		payChInfos[i] = PayChInfo{
 			ChannelID: chInfos[i].ChannelID,
-			BalInfo:   balsFromState(chInfos[i].Currency, chInfos[i].State, chInfos[i].Parts),
+			BalInfo:   balInfoFromState(chInfos[i].Currency, chInfos[i].State, chInfos[i].Parts),
 			Version:   fmt.Sprintf("%d", chInfos[i].State.Version),
 		}
 	}
@@ -106,7 +105,7 @@ func SubPayChProposals(s perun.SessionAPI, notifier PayChProposalNotifier) error
 		notifier(PayChProposalNotif{
 			ProposalID:       notif.ProposalID,
 			Currency:         notif.Currency,
-			OpeningBals:      balsFromBigInt("ETH", balsBigInt, notif.Parts),
+			OpeningBals:      balInfoFromRawBalance("ETH", balsBigInt, notif.Parts),
 			ChallengeDurSecs: notif.ChProposal.Proposal().ChallengeDuration,
 			Expiry:           notif.Expiry,
 		})
@@ -129,7 +128,7 @@ func SubPayChCloses(s perun.SessionAPI, notifier PayChCloseNotifier) error {
 		notifier(PayChCloseNotif{
 			ClosingState: PayChInfo{
 				ChannelID: notif.ChannelID,
-				BalInfo:   balsFromState(notif.Currency, notif.ChState, notif.Parts),
+				BalInfo:   balInfoFromState(notif.Currency, notif.ChState, notif.Parts),
 				Version:   fmt.Sprintf("%d", notif.ChState.Version),
 			},
 		})
@@ -141,20 +140,20 @@ func UnsubPayChCloses(s perun.SessionAPI) error {
 	return s.UnsubChCloses()
 }
 
-func balsFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
-	return balsFromBigInt(currency, state.Balances[0], parts)
+func balInfoFromState(currency string, state *pchannel.State, parts []string) perun.BalanceInfo {
+	return balInfoFromRawBalance(currency, state.Balances[0], parts)
 }
 
-func balsFromBigInt(chCurrency string, bigInt []*big.Int, parts []string) perun.BalInfo {
-	balInfo := perun.BalInfo{
+func balInfoFromRawBalance(chCurrency string, rawBalance []*big.Int, parts []string) perun.BalanceInfo {
+	balInfo := perun.BalanceInfo{
 		Currency: chCurrency,
-		Bals:     make(map[string]string, len(parts)),
+		Aliases:  parts,
+		Balance:  make([]string, len(rawBalance)),
 	}
 
 	parser := currency.NewParser(chCurrency)
-	for i := range parts {
-		balInfo.Bals[parts[i]] = parser.Print(bigInt[i])
-		balInfo.Bals[parts[i]] = parser.Print(bigInt[i])
+	for i := range rawBalance {
+		balInfo.Balance[i] = parser.Print(rawBalance[i])
 	}
 	return balInfo
 }
