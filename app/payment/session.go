@@ -34,7 +34,7 @@ type (
 	PayChProposalNotif struct {
 		ProposalID       string
 		Currency         string
-		OpeningBals      perun.BalanceInfo
+		OpeningBals      perun.BalInfo
 		ChallengeDurSecs uint64
 		Expiry           int64
 	}
@@ -65,7 +65,7 @@ func init() {
 // OpenPayCh opens a payment channel using the given sessionAPI instance with the specified parameters.
 func OpenPayCh(pctx context.Context,
 	s perun.SessionAPI,
-	openingBalInfo perun.BalanceInfo,
+	openingBalInfo perun.BalInfo,
 	challengeDurSecs uint64) (PayChInfo, error) {
 	paymentApp := perun.App{
 		Def:  ppayment.NewApp(),
@@ -140,12 +140,12 @@ func UnsubPayChCloses(s perun.SessionAPI) error {
 	return s.UnsubChCloses()
 }
 
-func balInfoFromState(currency string, state *pchannel.State, parts []string) perun.BalanceInfo {
+func balInfoFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
 	return balInfoFromRawBalance(currency, state.Balances[0], parts)
 }
 
-func balInfoFromRawBalance(chCurrency string, rawBalance []*big.Int, parts []string) perun.BalanceInfo {
-	balInfo := perun.BalanceInfo{
+func balInfoFromRawBalance(chCurrency string, rawBalance []*big.Int, parts []string) perun.BalInfo {
+	balInfo := perun.BalInfo{
 		Currency: chCurrency,
 		Aliases:  parts,
 		Balance:  make([]string, len(rawBalance)),

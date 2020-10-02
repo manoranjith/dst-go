@@ -206,13 +206,13 @@ func (s *session) GetContact(alias string) (perun.Peer, error) {
 	return peer, nil
 }
 
-func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalanceInfo, app perun.App, challengeDurSecs uint64) (
+func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app perun.App, challengeDurSecs uint64) (
 	perun.ChannelInfo, error) {
 	s.Debugf("\nReceived request:session.OpenCh Params %+v,%+v,%+v", openingBalInfo, app, challengeDurSecs)
 	s.Lock()
 	defer s.Unlock()
 
-	sanitizeBalanceInfo(openingBalInfo)
+	sanitizeBalInfo(openingBalInfo)
 	parts, err := retrieveParts(openingBalInfo.Aliases, s.contacts)
 	if err != nil {
 		s.Error(err, "retrieving channel parts")
@@ -250,11 +250,11 @@ func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalanceInfo,
 	return openedCh.GetInfo(), nil
 }
 
-// sanitizeBalanceInfo checks if the entry for ownAlias is at index 0,
+// sanitizeBalInfo checks if the entry for ownAlias is at index 0,
 // if not it rearranges the Aliases & Balance lists to make the index of ownAlias 0.
 //
 // BalanceInfo will be unchanged if there is no entry for ownAlias.
-func sanitizeBalanceInfo(balInfo perun.BalanceInfo) {
+func sanitizeBalInfo(balInfo perun.BalInfo) {
 	ownIdx := 0
 	for idx := range balInfo.Aliases {
 		if balInfo.Aliases[idx] == perun.OwnAlias {
@@ -330,7 +330,7 @@ func offChainAddrs(parts []perun.Peer) []pwallet.Address {
 // makeAllocation makes an allocation using the BalanceInfo and the chAsset.
 // Order of amounts in the balance is same as the order of Aliases in the Balance Info.
 // It errors if any of the amounts cannot be parsed using the interpreter corresponding to the currency.
-func makeAllocation(balInfo perun.BalanceInfo, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
+func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
 	if !currency.IsSupported(balInfo.Currency) {
 		return nil, perun.ErrUnsupportedCurrency
 	}

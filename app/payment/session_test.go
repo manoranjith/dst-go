@@ -62,17 +62,17 @@ var (
 	}
 	wantUpdatedBalance = []string{"0.500000", "2.500000"}
 
-	balInfo = perun.BalanceInfo{
+	balInfo = perun.BalInfo{
 		Currency: currency.ETH,
 		Aliases:  parts,
 		Balance:  balance,
 	}
-	wantBalInfo = perun.BalanceInfo{
+	wantBalInfo = perun.BalInfo{
 		Currency: currency.ETH,
 		Aliases:  parts,
 		Balance:  wantBalance,
 	}
-	wantUpdatedBalInfo = perun.BalanceInfo{
+	wantUpdatedBalInfo = perun.BalInfo{
 		Currency: currency.ETH,
 		Aliases:  parts,
 		Balance:  wantUpdatedBalance,

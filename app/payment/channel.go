@@ -30,7 +30,7 @@ type (
 	// PayChInfo represents the interpretation of channelInfo for payment app.
 	PayChInfo struct {
 		ChannelID string
-		BalInfo   perun.BalanceInfo
+		BalInfo   perun.BalInfo
 		Version   string
 	}
 	// PayChUpdateNotifier represents the channel update notification function for payment app.
@@ -39,7 +39,7 @@ type (
 	// PayChUpdateNotif represents the channel update notification data for payment app.
 	PayChUpdateNotif struct {
 		UpdateID     string
-		ProposedBals perun.BalanceInfo
+		ProposedBals perun.BalInfo
 		Version      string
 		Final        bool
 		Currency     string
@@ -93,7 +93,7 @@ func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, am
 }
 
 // GetBalInfo returns the balance information for this channel.
-func GetBalInfo(ch perun.ChannelAPI) perun.BalanceInfo {
+func GetBalInfo(ch perun.ChannelAPI) perun.BalInfo {
 	chInfo := ch.GetInfo()
 	return balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
 }

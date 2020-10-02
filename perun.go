@@ -229,7 +229,7 @@ type SessionAPI interface {
 	ID() string
 	AddContact(Peer) error
 	GetContact(alias string) (Peer, error)
-	OpenCh(context.Context, BalanceInfo, App, uint64) (ChannelInfo, error)
+	OpenCh(context.Context, BalInfo, App, uint64) (ChannelInfo, error)
 	HandleClose(string, error)
 	GetChInfos() []ChannelInfo
 	HandleUpdate(pclient.ChannelUpdate, *pclient.UpdateResponder)
@@ -314,14 +314,14 @@ type (
 		Parts     []string // List of Alias of channel participants.
 	}
 
-	// BalanceInfo represents the Balance of channel participants.
+	// BalInfo represents the Balance information of the channel participants.
 	// A valid BalInfo should meet the following conditions (will be validated before using the struct):
 	//	1. Lengths of Aliases list and Balance list are equal.
 	//	2. All entries in Aliases list are unique.
 	//	3. Aliases list has an entry "self", that represents the user of the session.
 	//	4. No amount in Balance is negative.
-	BalanceInfo struct {
-		Currency string   // Currency interpretter used to interpret the amounts in the balance.
+	BalInfo struct {
+		Currency string   // Currency interpreter used to interpret the amounts in the balance.
 		Aliases  []string // List of channel participants.
 		Balance  []string // Amounts held by each participant in this channel for the given currency.
 	}

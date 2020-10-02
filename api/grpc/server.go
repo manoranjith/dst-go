@@ -201,7 +201,7 @@ func (a *PayChServer) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.
 	if err != nil {
 		return errResponse(err), nil
 	}
-	payChInfo, err := payment.OpenPayCh(ctx, sess, FromGrpcBalInfo(req.OpeningBalanceInfo), req.ChallengeDurSecs)
+	payChInfo, err := payment.OpenPayCh(ctx, sess, FromGrpcBalInfo(req.OpeningBalInfo), req.ChallengeDurSecs)
 	if err != nil {
 		return errResponse(err), nil
 	}
@@ -209,10 +209,10 @@ func (a *PayChServer) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.
 	return &pb.OpenPayChResp{
 		Response: &pb.OpenPayChResp_MsgSuccess_{
 			MsgSuccess: &pb.OpenPayChResp_MsgSuccess{
-				OpenedPayChInfo: &pb.PaymentChannelInfo{
-					ChannelID:   payChInfo.ChannelID,
-					Balanceinfo: ToGrpcBalInfo(payChInfo.BalInfo),
-					Version:     payChInfo.Version,
+				OpenedPayChInfo: &pb.PaymentChInfo{
+					ChID:    payChInfo.ChannelID,
+					BalInfo: ToGrpcBalInfo(payChInfo.BalInfo),
+					Version: payChInfo.Version,
 				},
 			},
 		},
@@ -237,19 +237,19 @@ func (a *PayChServer) GetPayChs(ctx context.Context, req *pb.GetPayChsReq) (*pb.
 	if err != nil {
 		return errResponse(err), nil
 	}
-	payChInfosGrpc := make([]*pb.PaymentChannelInfo, len(payChInfos))
+	payChInfosGrpc := make([]*pb.PaymentChInfo, len(payChInfos))
 	for i := 0; i < len(payChInfosGrpc); i++ {
-		payChInfosGrpc[i] = &pb.PaymentChannelInfo{
-			ChannelID:   payChInfos[i].ChannelID,
-			Balanceinfo: ToGrpcBalInfo(payChInfos[i].BalInfo),
-			Version:     payChInfos[i].Version,
+		payChInfosGrpc[i] = &pb.PaymentChInfo{
+			ChID:    payChInfos[i].ChannelID,
+			BalInfo: ToGrpcBalInfo(payChInfos[i].BalInfo),
+			Version: payChInfos[i].Version,
 		}
 	}
 
 	return &pb.GetPayChsResp{
 		Response: &pb.GetPayChsResp_MsgSuccess_{
 			MsgSuccess: &pb.GetPayChsResp_MsgSuccess{
-				OpenChannels: payChInfosGrpc,
+				OpenChs: payChInfosGrpc,
 			},
 		},
 	}, nil
@@ -373,10 +373,10 @@ func (a *PayChServer) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_A
 		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
 		err := srv.Send(&pb.SubPayChClosesResp{Response: &pb.SubPayChClosesResp_Notify_{
 			Notify: &pb.SubPayChClosesResp_Notify{
-				ClosingState: &pb.PaymentChannelInfo{
-					ChannelID:   notif.ClosingState.ChannelID,
-					Balanceinfo: ToGrpcBalInfo(notif.ClosingState.BalInfo),
-					Version:     notif.ClosingState.Version,
+				ClosingState: &pb.PaymentChInfo{
+					ChannelID: notif.ClosingState.ChannelID,
+					BalInfo:   ToGrpcBalInfo(notif.ClosingState.BalInfo),
+					Version:   notif.ClosingState.Version,
 				},
 				Error: notif.Error,
 			},
@@ -665,8 +665,8 @@ func (a *PayChServer) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*p
 
 // FromGrpcBalInfo is a helper function to convert BalInfo struct defined in grpc package
 // to BalInfo struct defined in perun-node. It is exported for use in tests.
-func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalanceInfo {
-	return perun.BalanceInfo{
+func FromGrpcBalInfo(src *pb.BalInfo) perun.BalInfo {
+	return perun.BalInfo{
 		Currency: src.Currency,
 		Aliases:  src.Aliases,
 		Balance:  src.Balance,
@@ -675,8 +675,8 @@ func FromGrpcBalInfo(src *pb.BalanceInfo) perun.BalanceInfo {
 
 // ToGrpcBalInfo is a helper function to convert BalInfo struct defined in perun-node
 // to BalInfo struct defined in grpc package. It is exported for use in tests.
-func ToGrpcBalInfo(src perun.BalanceInfo) *pb.BalanceInfo {
-	return &pb.BalanceInfo{
+func ToGrpcBalInfo(src perun.BalInfo) *pb.BalInfo {
+	return &pb.BalInfo{
 		Currency: src.Currency,
 		Aliases:  src.Aliases,
 		Balance:  src.Balance,

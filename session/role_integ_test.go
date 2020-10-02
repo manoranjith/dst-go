@@ -108,7 +108,7 @@ func Test_Integ_Role(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			balInfo := perun.BalanceInfo{
+			balInfo := perun.BalInfo{
 				Currency: currency.ETH,
 				Aliases:  []string{perun.OwnAlias, bobAlias},
 				Balance:  []string{"1", "2"},
@@ -144,7 +144,7 @@ func Test_Integ_Role(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			balInfo := perun.BalanceInfo{
+			balInfo := perun.BalInfo{
 				Currency: currency.ETH,
 				Aliases:  []string{aliceAlias, perun.OwnAlias},
 				Balance:  []string{"1", "2"},
