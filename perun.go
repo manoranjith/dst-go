@@ -236,7 +236,7 @@ type SessionAPI interface {
 	HandleProposal(pclient.ChannelProposal, *pclient.ProposalResponder)
 	SubChProposals(ChProposalNotifier) error
 	UnsubChProposals() error
-	RespondChProposal(context.Context, string, bool) error
+	RespondChProposal(context.Context, string, bool) (ChInfo, error)
 	SubChCloses(ChCloseNotifier) error
 	UnsubChCloses() error
 

@@ -225,32 +225,37 @@ func Test_UnsubPayChProposals(t *testing.T) {
 	})
 }
 
-// nolint: dupl	// not duplicate of Test_RespondPayChUpdate.
 func Test_RespondPayChProposal(t *testing.T) {
 	proposalID := "proposal-id-1"
 	t.Run("happy_accept", func(t *testing.T) {
 		accept := true
 		sessionAPI := &mocks.SessionAPI{}
-		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(nil)
+		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(chInfo, nil)
 
-		gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
+		openedChInfo, gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
 		assert.NoError(t, gotErr)
+		_ = openedChInfo
+		// assert.NotZero(t, openedChInfo)
 	})
 	t.Run("happy_reject", func(t *testing.T) {
 		accept := false
 		sessionAPI := &mocks.SessionAPI{}
-		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(nil)
+		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(perun.ChInfo{}, nil)
 
-		gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
+		openedChInfo, gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
 		assert.NoError(t, gotErr)
+		_ = openedChInfo
+		// assert.NotZero(t, openedChInfo)
 	})
 	t.Run("error", func(t *testing.T) {
 		accept := true
 		sessionAPI := &mocks.SessionAPI{}
-		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(assert.AnError)
+		sessionAPI.On("RespondChProposal", context.Background(), proposalID, accept).Return(perun.ChInfo{}, assert.AnError)
 
-		gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
+		openedChInfo, gotErr := payment.RespondPayChProposal(context.Background(), sessionAPI, proposalID, accept)
 		assert.Error(t, gotErr)
+		_ = openedChInfo
+		// assert.NotZero(t, openedChInfo)
 	})
 }
 

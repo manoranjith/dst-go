@@ -438,7 +438,7 @@ func (s *session) UnsubChProposals() error {
 	return nil
 }
 
-func (s *session) RespondChProposal(pctx context.Context, chProposalID string, accept bool) error {
+func (s *session) RespondChProposal(pctx context.Context, chProposalID string, accept bool) (perun.ChInfo, error) {
 	s.Debugf("Received request: session.RespondChProposal. Params: %+v, %+v", chProposalID, accept)
 	s.Lock()
 	defer s.Unlock()
@@ -446,45 +446,48 @@ func (s *session) RespondChProposal(pctx context.Context, chProposalID string, a
 	entry, ok := s.chProposalResponders[chProposalID]
 	if !ok {
 		s.Info(perun.ErrUnknownProposalID)
-		return perun.ErrUnknownProposalID
+		return perun.ChInfo{}, perun.ErrUnknownProposalID
 	}
 	delete(s.chProposalResponders, chProposalID)
 
 	currTime := time.Now().UTC().Unix()
 	if entry.expiry < currTime {
 		s.Info("timeout:", entry.expiry, "received response at:", currTime)
-		return perun.ErrRespTimeoutExpired
+		return perun.ChInfo{}, perun.ErrRespTimeoutExpired
 	}
 
+	var openedChInfo perun.ChInfo
+	var err error
 	switch accept {
 	case true:
-		if err := s.acceptChProposal(pctx, entry); err != nil {
+		openedChInfo, err = s.acceptChProposal(pctx, entry)
+		if err != nil {
 			s.Error("Accepting channel proposal", err)
-			return perun.GetAPIError(err)
+			return perun.ChInfo{}, perun.GetAPIError(err)
 		}
 	case false:
 		if err := s.rejectChProposal(pctx, entry.responder, "rejected by user"); err != nil {
 			s.Error("Rejecting channel proposal", err)
-			return perun.GetAPIError(err)
+			return perun.ChInfo{}, perun.GetAPIError(err)
 		}
 	}
-	return nil
+	return openedChInfo, nil
 }
 
-func (s *session) acceptChProposal(pctx context.Context, entry chProposalResponderEntry) error {
+func (s *session) acceptChProposal(pctx context.Context, entry chProposalResponderEntry) (perun.ChInfo, error) {
 	ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.respChProposalAccept(entry.challengeDurSecs))
 	defer cancel()
 	pch, err := entry.responder.Accept(ctx, pclient.ProposalAcc{Participant: s.user.OffChainAddr})
 	if err != nil {
 		s.Error("Accepting channel proposal", err)
-		return err
+		return perun.ChInfo{}, err
 	}
 
 	// Set ETH as the currency interpreter for incoming channel.
 	// TODO: (mano) Provide an option for user to configure when more currency interpreters are supported.
 	openedCh := newCh(pch, currency.ETH, entry.parts, s.timeoutCfg, entry.challengeDurSecs)
 	s.addCh(openedCh)
-	return nil
+	return openedCh.GetInfo(), nil
 }
 
 func (s *session) rejectChProposal(pctx context.Context, responder chProposalResponder, reason string) error {

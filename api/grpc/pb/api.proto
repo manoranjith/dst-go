@@ -58,7 +58,7 @@ service Payment_API{
     rpc AddContact (AddContactReq) returns (AddContactResp) {}
     rpc GetContact (GetContactReq) returns (GetContactResp) {}
     rpc OpenPayCh (OpenPayChReq) returns (OpenPayChResp) {}
-    rpc GetPayChInfo (GetPayChsInfoReq) returns (GetPayChsInfoResp) {}
+    rpc GetPayChsInfo (GetPayChsInfoReq) returns (GetPayChsInfoResp) {}
     rpc SubPayChProposals (SubPayChProposalsReq) returns (stream SubPayChProposalsResp) {}
     rpc UnsubPayChProposals (UnsubPayChProposalsReq) returns (UnsubPayChProposalsResp) {}
     rpc RespondPayChProposal (RespondPayChProposalReq) returns (RespondPayChProposalResp) {}
@@ -216,7 +216,6 @@ message RespondPayChProposalResp {
         MsgError error = 2;
     }
     message MsgSuccess {
-        bool success=1;
         PayChInfo openedPayChInfo=2;
     }
 }

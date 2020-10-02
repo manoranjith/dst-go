@@ -131,7 +131,7 @@ func Test_Integ_Role(t *testing.T) {
 		require.NoError(t, err, "bob subscribing channel proposals")
 
 		notif := <-bobChProposalNotif
-		err = bob.RespondChProposal(ctx, notif.ProposalID, true)
+		_, err = bob.RespondChProposal(ctx, notif.ProposalID, true)
 		require.NoError(t, err, "bob accepting channel proposal")
 
 		err = bob.UnsubChProposals()
@@ -168,7 +168,7 @@ func Test_Integ_Role(t *testing.T) {
 		require.NoError(t, err, "alice subscribing channel proposals")
 
 		notif := <-aliceChProposalNotif
-		err = alice.RespondChProposal(ctx, notif.ProposalID, false)
+		_, err = alice.RespondChProposal(ctx, notif.ProposalID, false)
 		require.NoError(t, err, "alice rejecting channel proposal")
 
 		err = alice.UnsubChProposals()

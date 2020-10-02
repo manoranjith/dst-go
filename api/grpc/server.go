@@ -202,7 +202,7 @@ func (a *PayChServer) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.
 		return errResponse(err), nil
 	}
 	balInfo := FromGrpcBalInfo(req.OpeningBalInfo)
-	payChInfo, err := payment.OpenPayCh(ctx, sess, balInfo, req.ChallengeDurSecs)
+	openedPayChInfo, err := payment.OpenPayCh(ctx, sess, balInfo, req.ChallengeDurSecs)
 	if err != nil {
 		return errResponse(err), nil
 	}
@@ -210,21 +210,17 @@ func (a *PayChServer) OpenPayCh(ctx context.Context, req *pb.OpenPayChReq) (*pb.
 	return &pb.OpenPayChResp{
 		Response: &pb.OpenPayChResp_MsgSuccess_{
 			MsgSuccess: &pb.OpenPayChResp_MsgSuccess{
-				OpenedPayChInfo: &pb.PayChInfo{
-					ChID:    payChInfo.ChID,
-					BalInfo: ToGrpcBalInfo(payChInfo.BalInfo),
-					Version: payChInfo.Version,
-				},
+				OpenedPayChInfo: ToGrpcPayChInfo(openedPayChInfo),
 			},
 		},
 	}, nil
 }
 
-// GetPayChs wraps session.GetPayChs.
-func (a *PayChServer) GetPayChs(ctx context.Context, req *pb.GetPayChsReq) (*pb.GetPayChsResp, error) {
-	errResponse := func(err error) *pb.GetPayChsResp {
-		return &pb.GetPayChsResp{
-			Response: &pb.GetPayChsResp_Error{
+// GetPayChsInfo wraps session.GetPayChsInfo.
+func (a *PayChServer) GetPayChsInfo(ctx context.Context, req *pb.GetPayChsInfoReq) (*pb.GetPayChsInfoResp, error) {
+	errResponse := func(err error) *pb.GetPayChsInfoResp {
+		return &pb.GetPayChsInfoResp{
+			Response: &pb.GetPayChsInfoResp_Error{
 				Error: &pb.MsgError{Error: err.Error()},
 			},
 		}
@@ -234,22 +230,18 @@ func (a *PayChServer) GetPayChs(ctx context.Context, req *pb.GetPayChsReq) (*pb.
 	if err != nil {
 		return errResponse(err), nil
 	}
-	openPaysChInfo := payment.GetPayChsInfo(sess)
+	openPayChsInfo := payment.GetPayChsInfo(sess)
 	if err != nil {
 		return errResponse(err), nil
 	}
-	openPayChsInfoGrpc := make([]*pb.PayChInfo, len(openPaysChInfo))
+	openPayChsInfoGrpc := make([]*pb.PayChInfo, len(openPayChsInfo))
 	for i := 0; i < len(openPayChsInfoGrpc); i++ {
-		openPayChsInfoGrpc[i] = &pb.PayChInfo{
-			ChID:    openPaysChInfo[i].ChID,
-			BalInfo: ToGrpcBalInfo(openPaysChInfo[i].BalInfo),
-			Version: openPaysChInfo[i].Version,
-		}
+		openPayChsInfoGrpc[i] = ToGrpcPayChInfo(openPayChsInfo[i])
 	}
 
-	return &pb.GetPayChsResp{
-		Response: &pb.GetPayChsResp_MsgSuccess_{
-			MsgSuccess: &pb.GetPayChsResp_MsgSuccess{
+	return &pb.GetPayChsInfoResp{
+		Response: &pb.GetPayChsInfoResp_MsgSuccess_{
+			MsgSuccess: &pb.GetPayChsInfoResp_MsgSuccess{
 				OpenPayChsInfo: openPayChsInfoGrpc,
 			},
 		},
@@ -348,7 +340,7 @@ func (a *PayChServer) RespondPayChProposal(ctx context.Context, req *pb.RespondP
 	if err != nil {
 		return errResponse(err), nil
 	}
-	err = payment.RespondPayChProposal(ctx, sess, req.ProposalID, req.Accept)
+	openedPayChInfo, err := payment.RespondPayChProposal(ctx, sess, req.ProposalID, req.Accept)
 	if err != nil {
 		return errResponse(err), nil
 	}
@@ -356,7 +348,7 @@ func (a *PayChServer) RespondPayChProposal(ctx context.Context, req *pb.RespondP
 	return &pb.RespondPayChProposalResp{
 		Response: &pb.RespondPayChProposalResp_MsgSuccess_{
 			MsgSuccess: &pb.RespondPayChProposalResp_MsgSuccess{
-				Success: true,
+				OpenedPayChInfo: ToGrpcPayChInfo(openedPayChInfo),
 			},
 		},
 	}, nil
@@ -374,12 +366,8 @@ func (a *PayChServer) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_A
 		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
 		err := srv.Send(&pb.SubPayChClosesResp{Response: &pb.SubPayChClosesResp_Notify_{
 			Notify: &pb.SubPayChClosesResp_Notify{
-				ClosedPayChInfo: &pb.PayChInfo{
-					ChID:    notif.ClosedPayChInfo.ChID,
-					BalInfo: ToGrpcBalInfo(notif.ClosedPayChInfo.BalInfo),
-					Version: notif.ClosedPayChInfo.Version,
-				},
-				Error: notif.Error,
+				ClosedPayChInfo: ToGrpcPayChInfo(notif.ClosedPayChInfo),
+				Error:           notif.Error,
 			},
 		}})
 		_ = err
@@ -662,6 +650,26 @@ func (a *PayChServer) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*p
 			},
 		},
 	}, nil
+}
+
+// FromGrpcPayChInfo is a helper function to convert PayChInfo struct defined in grpc package
+// to PayChInfo struct defined in perun-node. It is exported for use in tests.
+func FromGrpcPayChInfo(src *pb.PayChInfo) payment.PayChInfo {
+	return payment.PayChInfo{
+		ChID:    src.ChID,
+		BalInfo: FromGrpcBalInfo(src.BalInfo),
+		Version: src.Version,
+	}
+}
+
+// ToGrpcPayChInfo is a helper function to convert PayChInfo struct defined in perun-node
+// to PayChInfo struct defined in grpc package. It is exported for use in tests.
+func ToGrpcPayChInfo(src payment.PayChInfo) *pb.PayChInfo {
+	return &pb.PayChInfo{
+		ChID:    src.ChID,
+		BalInfo: ToGrpcBalInfo(src.BalInfo),
+		Version: src.Version,
+	}
 }
 
 // FromGrpcBalInfo is a helper function to convert BalInfo struct defined in grpc package
