@@ -81,8 +81,8 @@ func OpenPayCh(pctx context.Context, s perun.SessionAPI, openingBalInfo perun.Ba
 	}, nil
 }
 
-// GetPayChs returns a list of payment channel info for all the channels in this session.
-func GetPayChs(s perun.SessionAPI) []PayChInfo {
+// GetPayChsInfo returns a list of payment channel info for all the channels in this session.
+func GetPayChsInfo(s perun.SessionAPI) []PayChInfo {
 	chsInfo := s.GetChsInfo()
 
 	openPayChsInfo := make([]PayChInfo, len(chsInfo))

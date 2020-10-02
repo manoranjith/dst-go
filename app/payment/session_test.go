@@ -164,7 +164,7 @@ func Test_GetPayChs(t *testing.T) {
 		sessionAPI := &mocks.SessionAPI{}
 		sessionAPI.On("GetChsInfo").Return([]perun.ChInfo{chInfo})
 
-		gotPayChInfos := payment.GetPayChs(sessionAPI)
+		gotPayChInfos := payment.GetPayChsInfo(sessionAPI)
 		require.Len(t, gotPayChInfos, 1)
 		assert.Equal(t, versionString, gotPayChInfos[0].Version)
 		assert.Equal(t, wantBalInfo, gotPayChInfos[0].BalInfo)

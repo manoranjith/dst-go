@@ -29,8 +29,13 @@ import (
 type (
 	// PayChInfo represents the interpretation of channelInfo for payment app.
 	PayChInfo struct {
-		ChID    string
+		// Unique ID for the channel.
+		ChID string
+		// Balance Information for the channel.
 		BalInfo perun.BalInfo
+		// Current Version Number for the channel. This will be zero when a channel is opened and will be incremented
+		// during each update. When registering the state on-chain, if different participants register states with
+		// different versions, channel will be settled according to the state with highest version number.
 		Version string
 	}
 	// PayChUpdateNotifier represents the channel update notification function for payment app.

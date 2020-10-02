@@ -234,7 +234,7 @@ func (a *PayChServer) GetPayChs(ctx context.Context, req *pb.GetPayChsReq) (*pb.
 	if err != nil {
 		return errResponse(err), nil
 	}
-	openPaysChInfo := payment.GetPayChs(sess)
+	openPaysChInfo := payment.GetPayChsInfo(sess)
 	if err != nil {
 		return errResponse(err), nil
 	}

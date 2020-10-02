@@ -58,7 +58,7 @@ service Payment_API{
     rpc AddContact (AddContactReq) returns (AddContactResp) {}
     rpc GetContact (GetContactReq) returns (GetContactResp) {}
     rpc OpenPayCh (OpenPayChReq) returns (OpenPayChResp) {}
-    rpc GetPayChs (GetPayChsReq) returns (GetPayChsResp) {}
+    rpc GetPayChInfo (GetPayChsInfoReq) returns (GetPayChsInfoResp) {}
     rpc SubPayChProposals (SubPayChProposalsReq) returns (stream SubPayChProposalsResp) {}
     rpc UnsubPayChProposals (UnsubPayChProposalsReq) returns (UnsubPayChProposalsResp) {}
     rpc RespondPayChProposal (RespondPayChProposalReq) returns (RespondPayChProposalResp) {}
@@ -159,11 +159,11 @@ message OpenPayChResp {
     }
 }
 
-message GetPayChsReq {
+message GetPayChsInfoReq {
     string sessionID = 1;
 }
 
-message GetPayChsResp {
+message GetPayChsInfoResp {
     oneof response{
         MsgSuccess msgSuccess = 1;
         MsgError error = 2;
