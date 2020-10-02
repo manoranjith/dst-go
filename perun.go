@@ -124,12 +124,12 @@ type Session struct {
 	ID   string // ID uniquely identifies a session instance.
 	User User
 
-	ChannelClient ChannelClient
+	ChClient ChClient
 }
 
-//go:generate mockery --name ChannelClient --output ./internal/mocks
+//go:generate mockery --name ChClient --output ./internal/mocks
 
-// ChannelClient allows the user to establish off-chain channels and transact on these channels.
+// ChClient allows the user to establish off-chain channels and transact on these channels.
 //
 // It allows the user to enable persistence, where all data pertaining to the lifecycle of a channel is
 // persisted continuously. When it is enabled, the channel client can be stopped at any point of time and resumed later.
@@ -137,7 +137,7 @@ type Session struct {
 // However, the channel client is not responsible if any channel the user was participating in was closed
 // with a wrong state when the channel client was not running.
 // Hence it is highly recommended not to stop the channel client if there are open channels.
-type ChannelClient interface {
+type ChClient interface {
 	Registerer
 	ProposeChannel(context.Context, pclient.ChannelProposal) (*pclient.Channel, error)
 	Handle(pclient.ProposalHandler, pclient.UpdateHandler)
@@ -155,7 +155,7 @@ type ChannelClient interface {
 
 // WireBus is a an extension of the wire.Bus interface in go-perun to include a "Close" method.
 // pwire.Bus (in go-perun) is a central message bus over which all clients of a channel network
-// communicate. It is used as the transport layer abstraction for the ChannelClient.
+// communicate. It is used as the transport layer abstraction for the ChClient.
 type WireBus interface {
 	pwire.Bus
 	Close() error
@@ -229,9 +229,9 @@ type SessionAPI interface {
 	ID() string
 	AddContact(Peer) error
 	GetContact(alias string) (Peer, error)
-	OpenCh(context.Context, string, BalInfo, App, uint64) (ChannelInfo, error)
+	OpenCh(context.Context, string, BalInfo, App, uint64) (ChInfo, error)
 	HandleClose(string, error)
-	GetChInfos() []ChannelInfo
+	GetChsInfo() []ChInfo
 	HandleUpdate(pclient.ChannelUpdate, *pclient.UpdateResponder)
 	HandleProposal(pclient.ChannelProposal, *pclient.ProposalResponder)
 	SubChProposals(ChProposalNotifier) error
@@ -242,7 +242,7 @@ type SessionAPI interface {
 
 	// This function is used internally to get a ChannelAPI instance.
 	// Should not be exposed via userAPI.
-	GetCh(string) (ChannelAPI, error)
+	GetCh(string) (ChAPI, error)
 }
 
 type (
@@ -263,27 +263,27 @@ type (
 
 	// ChCloseNotif represents the parameters sent in a channel close notifications.
 	ChCloseNotif struct {
-		ChannelID string
-		Currency  string
-		ChState   *pchannel.State
-		Parts     []string
-		Error     string
+		ChID     string
+		Currency string
+		ChState  *pchannel.State
+		Parts    []string
+		Error    string
 	}
 )
 
-//go:generate mockery --name ChannelAPI --output ./internal/mocks
+//go:generate mockery --name ChAPI --output ./internal/mocks
 
-// ChannelAPI represents the APIs that can be accessed in the context of a perun channel.
+// ChAPI represents the APIs that can be accessed in the context of a perun channel.
 // First a channel has to be initialized using the SessionAPI. The channel can then be used
 // send and receive updates.
-type ChannelAPI interface {
+type ChAPI interface {
 	ID() string
 	SendChUpdate(context.Context, StateUpdater) error
 	SubChUpdates(ChUpdateNotifier) error
 	UnsubChUpdates() error
 	RespondChUpdate(context.Context, string, bool) error
-	GetInfo() ChannelInfo
-	Close(context.Context) (ChannelInfo, error)
+	GetInfo() ChInfo
+	Close(context.Context) (ChInfo, error)
 }
 
 type (
@@ -306,12 +306,12 @@ type (
 		Data pchannel.Data
 	}
 
-	// ChannelInfo represents the info regarding a channel that will be sent to the user.
-	ChannelInfo struct {
-		ChannelID string
-		Currency  string
-		State     *pchannel.State
-		Parts     []string // List of Alias of channel participants.
+	// ChInfo represents the info regarding a channel that will be sent to the user.
+	ChInfo struct {
+		ChID     string
+		Currency string
+		State    *pchannel.State
+		Parts    []string // List of Alias of channel participants.
 	}
 
 	// BalInfo is used to send the balance information to the user.

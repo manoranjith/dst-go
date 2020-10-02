@@ -228,14 +228,14 @@ func OpenPayCh(t *testing.T, sessionID string, peerAlias string, ownBal, peerBal
 	req := pb.OpenPayChReq{
 		SessionID:        sessionID,
 		PeerAlias:        peerAlias,
-		OpeningBalance:   grpc.ToGrpcBalInfo(balInfo),
+		OpeningBalInfo:   grpc.ToGrpcBalInfo(balInfo),
 		ChallengeDurSecs: 10,
 	}
 	resp, err := client.OpenPayCh(ctx, &req)
 	require.NoErrorf(t, err, "OpenPayCh")
 	msg, ok := resp.Response.(*pb.OpenPayChResp_MsgSuccess_)
 	require.True(t, ok, "OpenPayCh returned error response")
-	return msg.MsgSuccess.Channel.ChannelID
+	return msg.MsgSuccess.OpenedPayChInfo.ChID
 }
 
 func SubRespondUnsubPayChProposal(t *testing.T, sessionID string, accept bool) {
@@ -271,7 +271,7 @@ func SubRespondUnsubPayChProposal(t *testing.T, sessionID string, accept bool) {
 func SendPayChUpdate(t *testing.T, sessionID, channelID, peerAlias, amount string) {
 	req := pb.SendPayChUpdateReq{
 		SessionID: sessionID,
-		ChannelID: channelID,
+		ChID:      channelID,
 		Payee:     peerAlias,
 		Amount:    amount,
 	}
@@ -285,7 +285,7 @@ func SubRespondUnsubPayChUpdate(t *testing.T, sessionID, channelID string, accep
 	// Subscribe to payment channel update notifications.
 	subReq := pb.SubpayChUpdatesReq{
 		SessionID: sessionID,
-		ChannelID: channelID,
+		ChID:      channelID,
 	}
 	subClient, err := client.SubPayChUpdates(ctx, &subReq)
 	require.NoErrorf(t, err, "SubPayChUpdates")
@@ -299,7 +299,7 @@ func SubRespondUnsubPayChUpdate(t *testing.T, sessionID, channelID string, accep
 	respondReq := pb.RespondPayChUpdateReq{
 		SessionID: sessionID,
 		UpdateID:  notif.Notify.UpdateID,
-		ChannelID: channelID,
+		ChID:      channelID,
 		Accept:    true,
 	}
 	_, err = client.RespondPayChUpdate(ctx, &respondReq)
@@ -308,7 +308,7 @@ func SubRespondUnsubPayChUpdate(t *testing.T, sessionID, channelID string, accep
 	// Unsubscribe to payment channel update notifications.
 	unsubReq := pb.UnsubPayChUpdatesReq{
 		SessionID: sessionID,
-		ChannelID: channelID,
+		ChID:      channelID,
 	}
 	_, err = client.UnsubPayChUpdates(ctx, &unsubReq)
 	require.NoErrorf(t, err, "UnsubPayChUpdates")
@@ -317,7 +317,7 @@ func SubRespondUnsubPayChUpdate(t *testing.T, sessionID, channelID string, accep
 func ClosePayCh(t *testing.T, sessionID, channelID string) {
 	req := pb.ClosePayChReq{
 		SessionID: sessionID,
-		ChannelID: channelID,
+		ChID:      channelID,
 	}
 	resp, err := client.ClosePayCh(ctx, &req)
 	require.NoErrorf(t, err, "ClosePayCh")

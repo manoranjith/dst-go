@@ -44,7 +44,7 @@ func GetAPIError(err error) error {
 var (
 	ErrUnknownSessionID  = APIError("No session corresponding to the specified ID.")
 	ErrUnknownProposalID = APIError("No channel proposal corresponding to the specified ID.")
-	ErrUnknownChannelID  = APIError("No channel corresponding to the specified ID.")
+	ErrUnknownChID       = APIError("No channel corresponding to the specified ID.")
 	ErrUnknownAlias      = APIError("No peer corresponding to the specified ID was found in contacts.")
 	ErrUnknownUpdateID   = APIError("No response was expected for the given channel update ID")
 
