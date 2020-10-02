@@ -28,14 +28,12 @@ message Peer {
     string commType=4;
 }
 
-// BalInfo represents the balanace of the corresponding alias 
-// and the currency used for specifying the amount.
+// BalInfo represents the balance of each channel participant.
+// TODO: Desc
 message BalInfo {
     string currency=1;
-    message AliasBal {
-    map<string, string> value = 1;
-    }
-    repeated AliasBal bals=2;
+    repeated string parts=2;
+    repeated string bal=3;
 }
 
 message PayChInfo {
@@ -147,9 +145,8 @@ message  GetContactResp {
 
 message OpenPayChReq {
     string sessionID = 1;
-    string peerAlias = 2;
-    BalInfo openingBalInfo = 3;
-    uint64 challengeDurSecs = 4;
+    BalInfo openingBalInfo = 2;
+    uint64 challengeDurSecs = 3;
 }
 
 message OpenPayChResp {

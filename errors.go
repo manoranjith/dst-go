@@ -54,7 +54,7 @@ var (
 
 	ErrInsufficientBal     = APIError("Insufficient balance in sender account.")
 	ErrInvalidAmount       = APIError("Invalid amount string")
-	ErrMissingBalance      = APIError("Missing balance")
+	ErrMissingAmountInBal  = APIError("Missing balance")
 	ErrInvalidConfig       = APIError("Invalid configuration detected.")
 	ErrInvalidOffChainAddr = APIError("Invalid off-chain address string.")
 	ErrInvalidPayee        = APIError("Invalid payee, no such participant in the channel.")
