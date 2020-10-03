@@ -70,7 +70,7 @@ service Payment_API{
     rpc SubPayChUpdates (SubpayChUpdatesReq) returns (stream SubPayChUpdatesResp) {}
     rpc UnsubPayChUpdates (UnsubPayChUpdatesReq) returns (UnsubPayChUpdatesResp) {}
     rpc RespondPayChUpdate (RespondPayChUpdateReq) returns (RespondPayChUpdateResp) {}
-    rpc GetPayChBalInfo (GetPayChBalInfoReq) returns (GetPayChBalInfoResp) {}
+    rpc GetPayChInfo (GetPayChInfoReq) returns (GetPayChInfoResp) {}
     rpc ClosePayCh (ClosePayChReq) returns (ClosePayChResp) {}
 }
 
@@ -331,19 +331,18 @@ message RespondPayChUpdateResp {
     }
 }
 
-message GetPayChBalInfoReq {
+message GetPayChInfoReq {
     string sessionID=1;
     string chID=2;
 }
 
-message GetPayChBalInfoResp {
+message GetPayChInfoResp {
     oneof response{
         MsgSuccess msgSuccess = 1;
         MsgError error = 2;
     }
     message MsgSuccess {
-        BalInfo currentBalInfo = 1;
-        string currentVersion = 2;
+        PayChInfo payChInfo = 1;
     }
 }
 

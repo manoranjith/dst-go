@@ -581,12 +581,12 @@ func (a *PayChServer) RespondPayChUpdate(ctx context.Context, req *pb.RespondPay
 	}, nil
 }
 
-// GetPayChBalInfo wraps ch.GetBalInfo.
-func (a *PayChServer) GetPayChBalInfo(ctx context.Context, req *pb.GetPayChBalInfoReq) (
-	*pb.GetPayChBalInfoResp, error) {
-	errResponse := func(err error) *pb.GetPayChBalInfoResp {
-		return &pb.GetPayChBalInfoResp{
-			Response: &pb.GetPayChBalInfoResp_Error{
+// GetPayChInfo wraps ch.GetInfo.
+func (a *PayChServer) GetPayChInfo(ctx context.Context, req *pb.GetPayChInfoReq) (
+	*pb.GetPayChInfoResp, error) {
+	errResponse := func(err error) *pb.GetPayChInfoResp {
+		return &pb.GetPayChInfoResp{
+			Response: &pb.GetPayChInfoResp_Error{
 				Error: &pb.MsgError{
 					Error: err.Error(),
 				},
@@ -602,16 +602,11 @@ func (a *PayChServer) GetPayChBalInfo(ctx context.Context, req *pb.GetPayChBalIn
 	if err != nil {
 		return errResponse(err), nil
 	}
-	balInfo := payment.GetBalInfo(ch)
-	if err != nil {
-		return errResponse(err), nil
-	}
 
-	return &pb.GetPayChBalInfoResp{
-		Response: &pb.GetPayChBalInfoResp_MsgSuccess_{
-			MsgSuccess: &pb.GetPayChBalInfoResp_MsgSuccess{
-				CurrentBalInfo: ToGrpcBalInfo(balInfo),
-				CurrentVersion: "",
+	return &pb.GetPayChInfoResp{
+		Response: &pb.GetPayChInfoResp_MsgSuccess_{
+			MsgSuccess: &pb.GetPayChInfoResp_MsgSuccess{
+				PayChInfo: ToGrpcPayChInfo(payment.GetInfo(ch)),
 			},
 		},
 	}, nil

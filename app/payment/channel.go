@@ -97,10 +97,14 @@ func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, am
 	}, nil
 }
 
-// GetBalInfo returns the balance information for this channel.
-func GetBalInfo(ch perun.ChAPI) perun.BalInfo {
+// GetInfo returns the balance information for this channel.
+func GetInfo(ch perun.ChAPI) PayChInfo {
 	chInfo := ch.GetInfo()
-	return balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts)
+	return PayChInfo{
+		ChID:    chInfo.ChID,
+		BalInfo: balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
+		Version: fmt.Sprintf("%d", chInfo.State.Version),
+	}
 }
 
 // SubPayChUpdates sets up a subscription for updates on this channel.
