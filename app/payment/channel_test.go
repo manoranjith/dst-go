@@ -39,62 +39,44 @@ func Test_SendPayChUpdate(t *testing.T) {
 		chAPI.On("SendChUpdate", context.Background(), mock.MatchedBy(func(gotUpdater perun.StateUpdater) bool {
 			updater = gotUpdater
 			return true
-		})).Return(nil)
+		})).Return(updatedChInfo, nil)
 
-		gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amountToSend)
+		updatedPayChInfo, gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amountToSend)
 		require.NoError(t, gotErr)
 		require.NotNil(t, updater)
+		require.Equal(t, payment.ToPayChInfo(updatedChInfo), updatedPayChInfo)
 
 		stateCopy := chInfo.State.Clone()
 		updater(stateCopy)
 		assert.Equal(t, chUpdateNotif.ProposedChInfo.State.Balances, stateCopy.Allocation.Balances)
 	})
 
-	t.Run("happy_requestPayment", func(t *testing.T) {
-		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
-		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(nil)
-
-		gotErr := payment.SendPayChUpdate(context.Background(), chAPI, perun.OwnAlias, amountToSend)
-		require.NoError(t, gotErr)
-	})
-
-	t.Run("error_InsufficientBalance", func(t *testing.T) {
-		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
-		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(nil)
-
-		amount := "10" // This amount is greater than the channel balance of "1"
-		gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amount)
-		require.True(t, errors.Is(gotErr, perun.ErrInsufficientBal))
-	})
-
 	t.Run("error_InvalidAmount", func(t *testing.T) {
 		chAPI := &mocks.ChAPI{}
 		chAPI.On("GetInfo").Return(chInfo)
-		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(nil)
+		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(perun.ChInfo{}, nil)
 
 		invalidAmount := "abc"
-		gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, invalidAmount)
+		_, gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, invalidAmount)
 		require.True(t, errors.Is(gotErr, perun.ErrInvalidAmount))
 	})
 
 	t.Run("error_InvalidPayee", func(t *testing.T) {
 		chAPI := &mocks.ChAPI{}
 		chAPI.On("GetInfo").Return(chInfo)
-		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(nil)
+		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(perun.ChInfo{}, nil)
 
 		invalidPayee := "invalid-payee"
-		gotErr := payment.SendPayChUpdate(context.Background(), chAPI, invalidPayee, amountToSend)
+		_, gotErr := payment.SendPayChUpdate(context.Background(), chAPI, invalidPayee, amountToSend)
 		require.True(t, errors.Is(gotErr, perun.ErrInvalidPayee))
 	})
 
 	t.Run("error_SendChUpdate", func(t *testing.T) {
 		chAPI := &mocks.ChAPI{}
 		chAPI.On("GetInfo").Return(chInfo)
-		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(assert.AnError)
+		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(perun.ChInfo{}, assert.AnError)
 
-		gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amountToSend)
+		_, gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amountToSend)
 		require.Error(t, gotErr)
 	})
 }

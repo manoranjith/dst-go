@@ -212,8 +212,9 @@ func Test_Integ_Role(t *testing.T) {
 				state.Allocation.Balances[0] = bals
 			}
 
-			err := bobCh.SendChUpdate(ctx, updater)
+			updatedChInfo, err := bobCh.SendChUpdate(ctx, updater)
 			require.NoError(t, err)
+			require.NotZero(t, updatedChInfo)
 		}()
 
 		// Accept channel by alice.
@@ -255,7 +256,7 @@ func Test_Integ_Role(t *testing.T) {
 				state.Allocation.Balances[0] = bals
 			}
 
-			err := aliceCh.SendChUpdate(ctx, updater)
+			_, err := aliceCh.SendChUpdate(ctx, updater)
 			require.Error(t, err, "alice update rejected by bob")
 			t.Log(err)
 		}()

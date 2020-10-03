@@ -93,17 +93,17 @@ func (ch *channel) ID() string {
 	return ch.id
 }
 
-func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater) error {
+func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater) (perun.ChInfo, error) {
 	ch.Debug("Received request: channel.SendChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
 
 	if ch.lockState == finalized {
 		ch.Error("Dropping update request as the channel is " + ch.lockState)
-		return perun.ErrChFinalized
+		return perun.ChInfo{}, perun.ErrChFinalized
 	} else if ch.lockState == closed {
 		ch.Error("Dropping update request as the channel is " + ch.lockState)
-		return perun.ErrChClosed
+		return perun.ChInfo{}, perun.ErrChClosed
 	}
 
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
@@ -111,12 +111,12 @@ func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater
 	err := ch.pch.UpdateBy(ctx, ch.pch.Idx(), updater)
 	if err != nil {
 		ch.Error("Sending channel update:", err)
-		return perun.GetAPIError(err)
+		return perun.ChInfo{}, perun.GetAPIError(err)
 	}
-	prevChInfo := ch.getChInfo()
+	prevChInfo := ch.getInfo()
 	ch.currState = ch.pch.State().Clone()
-	ch.Debugf("State upated from %v to %v", prevChInfo, ch.getChInfo())
-	return nil
+	ch.Debugf("State upated from %v to %v", prevChInfo, ch.getInfo())
+	return ch.getInfo(), nil
 }
 
 func (ch *channel) SubChUpdates(notifier perun.ChUpdateNotifier) error {
@@ -200,11 +200,11 @@ func (ch *channel) GetInfo() perun.ChInfo {
 	ch.Debug("Received request: channel.GetInfo")
 	ch.Lock()
 	defer ch.Unlock()
-	return ch.getChInfo()
+	return ch.getInfo()
 }
 
 // This function assumes that caller has already locked the channel.
-func (ch *channel) getChInfo() perun.ChInfo {
+func (ch *channel) getInfo() perun.ChInfo {
 	return perun.ChInfo{
 		ChID:     ch.id,
 		Currency: ch.currency,
@@ -249,11 +249,11 @@ func (ch *channel) Close(pctx context.Context) (perun.ChInfo, error) {
 		} else if cerr != nil {
 			ch.Logger.Error("Closing channel", cerr)
 		}
-		return ch.getChInfo(), nil
+		return ch.getInfo(), nil
 
 	case closed:
-		return ch.getChInfo(), perun.ErrChClosed
+		return ch.getInfo(), perun.ErrChClosed
 	}
 	ch.Error("Program reached unknonwn state")
-	return ch.getChInfo(), perun.ErrInternalServer
+	return ch.getInfo(), perun.ErrInternalServer
 }

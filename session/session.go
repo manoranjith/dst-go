@@ -557,11 +557,11 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 	ch.chUpdateResponders[updateID] = entry
 
-	proposedChInfo := ch.GetInfo()
+	proposedChInfo := ch.getInfo()
 	proposedChInfo.State = chUpdate.State.Clone()
 	notif := perun.ChUpdateNotif{
 		UpdateID:       updateID,
-		CurrentState:   ch.getChInfo().State.Clone(),
+		CurrentState:   ch.currState,
 		ProposedChInfo: proposedChInfo,
 		Expiry:         expiry,
 	}
@@ -589,7 +589,7 @@ func (s *session) HandleClose(chID string, err error) {
 		ch.lockState = closed
 	}
 
-	chInfo := ch.getChInfo()
+	chInfo := ch.getInfo()
 	notif := perun.ChCloseNotif{
 		ChID:     chInfo.ChID,
 		Currency: chInfo.Currency,

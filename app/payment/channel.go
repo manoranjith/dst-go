@@ -19,6 +19,7 @@ package payment
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	pchannel "perun.network/go-perun/channel"
 
@@ -52,46 +53,49 @@ type (
 
 // SendPayChUpdate send the given amount to the payee. Payee should be one of the channel participants.
 // Use "self" to request payments.
-func SendPayChUpdate(pctx context.Context, ch perun.ChAPI, payee, amount string) error {
-	chInfo := ch.GetInfo()
-	f, err := newUpdater(chInfo.State, chInfo.Parts, chInfo.Currency, payee, amount)
+func SendPayChUpdate(pctx context.Context, ch perun.ChAPI, payee, amount string) (PayChInfo, error) {
+	parsedAmount, err := parseAmount(ch.GetInfo().Currency, amount)
 	if err != nil {
-		return err
+		return PayChInfo{}, err
 	}
-	return ch.SendChUpdate(pctx, f)
+	payerIdx, payeeIdx, err := getPayerPayeeIdx(ch.GetInfo().Parts, payee)
+	if err != nil {
+		return PayChInfo{}, err
+	}
+	updatedChInfo, err := ch.SendChUpdate(pctx, newUpdate(payerIdx, payeeIdx, parsedAmount))
+	if err != nil {
+		return PayChInfo{}, err
+	}
+	return ToPayChInfo(updatedChInfo), nil
 }
 
-func newUpdater(currState *pchannel.State, parts []string, chCurrency, payee, amount string) (
-	perun.StateUpdater, error) {
+func parseAmount(chCurrency string, amount string) (*big.Int, error) {
 	parsedAmount, err := currency.NewParser(chCurrency).Parse(amount)
 	if err != nil {
 		return nil, perun.ErrInvalidAmount
 	}
+	return parsedAmount, nil
+}
 
-	// find index
+func getPayerPayeeIdx(parts []string, payee string) (int, int, error) {
 	var payerIdx, payeeIdx int
 	if parts[0] == payee {
 		payeeIdx = 0
 	} else if parts[1] == payee {
 		payeeIdx = 1
 	} else {
-		return nil, perun.ErrInvalidPayee
+		return 0, 0, perun.ErrInvalidPayee
 	}
 	payerIdx = payeeIdx ^ 1
+	return payerIdx, payeeIdx, nil
+}
 
-	// check sufficient balance
-	bals := currState.Allocation.Clone().Balances[0]
-	bals[payerIdx].Sub(bals[payerIdx], parsedAmount)
-	bals[payeeIdx].Add((bals[payeeIdx]), parsedAmount)
-	if bals[payerIdx].Sign() == -1 {
-		return nil, perun.ErrInsufficientBal
-	}
-
-	// return updater func
+func newUpdate(payerIdx, payeeIdx int, parsedAmount *big.Int) perun.StateUpdater {
 	return func(state *pchannel.State) {
-		state.Allocation.Balances[0][payerIdx] = bals[payerIdx]
-		state.Allocation.Balances[0][payeeIdx] = bals[payeeIdx]
-	}, nil
+		bal := state.Allocation.Balances[0]
+		bal[payerIdx].Sub(bal[payerIdx], parsedAmount)
+		bal[payeeIdx].Add(bal[payeeIdx], parsedAmount)
+	}
 }
 
 // GetInfo returns the balance information for this channel.

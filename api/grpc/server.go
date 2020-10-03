@@ -451,7 +451,7 @@ func (a *PayChServer) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpda
 	if err != nil {
 		return errResponse(err), nil
 	}
-	err = payment.SendPayChUpdate(ctx, ch, req.Payee, req.Amount)
+	updatedPayChInfo, err := payment.SendPayChUpdate(ctx, ch, req.Payee, req.Amount)
 	if err != nil {
 		return errResponse(err), nil
 	}
@@ -459,7 +459,7 @@ func (a *PayChServer) SendPayChUpdate(ctx context.Context, req *pb.SendPayChUpda
 	return &pb.SendPayChUpdateResp{
 		Response: &pb.SendPayChUpdateResp_MsgSuccess_{
 			MsgSuccess: &pb.SendPayChUpdateResp_MsgSuccess{
-				Success: true,
+				UpdatedPayChInfo: ToGrpcPayChInfo(updatedPayChInfo),
 			},
 		},
 	}, nil

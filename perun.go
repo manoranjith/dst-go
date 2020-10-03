@@ -278,7 +278,7 @@ type (
 // send and receive updates.
 type ChAPI interface {
 	ID() string
-	SendChUpdate(context.Context, StateUpdater) error
+	SendChUpdate(context.Context, StateUpdater) (ChInfo, error)
 	SubChUpdates(ChUpdateNotifier) error
 	UnsubChUpdates() error
 	RespondChUpdate(context.Context, string, bool) error

@@ -277,7 +277,7 @@ message SendPayChUpdateResp {
         MsgError error = 2;
     }
     message MsgSuccess {
-        bool success = 1;
+        PayChInfo updatedPayChInfo = 1;
     }
 }
 
