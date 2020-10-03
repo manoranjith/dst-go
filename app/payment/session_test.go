@@ -114,17 +114,9 @@ var (
 		Expiry: expiry,
 	}
 	chUpdateNotif = perun.ChUpdateNotif{
-		UpdateID: updateID,
-		Currency: currency.ETH,
-		Update: &pclient.ChannelUpdate{
-			State: &pchannel.State{
-				Allocation: updatedAllocation,
-				IsFinal:    true,
-				Version:    version,
-			},
-		},
-		Parts:  parts,
-		Expiry: expiry,
+		UpdateID:       updateID,
+		ProposedChInfo: updatedChInfo,
+		Expiry:         expiry,
 	}
 	chCloseNotif = perun.ChCloseNotif{
 		ChID:     chID,

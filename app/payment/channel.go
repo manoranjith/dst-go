@@ -43,13 +43,10 @@ type (
 
 	// PayChUpdateNotif represents the channel update notification data for payment app.
 	PayChUpdateNotif struct {
-		UpdateID        string
-		ProposedBalInfo perun.BalInfo
-		Version         string
-		Final           bool
-		Currency        string
-		Parts           []string
-		Expiry          int64
+		UpdateID          string
+		ProposedPayChInfo PayChInfo
+		IsFinal           bool
+		Expiry            int64
 	}
 )
 
@@ -111,11 +108,10 @@ func GetInfo(ch perun.ChAPI) PayChInfo {
 func SubPayChUpdates(ch perun.ChAPI, notifier PayChUpdateNotifier) error {
 	return ch.SubChUpdates(func(notif perun.ChUpdateNotif) {
 		notifier(PayChUpdateNotif{
-			UpdateID:        notif.UpdateID,
-			ProposedBalInfo: balInfoFromState(notif.Currency, notif.Update.State, notif.Parts),
-			Version:         fmt.Sprintf("%d", notif.Update.State.Version),
-			Final:           notif.Update.State.IsFinal,
-			Expiry:          notif.Expiry,
+			UpdateID:          notif.UpdateID,
+			ProposedPayChInfo: ToPayChInfo(notif.ProposedChInfo),
+			IsFinal:           notif.ProposedChInfo.State.IsFinal,
+			Expiry:            notif.Expiry,
 		})
 	})
 }

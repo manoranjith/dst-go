@@ -557,13 +557,13 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	}
 	ch.chUpdateResponders[updateID] = entry
 
+	proposedChInfo := ch.GetInfo()
+	proposedChInfo.State = chUpdate.State.Clone()
 	notif := perun.ChUpdateNotif{
-		UpdateID:  updateID,
-		Currency:  ch.currency,
-		CurrState: ch.currState,
-		Update:    &chUpdate,
-		Parts:     ch.parts,
-		Expiry:    expiry,
+		UpdateID:       updateID,
+		CurrentState:   ch.getChInfo().State.Clone(),
+		ProposedChInfo: proposedChInfo,
+		Expiry:         expiry,
 	}
 	if ch.chUpdateNotifier == nil {
 		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)

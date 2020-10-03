@@ -47,7 +47,7 @@ func Test_SendPayChUpdate(t *testing.T) {
 
 		stateCopy := chInfo.State.Clone()
 		updater(stateCopy)
-		assert.Equal(t, chUpdateNotif.Update.State.Allocation.Balances, stateCopy.Allocation.Balances)
+		assert.Equal(t, chUpdateNotif.ProposedChInfo.State.Balances, stateCopy.Allocation.Balances)
 	})
 
 	t.Run("happy_requestPayment", func(t *testing.T) {
@@ -130,9 +130,7 @@ func Test_SubPayChUpdates(t *testing.T) {
 		notifier(chUpdateNotif)
 		require.NotZero(t, notif)
 		require.Equal(t, chUpdateNotif.UpdateID, notif.UpdateID)
-		require.Equal(t, wantUpdatedBalInfo, notif.ProposedBalInfo)
-		require.Equal(t, versionString, notif.Version)
-		require.Equal(t, chUpdateNotif.Update.State.IsFinal, notif.Final)
+		require.Equal(t, payment.ToPayChInfo(chUpdateNotif.ProposedChInfo), notif.ProposedPayChInfo)
 		require.Equal(t, chUpdateNotif.Expiry, notif.Expiry)
 	})
 	t.Run("error", func(t *testing.T) {

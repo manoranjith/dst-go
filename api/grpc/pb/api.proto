@@ -292,9 +292,9 @@ message SubPayChUpdatesResp {
         MsgError error = 2;
     }
     message Notify {
-        BalInfo proposedBalInfo = 1;
-        string updateID = 2;
-        bool final = 3;
+        string updateID = 1;
+        PayChInfo proposedPayChInfo = 2;
+        bool isFinal = 3;
         int64 expiry = 4;
     }
 }

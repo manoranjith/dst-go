@@ -292,12 +292,10 @@ type (
 
 	// ChUpdateNotif represents the parameters sent in a channel update notifications.
 	ChUpdateNotif struct {
-		UpdateID  string
-		Currency  string
-		CurrState *pchannel.State
-		Update    *pclient.ChannelUpdate
-		Parts     []string
-		Expiry    int64
+		UpdateID       string
+		CurrentState   *pchannel.State
+		ProposedChInfo ChInfo
+		Expiry         int64
 	}
 
 	// App represents the parameters of an App used in a channel.
