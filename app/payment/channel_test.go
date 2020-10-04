@@ -27,15 +27,23 @@ import (
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/app/payment"
+	"github.com/hyperledger-labs/perun-node/currency"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 )
 
 func Test_SendPayChUpdate(t *testing.T) {
+	// Returns a mock with API calls set up for currency and parts.
+	newChAPIMock := func() *mocks.ChAPI {
+		chAPI := &mocks.ChAPI{}
+		chAPI.On("Currency").Return(currency.ETH)
+		chAPI.On("Parts").Return(parts)
+		return chAPI
+	}
+
 	t.Run("happy_sendPayment", func(t *testing.T) {
 		var updater perun.StateUpdater
 
-		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
+		chAPI := newChAPIMock()
 		chAPI.On("SendChUpdate", context.Background(), mock.MatchedBy(func(gotUpdater perun.StateUpdater) bool {
 			updater = gotUpdater
 			return true
@@ -43,17 +51,17 @@ func Test_SendPayChUpdate(t *testing.T) {
 
 		updatedPayChInfo, gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amountToSend)
 		require.NoError(t, gotErr)
+		require.Equal(t, wantUpdatedPayChInfo, updatedPayChInfo)
 		require.NotNil(t, updater)
-		require.Equal(t, payment.ToPayChInfo(updatedChInfo), updatedPayChInfo)
 
-		stateCopy := chInfo.State.Clone()
-		updater(stateCopy)
-		assert.Equal(t, chUpdateNotif.ProposedChInfo.State.Balances, stateCopy.Allocation.Balances)
+		// TODO: Now that State is not available, how to test the updater function ?
+		// stateCopy := chInfo.State.Clone()
+		// updater(stateCopy)
+		// assert.Equal(t, chUpdateNotif.ProposedChInfo.State.Balances, stateCopy.Allocation.Balances)
 	})
 
 	t.Run("error_InvalidAmount", func(t *testing.T) {
-		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
+		chAPI := newChAPIMock()
 		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(perun.ChInfo{}, nil)
 
 		invalidAmount := "abc"
@@ -62,8 +70,7 @@ func Test_SendPayChUpdate(t *testing.T) {
 	})
 
 	t.Run("error_InvalidPayee", func(t *testing.T) {
-		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
+		chAPI := newChAPIMock()
 		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(perun.ChInfo{}, nil)
 
 		invalidPayee := "invalid-payee"
@@ -72,26 +79,33 @@ func Test_SendPayChUpdate(t *testing.T) {
 	})
 
 	t.Run("error_SendChUpdate", func(t *testing.T) {
-		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
+		chAPI := newChAPIMock()
 		chAPI.On("SendChUpdate", context.Background(), mock.Anything).Return(perun.ChInfo{}, assert.AnError)
 
 		_, gotErr := payment.SendPayChUpdate(context.Background(), chAPI, peerAlias, amountToSend)
 		require.Error(t, gotErr)
+		t.Log(gotErr)
 	})
 }
 
 func Test_GetBalInfo(t *testing.T) {
-	t.Run("happy", func(t *testing.T) {
+	t.Run("happy1", func(t *testing.T) {
 		chAPI := &mocks.ChAPI{}
-		chAPI.On("GetInfo").Return(chInfo)
+		chAPI.On("GetInfo").Return(openedChInfo)
 
 		gotPayChInfo := payment.GetInfo(chAPI)
-		_ = gotPayChInfo
-		// assert.Equal(t, chInfo, gotBalInfo)
+		assert.Equal(t, wantOpenedPayChInfo, gotPayChInfo)
+	})
+	t.Run("happy2", func(t *testing.T) {
+		chAPI := &mocks.ChAPI{}
+		chAPI.On("GetInfo").Return(updatedChInfo)
+
+		gotPayChInfo := payment.GetInfo(chAPI)
+		assert.Equal(t, wantUpdatedPayChInfo, gotPayChInfo)
 	})
 }
 
+// nolint: dupl	// not duplicate of Test_SubPayChProposals.
 func Test_SubPayChUpdates(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 		var notifier perun.ChUpdateNotifier
@@ -107,13 +121,11 @@ func Test_SubPayChUpdates(t *testing.T) {
 
 		gotErr := payment.SubPayChUpdates(chAPI, dummyNotifier)
 		assert.NoError(t, gotErr)
-		require.NotNil(t, notifier)
 
+		// Test the notifier function, that interprets the notification for payment app.
+		require.NotNil(t, notifier)
 		notifier(chUpdateNotif)
-		require.NotZero(t, notif)
-		require.Equal(t, chUpdateNotif.UpdateID, notif.UpdateID)
-		require.Equal(t, payment.ToPayChInfo(chUpdateNotif.ProposedChInfo), notif.ProposedPayChInfo)
-		require.Equal(t, chUpdateNotif.Expiry, notif.Expiry)
+		require.Equal(t, wantPayChUpdateNotif, notif)
 	})
 	t.Run("error", func(t *testing.T) {
 		chAPI := &mocks.ChAPI{}
@@ -167,6 +179,7 @@ func Test_RespondPayChUpdate(t *testing.T) {
 
 		gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
 		assert.Error(t, gotErr)
+		t.Log(gotErr)
 	})
 }
 
@@ -177,15 +190,14 @@ func Test_ClosePayCh(t *testing.T) {
 
 		gotPayChInfo, err := payment.ClosePayCh(context.Background(), chAPI)
 		require.NoError(t, err)
-		assert.Equal(t, wantUpdatedBalInfo, gotPayChInfo.BalInfo)
-		assert.Equal(t, versionString, gotPayChInfo.Version)
-		assert.NotZero(t, gotPayChInfo.ChID)
+		assert.Equal(t, wantUpdatedPayChInfo, gotPayChInfo)
 	})
 	t.Run("error", func(t *testing.T) {
 		chAPI := &mocks.ChAPI{}
-		chAPI.On("Close", context.Background()).Return(chInfo, assert.AnError)
+		chAPI.On("Close", context.Background()).Return(updatedChInfo, assert.AnError)
 
-		_, err := payment.ClosePayCh(context.Background(), chAPI)
-		require.Error(t, err)
+		_, gotErr := payment.ClosePayCh(context.Background(), chAPI)
+		require.Error(t, gotErr)
+		t.Log(gotErr)
 	})
 }

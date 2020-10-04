@@ -18,22 +18,19 @@ package payment
 
 import (
 	"context"
-	"fmt"
-	"math/big"
 
 	ppayment "perun.network/go-perun/apps/payment"
 	pchannel "perun.network/go-perun/channel"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum"
-	"github.com/hyperledger-labs/perun-node/currency"
+	"github.com/hyperledger-labs/perun-node/session"
 )
 
 type (
 	// PayChProposalNotif represents the channel update notification data for payment app.
 	PayChProposalNotif struct {
 		ProposalID       string
-		Currency         string
 		OpeningBalInfo   perun.BalInfo
 		ChallengeDurSecs uint64
 		Expiry           int64
@@ -91,11 +88,10 @@ func GetPayChsInfo(s perun.SessionAPI) []PayChInfo {
 // SubPayChProposals sets up a subscription for payment channel proposals.
 func SubPayChProposals(s perun.SessionAPI, notifier PayChProposalNotifier) error {
 	return s.SubChProposals(func(notif perun.ChProposalNotif) {
-		balsBigInt := notif.ChProposal.Proposal().InitBals.Balances[0]
+		rawBal := notif.ChProposal.Proposal().InitBals.Balances[0]
 		notifier(PayChProposalNotif{
 			ProposalID:       notif.ProposalID,
-			Currency:         notif.Currency,
-			OpeningBalInfo:   balInfoFromRawBal("ETH", balsBigInt, notif.Parts),
+			OpeningBalInfo:   session.BalInfoFromRawBal(notif.Parts, notif.Currency, rawBal),
 			ChallengeDurSecs: notif.ChProposal.Proposal().ChallengeDuration,
 			Expiry:           notif.Expiry,
 		})
@@ -121,11 +117,7 @@ func RespondPayChProposal(pctx context.Context, s perun.SessionAPI, proposalID s
 func SubPayChCloses(s perun.SessionAPI, notifier PayChCloseNotifier) error {
 	return s.SubChCloses(func(notif perun.ChCloseNotif) {
 		notifier(PayChCloseNotif{
-			ClosedPayChInfo: PayChInfo{
-				ChID:    notif.ChID,
-				BalInfo: balInfoFromState(notif.Currency, notif.ChState, notif.Parts),
-				Version: fmt.Sprintf("%d", notif.ChState.Version),
-			},
+			ClosedPayChInfo: ToPayChInfo(notif.ClosedChInfo),
 		})
 	})
 }
@@ -133,34 +125,4 @@ func SubPayChCloses(s perun.SessionAPI, notifier PayChCloseNotifier) error {
 // UnsubPayChCloses deletes the existing subscription for payment channel closes.
 func UnsubPayChCloses(s perun.SessionAPI) error {
 	return s.UnsubChCloses()
-}
-
-// ToPayChInfo converts ChInfo to PayChInfo.
-func ToPayChInfo(chInfo perun.ChInfo) PayChInfo {
-	return PayChInfo{
-		ChID:    chInfo.ChID,
-		BalInfo: balInfoFromState(chInfo.Currency, chInfo.State, chInfo.Parts),
-		Version: fmt.Sprintf("%d", chInfo.State.Version),
-	}
-}
-
-func balInfoFromState(currency string, state *pchannel.State, parts []string) perun.BalInfo {
-	if state == nil {
-		return perun.BalInfo{}
-	}
-	return balInfoFromRawBal(currency, state.Balances[0], parts)
-}
-
-func balInfoFromRawBal(chCurrency string, rawBal []*big.Int, parts []string) perun.BalInfo {
-	balInfo := perun.BalInfo{
-		Currency: chCurrency,
-		Parts:    parts,
-		Bal:      make([]string, len(rawBal)),
-	}
-
-	parser := currency.NewParser(chCurrency)
-	for i := range rawBal {
-		balInfo.Bal[i] = parser.Print(rawBal[i])
-	}
-	return balInfo
 }

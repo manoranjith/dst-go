@@ -263,11 +263,8 @@ type (
 
 	// ChCloseNotif represents the parameters sent in a channel close notifications.
 	ChCloseNotif struct {
-		ChID     string
-		Currency string
-		ChState  *pchannel.State
-		Parts    []string
-		Error    string
+		ClosedChInfo ChInfo
+		Error        string
 	}
 )
 
@@ -277,7 +274,13 @@ type (
 // First a channel has to be initialized using the SessionAPI. The channel can then be used
 // send and receive updates.
 type ChAPI interface {
+	// Methods for reading the channel information for internal use.
 	ID() string
+	Currency() string
+	Parts() []string
+	ChallengeDurSecs() uint64
+
+	// Methods for providing a user interface to interact with the channel.
 	SendChUpdate(context.Context, StateUpdater) (ChInfo, error)
 	SubChUpdates(ChUpdateNotifier) error
 	UnsubChUpdates() error
@@ -293,12 +296,12 @@ type (
 	// ChUpdateNotif represents the parameters sent in a channel update notifications.
 	ChUpdateNotif struct {
 		UpdateID       string
-		CurrentState   *pchannel.State
+		CurrChInfo     ChInfo
 		ProposedChInfo ChInfo
 		Expiry         int64
 	}
 
-	// App represents the parameters of an App used in a channel.
+	// App represents App Definition and the corresponding app data for a channel.
 	App struct {
 		Def  pchannel.App
 		Data pchannel.Data
@@ -306,10 +309,20 @@ type (
 
 	// ChInfo represents the info regarding a channel that will be sent to the user.
 	ChInfo struct {
-		ChID     string
-		Currency string
-		State    *pchannel.State
-		Parts    []string // List of Alias of channel participants.
+		ChID string
+		// Represents the amount held by each participant in the channel.
+		BalInfo BalInfo
+		// App used in the channel.
+		App App
+		// Indicates if the state of the channel is marked as "final". Once a state of channel is marked final,
+		// no further update can be made to the channel and the channel can be settled on the blockchain
+		// instantaneously without a challenge duration. It is used when all participants of a channel decide to
+		// close a channel collaboratively.
+		IsFinal bool
+		// Current Version Number for the channel. This will be zero when a channel is opened and will be incremented
+		// during each update. When registering the state on-chain, if different participants register states with
+		// different versions, channel will be settled according to the state with highest version number.
+		Version string
 	}
 
 	// BalInfo represents the Balance information of the channel participants.

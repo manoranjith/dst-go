@@ -14,6 +14,20 @@ type ChAPI struct {
 	mock.Mock
 }
 
+// ChallengeDurSecs provides a mock function with given fields:
+func (_m *ChAPI) ChallengeDurSecs() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // Close provides a mock function with given fields: _a0
 func (_m *ChAPI) Close(_a0 context.Context) (perun.ChInfo, error) {
 	ret := _m.Called(_a0)
@@ -33,6 +47,20 @@ func (_m *ChAPI) Close(_a0 context.Context) (perun.ChInfo, error) {
 	}
 
 	return r0, r1
+}
+
+// Currency provides a mock function with given fields:
+func (_m *ChAPI) Currency() string {
+	ret := _m.Called()
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	return r0
 }
 
 // GetInfo provides a mock function with given fields:
@@ -58,6 +86,22 @@ func (_m *ChAPI) ID() string {
 		r0 = rf()
 	} else {
 		r0 = ret.Get(0).(string)
+	}
+
+	return r0
+}
+
+// Parts provides a mock function with given fields:
+func (_m *ChAPI) Parts() []string {
+	ret := _m.Called()
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func() []string); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
 	}
 
 	return r0

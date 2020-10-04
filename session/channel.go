@@ -19,6 +19,7 @@ package session
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	pchannel "perun.network/go-perun/channel"
@@ -26,6 +27,7 @@ import (
 	psync "perun.network/go-perun/pkg/sync"
 
 	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/currency"
 	"github.com/hyperledger-labs/perun-node/log"
 )
 
@@ -89,8 +91,33 @@ func newCh(pch *pclient.Channel, currency string, parts []string, timeoutCfg tim
 	return ch
 }
 
+// ID() returns the ID of the channel.
+//
+// Does not require a mutex lock, as the data will remain unchanged throughout the lifecycle of the channel.
 func (ch *channel) ID() string {
 	return ch.id
+}
+
+// Currency returns the currency interpreter used in the channel.
+//
+// Does not require a mutex lock, as the data will remain unchanged throughout the lifecycle of the channel.
+func (ch *channel) Currency() string {
+	return ch.currency
+}
+
+// Parts returns the list of aliases of the channel participants.
+//
+// Does not require a mutex lock, as the data will remain unchanged throughout the lifecycle of the channel.
+func (ch *channel) Parts() []string {
+	return ch.parts
+}
+
+// ChallengeDurSecs returns the challenge duration for the channel (in seconds) for refuting when
+// an invalid/older state is registered on the blockchain closing the channel.
+//
+// Does not require a mutex lock, as the data will remain unchanged throughout the lifecycle of the channel.
+func (ch *channel) ChallengeDurSecs() uint64 {
+	return ch.challengeDurSecs
 }
 
 func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater) (perun.ChInfo, error) {
@@ -205,12 +232,39 @@ func (ch *channel) GetInfo() perun.ChInfo {
 
 // This function assumes that caller has already locked the channel.
 func (ch *channel) getInfo() perun.ChInfo {
+	return chInfo(ch.ID(), ch.parts, ch.currency, ch.currState)
+}
+
+func chInfo(chID string, parts []string, curr string, state *pchannel.State) perun.ChInfo {
 	return perun.ChInfo{
-		ChID:     ch.id,
-		Currency: ch.currency,
-		State:    ch.currState,
-		Parts:    ch.parts,
+		ChID:    chID,
+		BalInfo: BalInfoFromState(parts, curr, state),
+		IsFinal: state.IsFinal,
+		Version: fmt.Sprintf("%d", state.Version),
 	}
+}
+
+// BalInfoFromState retrieves balance information from the channel state.
+func BalInfoFromState(parts []string, curr string, state *pchannel.State) perun.BalInfo {
+	if state == nil {
+		return perun.BalInfo{}
+	}
+	return BalInfoFromRawBal(parts, curr, state.Balances[0])
+}
+
+// BalInfoFromRawBal retrieves balance information from the raw balance.
+func BalInfoFromRawBal(parts []string, curr string, rawBal []*big.Int) perun.BalInfo {
+	balInfo := perun.BalInfo{
+		Currency: curr,
+		Parts:    parts,
+		Bal:      make([]string, len(rawBal)),
+	}
+
+	parser := currency.NewParser(curr)
+	for i := range rawBal {
+		balInfo.Bal[i] = parser.Print(rawBal[i])
+	}
+	return balInfo
 }
 
 func (ch *channel) Close(pctx context.Context) (perun.ChInfo, error) {
