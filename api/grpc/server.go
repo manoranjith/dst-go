@@ -567,7 +567,7 @@ func (a *PayChServer) RespondPayChUpdate(ctx context.Context, req *pb.RespondPay
 	if err != nil {
 		return errResponse(err), nil
 	}
-	err = payment.RespondPayChUpdate(ctx, ch, req.UpdateID, req.Accept)
+	payChInfo, err := payment.RespondPayChUpdate(ctx, ch, req.UpdateID, req.Accept)
 	if err != nil {
 		return errResponse(err), nil
 	}
@@ -575,7 +575,7 @@ func (a *PayChServer) RespondPayChUpdate(ctx context.Context, req *pb.RespondPay
 	return &pb.RespondPayChUpdateResp{
 		Response: &pb.RespondPayChUpdateResp_MsgSuccess_{
 			MsgSuccess: &pb.RespondPayChUpdateResp_MsgSuccess{
-				Success: true,
+				UpdatedPayChInfo: ToGrpcPayChInfo(payChInfo),
 			},
 		},
 	}, nil

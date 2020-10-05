@@ -159,25 +159,26 @@ func Test_RespondPayChUpdate(t *testing.T) {
 	t.Run("happy_accept", func(t *testing.T) {
 		accept := true
 		chAPI := &mocks.ChAPI{}
-		chAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(nil)
+		chAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(updatedChInfo, nil)
 
-		gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
-		assert.NoError(t, gotErr)
+		payChInfo, gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
+		require.NoError(t, gotErr)
+		require.Equal(t, wantUpdatedPayChInfo, payChInfo)
 	})
 	t.Run("happy_reject", func(t *testing.T) {
 		accept := false
 		chAPI := &mocks.ChAPI{}
-		chAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(nil)
+		chAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(perun.ChInfo{}, nil)
 
-		gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
+		_, gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
 		assert.NoError(t, gotErr)
 	})
 	t.Run("error", func(t *testing.T) {
 		accept := true
 		chAPI := &mocks.ChAPI{}
-		chAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(assert.AnError)
+		chAPI.On("RespondChUpdate", context.Background(), updateID, accept).Return(perun.ChInfo{}, assert.AnError)
 
-		gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
+		_, gotErr := payment.RespondPayChUpdate(context.Background(), chAPI, updateID, accept)
 		assert.Error(t, gotErr)
 		t.Log(gotErr)
 	})

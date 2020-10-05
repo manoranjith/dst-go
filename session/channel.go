@@ -178,7 +178,7 @@ func (ch *channel) UnsubChUpdates() error {
 	return nil
 }
 
-func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept bool) error {
+func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept bool) (perun.ChInfo, error) {
 	ch.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
@@ -186,13 +186,13 @@ func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept
 	entry, ok := ch.chUpdateResponders[updateID]
 	if !ok {
 		ch.Error(perun.ErrUnknownUpdateID, updateID)
-		return perun.ErrUnknownUpdateID
+		return perun.ChInfo{}, perun.ErrUnknownUpdateID
 	}
 	delete(ch.chUpdateResponders, updateID)
 	currTime := time.Now().UTC().Unix()
 	if entry.expiry < currTime {
 		ch.Error("timeout:", entry.expiry, "received response at:", currTime)
-		return perun.ErrRespTimeoutExpired
+		return perun.ChInfo{}, perun.ErrRespTimeoutExpired
 	}
 
 	switch accept {
@@ -202,7 +202,7 @@ func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept
 		err := entry.responder.Accept(ctx)
 		if err != nil {
 			ch.Logger.Error("Accepting channel update", err)
-			return perun.GetAPIError(err)
+			return perun.ChInfo{}, perun.GetAPIError(err)
 		}
 		ch.currState = ch.pch.State().Clone()
 
@@ -212,7 +212,7 @@ func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept
 		err := entry.responder.Reject(ctx, "rejected by user")
 		if err != nil {
 			ch.Logger.Error("Rejecting channel update", err)
-			return perun.GetAPIError(err)
+			return perun.ChInfo{}, perun.GetAPIError(err)
 		}
 	}
 
@@ -220,7 +220,7 @@ func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept
 	// For now, it is upto the user to close a channel that has been set to finalized state.
 	// if ch.lockState == finalized {
 	// }
-	return nil
+	return ch.getInfo(), nil
 }
 
 func (ch *channel) GetInfo() perun.ChInfo {

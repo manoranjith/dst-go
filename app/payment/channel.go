@@ -122,8 +122,9 @@ func UnsubPayChUpdates(ch perun.ChAPI) error {
 }
 
 // RespondPayChUpdate sends a response for a channel update notification.
-func RespondPayChUpdate(pctx context.Context, ch perun.ChAPI, updateID string, accept bool) error {
-	return ch.RespondChUpdate(pctx, updateID, accept)
+func RespondPayChUpdate(pctx context.Context, ch perun.ChAPI, updateID string, accept bool) (PayChInfo, error) {
+	chInfo, err := ch.RespondChUpdate(pctx, updateID, accept)
+	return ToPayChInfo(chInfo), err
 }
 
 // ClosePayCh closes the payment channel.
