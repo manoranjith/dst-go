@@ -640,8 +640,7 @@ func (a *PayChServer) ClosePayCh(ctx context.Context, req *pb.ClosePayChReq) (*p
 	return &pb.ClosePayChResp{
 		Response: &pb.ClosePayChResp_MsgSuccess_{
 			MsgSuccess: &pb.ClosePayChResp_MsgSuccess{
-				ClosedBalInfo: ToGrpcBalInfo(payChInfo.BalInfo),
-				ClosedVersion: payChInfo.Version,
+				ClosedPayChInfo: ToGrpcPayChInfo(payChInfo),
 			},
 		},
 	}, nil

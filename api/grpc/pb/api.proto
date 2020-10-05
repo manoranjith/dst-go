@@ -357,7 +357,6 @@ message ClosePayChResp {
         MsgError error = 2;
     }
     message MsgSuccess {
-        BalInfo closedBalInfo = 1;
-        string closedVersion = 2;
+        PayChInfo closedPayChInfo = 1;
     }
 }
