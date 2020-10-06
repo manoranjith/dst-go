@@ -41,14 +41,13 @@ type PayChServer struct {
 	// The unsubscribe call should retrieve the channel from the map and close it, which
 	// will signal the subscription routine to end.
 	//
-	// chProposalsNotif & chCloseNotifs work on per session basis and hence this is a map
+	// chProposalsNotif works on per session basis and hence this is a map
 	// of session id to signaling channel.
-	// chUpdatesNotif work on a per channel basis and hence this is a map of session id to
+	// chUpdatesNotif works on a per channel basis and hence this is a map of session id to
 	// channel id to signaling channel.
 
 	chProposalsNotif map[string]chan bool
 	chUpdatesNotif   map[string]map[string]chan bool
-	chClosesNotif    map[string]chan bool
 }
 
 // NewPayChServer returns a new grpc server that can server the payment channel API.
@@ -57,7 +56,6 @@ func NewPayChServer(n perun.NodeAPI) *PayChServer {
 		n:                n,
 		chProposalsNotif: make(map[string]chan bool),
 		chUpdatesNotif:   make(map[string]map[string]chan bool),
-		chClosesNotif:    make(map[string]chan bool),
 	}
 }
 
@@ -362,81 +360,6 @@ func (a *PayChServer) RespondPayChProposal(ctx context.Context, req *pb.RespondP
 	}, nil
 }
 
-// SubPayChCloses wraps session.SubPayChCloses.
-func (a *PayChServer) SubPayChCloses(req *pb.SubPayChClosesReq, srv pb.Payment_API_SubPayChClosesServer) error {
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
-		// TODO: (mano) Return a error response and not a protocol error
-		return errors.WithMessage(err, "cannot register subscription")
-	}
-
-	notifier := func(notif payment.PayChCloseNotif) {
-		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
-		err := srv.Send(&pb.SubPayChClosesResp{Response: &pb.SubPayChClosesResp_Notify_{
-			Notify: &pb.SubPayChClosesResp_Notify{
-				ClosedPayChInfo: &pb.PayChInfo{
-					ChID:    notif.ClosedPayChInfo.ChID,
-					BalInfo: ToGrpcBalInfo(notif.ClosedPayChInfo.BalInfo),
-					Version: notif.ClosedPayChInfo.Version,
-				},
-				Error: notif.Error,
-			},
-		}})
-		_ = err
-		// if err != nil {
-		// TODO: (mano) Handle error while sending.
-		// }
-	}
-	err = payment.SubPayChCloses(sess, notifier)
-	if err != nil {
-		// TODO: (mano) Return a error response and not a protocol error
-		return errors.WithMessage(err, "cannot register subscription")
-	}
-
-	signal := make(chan bool)
-	a.Lock()
-	a.chClosesNotif[req.SessionID] = signal
-	a.Unlock()
-
-	<-signal
-	return nil
-}
-
-// UnsubPayChClose wraps session.UnsubPayChClose.
-func (a *PayChServer) UnsubPayChClose(ctx context.Context, req *pb.UnsubPayChClosesReq) (
-	*pb.UnsubPayChClosesResp, error) {
-	errResponse := func(err error) *pb.UnsubPayChClosesResp {
-		return &pb.UnsubPayChClosesResp{
-			Response: &pb.UnsubPayChClosesResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
-				},
-			},
-		}
-	}
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
-		return errResponse(err), nil
-	}
-	err = payment.UnsubPayChCloses(sess)
-	if err != nil {
-		return errResponse(err), nil
-	}
-
-	a.Lock()
-	signal := a.chClosesNotif[req.SessionID]
-	a.Unlock()
-	close(signal)
-
-	return &pb.UnsubPayChClosesResp{
-		Response: &pb.UnsubPayChClosesResp_MsgSuccess_{
-			MsgSuccess: &pb.UnsubPayChClosesResp_MsgSuccess{
-				Success: true,
-			},
-		},
-	}, nil
-}
-
 // CloseSession wraps session.CloseSession. For now, this is a stub.
 func (a *PayChServer) CloseSession(context.Context, *pb.CloseSessionReq) (*pb.CloseSessionResp, error) {
 	return nil, nil
@@ -493,10 +416,11 @@ func (a *PayChServer) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment
 		// nolint: govet	// err does not shadow prev declarations as this runs in a different context.
 		err := srv.Send(&pb.SubPayChUpdatesResp{Response: &pb.SubPayChUpdatesResp_Notify_{
 			Notify: &pb.SubPayChUpdatesResp_Notify{
-				ProposedBalInfo: ToGrpcBalInfo(notif.ProposedPayChInfo.BalInfo),
-				UpdateID:        notif.UpdateID,
-				Final:           notif.IsFinal,
-				Expiry:          notif.Expiry,
+				UpdateID:          notif.UpdateID,
+				ProposedPayChInfo: ToGrpcPayChInfo(notif.ProposedPayChInfo),
+				Type:              ToGrpcChUpdateType(notif.Type),
+				Expiry:            notif.Expiry,
+				Error:             notif.Error,
 			},
 		}})
 		_ = err
@@ -517,6 +441,10 @@ func (a *PayChServer) SubPayChUpdates(req *pb.SubpayChUpdatesReq, srv pb.Payment
 
 	<-signal
 	return nil
+}
+
+func ToGrpcChUpdateType(t perun.ChUpdateType) pb.SubPayChUpdatesResp_Notify_ChUpdateType {
+	return pb.SubPayChUpdatesResp_Notify_ChUpdateType(pb.SubPayChUpdatesResp_Notify_ChUpdateType_value[string(t)])
 }
 
 // UnsubPayChUpdates wraps ch.UnsubPayChUpdates.

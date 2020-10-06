@@ -291,7 +291,7 @@ func Test_Integ_Role(t *testing.T) {
 			t.Log("alice", closingChInfo)
 		}()
 
-		// Accept final channel by bob.
+		// Reject final channel by bob.
 		bobChUpdateNotif := make(chan perun.ChUpdateNotif)
 		bobChUpdateNotifier := func(notif perun.ChUpdateNotif) {
 			bobChUpdateNotif <- notif
@@ -303,30 +303,30 @@ func Test_Integ_Role(t *testing.T) {
 		_, err = bobCh.RespondChUpdate(ctx, notif.UpdateID, false)
 		require.NoError(t, err, "bob accepting channel update")
 
-		err = bobCh.UnsubChUpdates()
-		require.NoError(t, err, "bob unsubscribing channel updates")
+		// closing update for bob.
+		notif = <-bobChUpdateNotif
+		t.Log("bob", notif)
+		assert.Equal(t, perun.ChUpdateTypeClosed, notif.Type)
+
+		// error on responding to channel update closed.
+		_, err = bobCh.RespondChUpdate(ctx, notif.UpdateID, false)
+		require.Error(t, err, "bob responding to channel update closed")
+
+		assert.NoError(t, bobCh.UnsubChUpdates())
 
 		// Sub, receive, unsub channel close notifs.
-		bobChCloseNotif := make(chan perun.ChCloseNotif)
-		bobChCloseNotifier := func(notif perun.ChCloseNotif) {
-			bobChCloseNotif <- notif
+		aliceChUpdateNotif := make(chan perun.ChUpdateNotif)
+		aliceChUpdateNotifier := func(notif perun.ChUpdateNotif) {
+			aliceChUpdateNotif <- notif
 		}
-		err = bob.SubChCloses(bobChCloseNotifier)
-		require.NoError(t, err, "bob subscribing channel closes")
+		err = aliceCh.SubChUpdates(aliceChUpdateNotifier)
+		require.NoError(t, err, "alice subscribing channel updates")
 
-		chCloseNotif := <-bobChCloseNotif
-		t.Log("bob", chCloseNotif)
-
-		// Sub, receive, unsub channel close notifs.
-		aliceChCloseNotif := make(chan perun.ChCloseNotif)
-		aliceChCloseNotifier := func(notif perun.ChCloseNotif) {
-			aliceChCloseNotif <- notif
-		}
-		err = alice.SubChCloses(aliceChCloseNotifier)
-		require.NoError(t, err, "alice subscribing channel closes")
-
-		chCloseNotif = <-aliceChCloseNotif
-		t.Log("alice", chCloseNotif)
+		// closing update for bob.
+		notif = <-aliceChUpdateNotif
+		t.Log("alice", notif)
+		assert.Equal(t, perun.ChUpdateTypeClosed, notif.Type)
+		assert.NoError(t, aliceCh.UnsubChUpdates())
 
 		wg.Wait()
 	})

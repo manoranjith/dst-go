@@ -34,9 +34,8 @@ import (
 )
 
 const (
-	open      chLockState = "open"
-	finalized chLockState = "finalized"
-	closed    chLockState = "closed"
+	open   chStatus = "open"
+	closed chStatus = "closed"
 )
 
 type (
@@ -45,7 +44,7 @@ type (
 
 		id               string
 		pch              *pclient.Channel
-		lockState        chLockState
+		lockState        chStatus
 		currency         string
 		parts            []string
 		timeoutCfg       timeoutConfig
@@ -59,7 +58,7 @@ type (
 		psync.Mutex
 	}
 
-	chLockState string
+	chStatus string
 
 	chUpdateResponderEntry struct {
 		notif       perun.ChUpdateNotif
@@ -90,7 +89,11 @@ func newCh(pch *pclient.Channel, currency string, parts []string, timeoutCfg tim
 		parts:              parts,
 		chUpdateResponders: make(map[string]chUpdateResponderEntry),
 	}
-	ch.Logger = log.NewLoggerWithField("channel-id", ch.id)
+	go func(ch *channel) {
+		ch.Debug("Started channel watcher")
+		err := ch.pch.Watch()
+		ch.HandleClose(err)
+	}(ch)
 	return ch
 }
 
@@ -114,6 +117,51 @@ func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater
 	ch.currState = ch.pch.State().Clone()
 	ch.Debugf("State upated from %v to %v", prevChInfo, ch.getChInfo())
 	return ch.getChInfo(), nil
+}
+
+func (ch *channel) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
+	ch.Lock()
+	defer ch.Unlock()
+
+	expiry := time.Now().UTC().Add(ch.timeoutCfg.response).Unix()
+	notif := makeChUpdateNotif(ch.getChInfo(), chUpdate.State, expiry)
+	entry := chUpdateResponderEntry{
+		notif:       notif,
+		responder:   responder,
+		notifExpiry: expiry,
+	}
+
+	// Need not store entries for notification with expiry = 0, as these update requests have
+	// already been rejected by the perun node. Hence no response is expected for these notifications.
+	if expiry != 0 {
+		ch.chUpdateResponders[notif.UpdateID] = entry
+	}
+
+	if ch.chUpdateNotifier == nil {
+		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
+		ch.Debug("HandleUpdate: Notification cached")
+	} else {
+		go ch.chUpdateNotifier(notif)
+		ch.Debug("HandleUpdate: Notification sent")
+	}
+}
+
+func makeChUpdateNotif(currChInfo perun.ChInfo, proposedState *pchannel.State, expiry int64) perun.ChUpdateNotif {
+	var chUpdateType perun.ChUpdateType
+	switch proposedState.IsFinal {
+	case true:
+		chUpdateType = perun.ChUpdateTypeFinal
+	case false:
+		chUpdateType = perun.ChUpdateTypeOpen
+	}
+	return perun.ChUpdateNotif{
+		UpdateID:       fmt.Sprintf("%s_%d", currChInfo.ChID, proposedState.Version),
+		CurrChInfo:     currChInfo,
+		ProposedChInfo: makeChInfo(currChInfo.ChID, currChInfo.BalInfo.Parts, currChInfo.BalInfo.Currency, proposedState),
+		Type:           chUpdateType,
+		Expiry:         expiry,
+		Error:          "",
+	}
 }
 
 func (ch *channel) SubChUpdates(notifier perun.ChUpdateNotifier) error {
@@ -170,7 +218,7 @@ func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept
 	switch accept {
 	case true:
 		err = ch.acceptChUpdate(pctx, entry)
-		if err == nil && entry.notif.ProposedChInfo.IsFinal {
+		if err == nil && entry.notif.Type == perun.ChUpdateTypeFinal {
 			ch.Info("Responded to update successfully, settling the state as it was final update.")
 			err = ch.settleSecondary(pctx)
 		}
@@ -197,7 +245,7 @@ func (ch *channel) rejectChUpdate(pctx context.Context, entry chUpdateResponderE
 	defer cancel()
 	err := entry.responder.Reject(ctx, reason)
 	if err != nil {
-		ch.Logger.Error("Rejecting channel update", err)
+		ch.Error("Rejecting channel update", err)
 	}
 	return perun.GetAPIError(errors.Wrap(err, "rejecting update"))
 }
@@ -219,7 +267,6 @@ func makeChInfo(chID string, parts []string, curr string, state *pchannel.State)
 		ChID:    chID,
 		BalInfo: makeBalInfoFromState(parts, curr, state),
 		App:     makeApp(state.App, state.Data),
-		IsFinal: state.IsFinal,
 		Version: fmt.Sprintf("%d", state.Version),
 	}
 }
@@ -255,6 +302,41 @@ func makeBalInfoFromRawBal(parts []string, curr string, rawBal []*big.Int) perun
 	return balInfo
 }
 
+func (ch *channel) HandleClose(err error) {
+	ch.Debug("SDK Callback: Channel watcher returned.")
+	ch.Lock()
+	defer ch.Unlock()
+
+	if ch.lockState == open {
+		ch.lockState = closed
+	}
+
+	notif := makeChCloseNotif(ch.getChInfo(), err)
+
+	if ch.chUpdateNotifier == nil {
+		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
+		ch.Debug("HandleClose: Notification cached")
+	} else {
+		go ch.chUpdateNotifier(notif)
+		ch.Debug("HandleClose: Notification sent")
+	}
+}
+
+func makeChCloseNotif(currChInfo perun.ChInfo, err error) perun.ChUpdateNotif {
+	var errMsg string
+	if err != nil {
+		errMsg = err.Error()
+	}
+	return perun.ChUpdateNotif{
+		UpdateID:       fmt.Sprintf("%s_%s_%s", currChInfo.ChID, currChInfo.Version, "closed"),
+		CurrChInfo:     currChInfo,
+		ProposedChInfo: perun.ChInfo{},
+		Type:           perun.ChUpdateTypeClosed,
+		Expiry:         0,
+		Error:          errMsg,
+	}
+}
+
 func (ch *channel) Close(pctx context.Context) (perun.ChInfo, error) {
 	ch.Debug("Received request channel.Close")
 	ch.Lock()
@@ -287,7 +369,7 @@ func (ch *channel) finalize(pctx context.Context) error {
 	defer cancel()
 	err := ch.pch.UpdateBy(ctx, ch.pch.Idx(), chFinalizer)
 	if err != nil {
-		ch.Logger.Info("Error when trying to finalize state", err)
+		ch.Info("Error when trying to finalize state", err)
 	} else {
 		ch.currState = ch.pch.State().Clone()
 	}
