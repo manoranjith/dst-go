@@ -178,9 +178,18 @@ func Test_Integ_Role(t *testing.T) {
 	})
 	t.Run("Close_Sub_Unsub", func(t *testing.T) {
 		// Bob closes payment channel.
+		wg.Add(2)
+		go func() {
+			SubRespondUnsubPayChUpdate2(t, aliceSessionID, chID, false)
+			// SubUnsubClose(t, aliceSessionID, chID)
+			wg.Done()
+		}()
+		go func() {
+			SubUnsubClose(t, bobSessionID, chID)
+			wg.Done()
+		}()
 		ClosePayCh(t, bobSessionID, chID)
-		SubUnsubClose(t, aliceSessionID, chID)
-		SubUnsubClose(t, bobSessionID, chID)
+		wg.Wait()
 	})
 }
 
@@ -290,6 +299,7 @@ func SubRespondUnsubPayChUpdate(t *testing.T, sessionID, chID string, accept boo
 	notifMsg, err := subClient.Recv()
 	require.NoErrorf(t, err, "subClient.Recv")
 	notif, ok := notifMsg.Response.(*pb.SubPayChUpdatesResp_Notify_)
+	t.Log("Update notif", notif)
 	require.True(t, ok, "SendPayChUpdate returned error response")
 
 	// Respond to payment channel update notification.
@@ -301,6 +311,46 @@ func SubRespondUnsubPayChUpdate(t *testing.T, sessionID, chID string, accept boo
 	}
 	_, err = client.RespondPayChUpdate(ctx, &respondReq)
 	require.NoErrorf(t, err, "RespondPayChUpdate")
+
+	// Unsubscribe to payment channel update notifications.
+	unsubReq := pb.UnsubPayChUpdatesReq{
+		SessionID: sessionID,
+		ChID:      chID,
+	}
+	_, err = client.UnsubPayChUpdates(ctx, &unsubReq)
+	require.NoErrorf(t, err, "UnsubPayChUpdates")
+}
+
+func SubRespondUnsubPayChUpdate2(t *testing.T, sessionID, chID string, accept bool) {
+	// Subscribe to payment channel update notifications.
+	subReq := pb.SubpayChUpdatesReq{
+		SessionID: sessionID,
+		ChID:      chID,
+	}
+	subClient, err := client.SubPayChUpdates(ctx, &subReq)
+	require.NoErrorf(t, err, "SubPayChUpdates")
+
+	notifMsg, err := subClient.Recv()
+	require.NoErrorf(t, err, "subClient.Recv")
+	notif, ok := notifMsg.Response.(*pb.SubPayChUpdatesResp_Notify_)
+	t.Log("Update notif", notif)
+	require.True(t, ok, "SendPayChUpdate returned error response")
+
+	// Respond to payment channel update notification.
+	respondReq := pb.RespondPayChUpdateReq{
+		SessionID: sessionID,
+		UpdateID:  notif.Notify.UpdateID,
+		ChID:      chID,
+		Accept:    true,
+	}
+	_, err = client.RespondPayChUpdate(ctx, &respondReq)
+	require.NoErrorf(t, err, "RespondPayChUpdate")
+
+	notifMsg, err = subClient.Recv()
+	require.NoErrorf(t, err, "subClient.Recv")
+	notif, ok = notifMsg.Response.(*pb.SubPayChUpdatesResp_Notify_)
+	t.Log("Update notif", notif)
+	require.True(t, ok, "SendPayChUpdate returned error response")
 
 	// Unsubscribe to payment channel update notifications.
 	unsubReq := pb.UnsubPayChUpdatesReq{
@@ -334,7 +384,8 @@ func SubUnsubClose(t *testing.T, sessionID, chID string) {
 	notifMsg, err := subClient.Recv()
 	require.NoErrorf(t, err, "subClient.Recv")
 	notif, ok := notifMsg.Response.(*pb.SubPayChUpdatesResp_Notify_)
-	require.True(t, ok, "SendPayChUpdate returned error response")
+	require.True(t, ok, "SendPayChUpdate returned success response")
+	t.Log("Close notif", notif)
 	require.Equal(t, notif.Notify.Type, pb.SubPayChUpdatesResp_Notify_closed)
 
 	// Respond to payment channel update notification.
@@ -348,7 +399,7 @@ func SubUnsubClose(t *testing.T, sessionID, chID string) {
 	respErrMsg, ok := resp.Response.(*pb.RespondPayChUpdateResp_Error)
 	require.True(t, ok)
 	require.NotZero(t, respErrMsg.Error.Error, "RespondPayChUpdate for closed channel notif")
-	t.Log(respErrMsg.Error.Error)
+	t.Log("Error responding to channel close notif", respErrMsg.Error.Error)
 
 	// Unsubscribe to payment channel update notifications.
 	unsubReq := pb.UnsubPayChUpdatesReq{

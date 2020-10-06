@@ -55,6 +55,9 @@ type (
 		chUpdateNotifCache []perun.ChUpdateNotif
 		chUpdateResponders map[string]chUpdateResponderEntry
 
+		// closedChRemover is used to remove the channel from it's registry in the session, once it is closed.
+		closedChRemover closedChRemover
+
 		psync.Mutex
 	}
 
@@ -76,8 +79,8 @@ type (
 )
 
 // newCh sets up a channel object from the passed pchannel.
-func newCh(pch *pclient.Channel, currency string, parts []string, timeoutCfg timeoutConfig,
-	challengeDurSecs uint64) *channel {
+func newCh(pch *pclient.Channel, currency string, parts []string, timeoutCfg timeoutConfig, challengeDurSecs uint64,
+	closedChRemover closedChRemover) *channel {
 	ch := &channel{
 		id:                 fmt.Sprintf("%x", pch.ID()),
 		pch:                pch,
@@ -87,6 +90,7 @@ func newCh(pch *pclient.Channel, currency string, parts []string, timeoutCfg tim
 		challengeDurSecs:   challengeDurSecs,
 		currency:           currency,
 		parts:              parts,
+		closedChRemover:    closedChRemover,
 		chUpdateResponders: make(map[string]chUpdateResponderEntry),
 	}
 	go func(ch *channel) {
@@ -106,17 +110,24 @@ func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater
 	ch.Lock()
 	defer ch.Unlock()
 
-	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
-	defer cancel()
-	err := ch.pch.UpdateBy(ctx, ch.pch.Idx(), updater)
+	err := ch.sendChUpdate(pctx, updater)
 	if err != nil {
-		ch.Error("Sending channel update:", err)
 		return perun.ChInfo{}, perun.GetAPIError(err)
 	}
 	prevChInfo := ch.getChInfo()
 	ch.currState = ch.pch.State().Clone()
 	ch.Debugf("State upated from %v to %v", prevChInfo, ch.getChInfo())
 	return ch.getChInfo(), nil
+}
+
+func (ch *channel) sendChUpdate(pctx context.Context, updater perun.StateUpdater) error {
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
+	defer cancel()
+	err := ch.pch.UpdateBy(ctx, ch.pch.Idx(), updater)
+	if err != nil {
+		ch.Error("Sending channel update:", err)
+	}
+	return perun.GetAPIError(err)
 }
 
 func (ch *channel) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
@@ -320,6 +331,7 @@ func (ch *channel) HandleClose(err error) {
 		go ch.chUpdateNotifier(notif)
 		ch.Debug("HandleClose: Notification sent")
 	}
+	ch.close()
 }
 
 func makeChCloseNotif(currChInfo perun.ChInfo, err error) perun.ChUpdateNotif {
@@ -347,7 +359,8 @@ func (ch *channel) Close(pctx context.Context) (perun.ChInfo, error) {
 	}
 
 	ch.finalize(pctx)
-	return ch.getChInfo(), ch.settlePrimary(pctx)
+	err := ch.settlePrimary(pctx)
+	return ch.getChInfo(), err
 }
 
 // finalize tries to finalize the channel offchain by sending an update with isFinal = true
@@ -410,8 +423,10 @@ func (ch *channel) settleSecondary(pctx context.Context) error {
 
 // Close the computing resources (listeners, subscriptions etc.,) of the channel.
 // If it fails, this error can be ignored.
+// It also removes the channel from the session.
 func (ch *channel) close() {
 	if err := ch.pch.Close(); err != nil {
 		ch.Error("Closing channel", err)
 	}
+	ch.closedChRemover.removeClosedCh(ch.ID())
 }

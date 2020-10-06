@@ -69,6 +69,10 @@ type (
 		chProposalResponders  map[string]chProposalResponderEntry
 	}
 
+	closedChRemover interface {
+		removeClosedCh(chID string) bool
+	}
+
 	chProposalResponderEntry struct {
 		notif     perun.ChProposalNotif
 		responder chProposalResponder
@@ -239,8 +243,8 @@ func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app
 		return perun.ChInfo{}, perun.GetAPIError(err)
 	}
 
-	ch := newCh(pch, openingBalInfo.Currency, openingBalInfo.Parts, s.timeoutCfg, challengeDurSecs)
-	s.addCh(ch)
+	ch := newCh(pch, openingBalInfo.Currency, openingBalInfo.Parts, s.timeoutCfg, challengeDurSecs, s)
+	s.addOpenCh(ch)
 	return ch.GetChInfo(), nil
 }
 
@@ -344,10 +348,24 @@ func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Al
 	}, nil
 }
 
-func (s *session) addCh(ch *channel) {
+func (s *session) addOpenCh(ch *channel) {
 	// TODO: (mano) use logger with multiple fields and use session-id, channel-id.
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.id)
 	s.chs[ch.id] = ch
+}
+
+// This function assumes that channel is available in the s.chs, else it panics.
+func (s *session) removeClosedCh(chID string) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	_, ok := s.chs[chID]
+	if !ok || s.chs[chID].lockState == open {
+		return false
+	}
+	delete(s.chs, chID)
+	s.Infof("Removed closed channel from session: %s", chID)
+	return true
 }
 
 func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *pclient.ProposalResponder) {
@@ -472,8 +490,8 @@ func (s *session) acceptChProposal(pctx context.Context, entry chProposalRespond
 
 	// Set ETH as the currency interpreter for incoming channel.
 	// TODO: (mano) Provide an option for user to configure when more currency interpreters are supported.
-	ch := newCh(pch, currency.ETH, entry.notif.OpeningBalInfo.Parts, s.timeoutCfg, entry.notif.ChallengeDurSecs)
-	s.addCh(ch)
+	ch := newCh(pch, currency.ETH, entry.notif.OpeningBalInfo.Parts, s.timeoutCfg, entry.notif.ChallengeDurSecs, s)
+	s.addOpenCh(ch)
 	return ch.getChInfo(), nil
 }
 
