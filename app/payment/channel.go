@@ -128,4 +128,4 @@ func ToPayChInfo(chInfo perun.ChInfo) PayChInfo {
 		BalInfo: chInfo.BalInfo,
 		Version: chInfo.Version,
 	}
-}
+} // nolint:gofumpt // unknown error, maybe a false positive
