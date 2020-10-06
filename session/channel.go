@@ -62,6 +62,7 @@ type (
 	chLockState string
 
 	chUpdateResponderEntry struct {
+		notif       perun.ChUpdateNotif
 		responder   chUpdateResponder
 		notifExpiry int64
 	}
@@ -101,14 +102,6 @@ func (ch *channel) SendChUpdate(pctx context.Context, updater perun.StateUpdater
 	ch.Debug("Received request: channel.SendChUpdate")
 	ch.Lock()
 	defer ch.Unlock()
-
-	if ch.lockState == finalized {
-		ch.Error("Dropping update request as the channel is " + ch.lockState)
-		return perun.ChInfo{}, perun.ErrChFinalized
-	} else if ch.lockState == closed {
-		ch.Error("Dropping update request as the channel is " + ch.lockState)
-		return perun.ChInfo{}, perun.ErrChClosed
-	}
 
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
 	defer cancel()
@@ -173,36 +166,34 @@ func (ch *channel) RespondChUpdate(pctx context.Context, updateID string, accept
 		return perun.ChInfo{}, perun.ErrRespTimeoutExpired
 	}
 
-	var updatedChInfo perun.ChInfo
 	var err error
 	switch accept {
 	case true:
-		updatedChInfo, err = ch.acceptChUpdate(pctx, entry)
+		err = ch.acceptChUpdate(pctx, entry)
+		if err == nil && entry.notif.ProposedChInfo.IsFinal {
+			ch.Info("Responded to update successfully, settling the state as it was final update.")
+			err = ch.settleSecondary(pctx)
+		}
 	case false:
 		err = ch.rejectChUpdate(pctx, entry, "rejected by user")
 	}
-
-	// TODO: (mano) Provide an option for user to config the node to close finalized channels automatically.
-	// For now, it is upto the user to close a channel that has been set to finalized state.
-	// if ch.lockState == finalized {
-	// }
-	return updatedChInfo, err
+	return ch.getChInfo(), err
 }
 
-func (ch *channel) acceptChUpdate(pctx context.Context, entry chUpdateResponderEntry) (perun.ChInfo, error) {
-	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.respChUpdateAccept())
+func (ch *channel) acceptChUpdate(pctx context.Context, entry chUpdateResponderEntry) error {
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.respChUpdate())
 	defer cancel()
 	err := entry.responder.Accept(ctx)
 	if err != nil {
 		ch.Error("Accepting channel update", err)
-		return perun.ChInfo{}, perun.GetAPIError(errors.Wrap(err, "accepting update"))
+	} else {
+		ch.currState = ch.pch.State().Clone()
 	}
-	ch.currState = ch.pch.State().Clone()
-	return ch.getChInfo(), nil
+	return perun.GetAPIError(errors.Wrap(err, "accepting update"))
 }
 
 func (ch *channel) rejectChUpdate(pctx context.Context, entry chUpdateResponderEntry, reason string) error {
-	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.respChUpdateReject())
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.respChUpdate())
 	defer cancel()
 	err := entry.responder.Reject(ctx, reason)
 	if err != nil {
@@ -269,42 +260,76 @@ func (ch *channel) Close(pctx context.Context) (perun.ChInfo, error) {
 	ch.Lock()
 	defer ch.Unlock()
 
-	switch ch.lockState {
-	case open:
-		ch.lockState = closed
-		// Try to finalize state, so that channel can be settled directly without waiting for challenge duration
-		// to expire. If this fails, channel will still be settled but by registering the state on-chain
-		// and waiting for challenge duration to expire.
-		chFinalizer := func(state *pchannel.State) {
-			state.IsFinal = true
-		}
-		upCtx, upCancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
-		defer upCancel()
-		if err := ch.pch.UpdateBy(upCtx, ch.pch.Idx(), chFinalizer); err != nil {
-			ch.Logger.Info("Error when trying to finalize state for closing:", err)
-			ch.Logger.Info("Opting for non collaborative close")
-		} else {
-			ch.currState = ch.pch.State().Clone()
-		}
-		fallthrough
-
-	case finalized:
-		ch.lockState = closed
-		clCtx, clCancel := context.WithTimeout(pctx, ch.timeoutCfg.closeCh(ch.challengeDurSecs))
-		defer clCancel()
-		err := ch.pch.Settle(clCtx)
-
-		if cerr := ch.pch.Close(); err != nil {
-			ch.Logger.Error("Settling channel", err)
-			return perun.ChInfo{}, perun.GetAPIError(err)
-		} else if cerr != nil {
-			ch.Logger.Error("Closing channel", cerr)
-		}
-		return ch.getChInfo(), nil
-
-	case closed:
+	if ch.lockState == closed {
 		return ch.getChInfo(), perun.ErrChClosed
 	}
-	ch.Error("Program reached unknonwn state")
-	return ch.getChInfo(), perun.ErrInternalServer
+
+	ch.finalize(pctx)
+	return ch.getChInfo(), ch.settlePrimary(pctx)
+}
+
+// finalize tries to finalize the channel offchain by sending an update with isFinal = true
+// to all channel participants.
+//
+// If this suceeds, calling Settle consequently will close the channel collaboratively by directly settling
+// the channel on the blockchain without registering or waiting for challenge duration to expire.
+// If this fails, calling Settle consequently will close the channel non-collaboratively, by registering
+// the state on-chain and waiting for challenge duration to expire.
+func (ch *channel) finalize(pctx context.Context) error {
+	if ch.lockState == closed {
+		return perun.ErrChClosed
+	}
+
+	chFinalizer := func(state *pchannel.State) {
+		state.IsFinal = true
+	}
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.chUpdate())
+	defer cancel()
+	err := ch.pch.UpdateBy(ctx, ch.pch.Idx(), chFinalizer)
+	if err != nil {
+		ch.Logger.Info("Error when trying to finalize state", err)
+	} else {
+		ch.currState = ch.pch.State().Clone()
+	}
+	return err
+}
+
+// settlePrimary is used when the channel close initiated by the user.
+func (ch *channel) settlePrimary(pctx context.Context) error {
+	ch.lockState = closed
+
+	// TODO (mano): Document what happens when a Settle fails, should channel close be called again ?
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.settleChPrimary(ch.challengeDurSecs))
+	defer cancel()
+	err := ch.pch.Settle(ctx)
+	if err != nil {
+		ch.Error("Settling channel", err)
+		return perun.GetAPIError(err)
+	}
+	ch.close()
+	return nil
+}
+
+// settleSecondary is used when the channel close is initiated after accepting a final update.
+func (ch *channel) settleSecondary(pctx context.Context) error {
+	ch.lockState = closed
+
+	// TODO (mano): Document what happens when a Settle fails, should channel close be called again ?
+	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.settleChSecondary(ch.challengeDurSecs))
+	defer cancel()
+	err := ch.pch.SettleSecondary(ctx)
+	if err != nil {
+		ch.Error("Settling channel", err)
+		return perun.GetAPIError(err)
+	}
+	ch.close()
+	return nil
+}
+
+// Close the computing resources (listeners, subscriptions etc.,) of the channel.
+// If it fails, this error can be ignored.
+func (ch *channel) close() {
+	if err := ch.pch.Close(); err != nil {
+		ch.Error("Closing channel", err)
+	}
 }

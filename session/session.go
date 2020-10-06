@@ -541,12 +541,10 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 
 	ch.Lock()
 	defer ch.Unlock()
-	if chUpdate.State.IsFinal {
-		ch.Info("Received final update from peer, channel is finalized.")
-		ch.lockState = finalized
-	}
 
+	notif := chUpdateNotif(ch.getChInfo(), chUpdate.State, expiry)
 	entry := chUpdateResponderEntry{
+		notif:       notif,
 		responder:   responder,
 		notifExpiry: expiry,
 	}
@@ -555,7 +553,6 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	if expiry != 0 {
 		ch.chUpdateResponders[updateID] = entry
 	}
-	notif := chUpdateNotif(ch.getChInfo(), chUpdate.State, expiry)
 	if ch.chUpdateNotifier == nil {
 		ch.chUpdateNotifCache = append(ch.chUpdateNotifCache, notif)
 		ch.Debug("HandleUpdate: Notification cached")
