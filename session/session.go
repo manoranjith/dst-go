@@ -543,42 +543,54 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	go ch.HandleUpdate(chUpdate, responder)
 }
 
-func (s *session) Close(force bool) error {
+func (s *session) Close(force bool) ([]perun.ChInfo, error) {
 	s.Debug("Received request: session.Close")
 	s.Lock()
 	defer s.Unlock()
 
-	unclosedChIDs := []string{}
+	openChsInfo := []perun.ChInfo{}
 	unexpectedPhaseChIDs := []string{}
 
 	for _, ch := range s.chs {
-		// Acquire channel mutex to ensure any ongoing operation on the channel initiated by perun-node is finished.
+		// Acquire channel mutex to ensure any ongoing operation on the channel is finished.
 		ch.Lock()
 
 		// Calling Phase() also waits for the mutex on pchannel that ensures any handling of Registered event
-		// in the Watch routine is also completed.
-		// Hence, the Phase should return one of the two stable phases: Acting or Withdrawn.
+		// in the Watch routine is also completed. But if the event was received after acquiring channel mutex
+		// and completed before pc.Phase() returned, this event will not yet be serviced by perun-node.
+		// A solution to this is to add a provision (that is currenlt missing) to suspend the Watcher (only
+		// for open channels) before acquiring channel mutex and restoring it later if force option is false.
+		//
+		// TODO (mano): Add a provision in go-perun to suspend the watcher and it use it here.
+		//
+		// Since there will be no ongoing operations in perun-node, the pchannel is should be in one of the two
+		// stable phases knonwn to perun node (see state diagram in the docs for details) : Acting or Withdrawn.
 		phase := ch.pch.Phase()
 		if phase != pchannel.Acting && phase != pchannel.Withdrawn {
 			unexpectedPhaseChIDs = append(unexpectedPhaseChIDs, ch.ID())
-			s.Errorf("Ch %v in unexpected phase during session close", ch.ID)
 		}
-		if phase == pchannel.Acting {
-			unclosedChIDs = append(unclosedChIDs, ch.ID())
-			s.Infof("Channel %v in open phase during session close", unclosedChIDs)
-			// TODO (mano): Close channel watcher here, and restore all of them, when unlocking channels.
-			// Watch() for channels in Withdrawn state will have already been closed.
+		if ch.status == open {
+			openChsInfo = append(openChsInfo, ch.getChInfo())
 		}
+		s.Infof("Channels in open phase during session close: %v", openChsInfo)
 	}
-	if !force && len(unclosedChIDs) != 0 {
-		s.unclockAllChs()
-		return errors.New(fmt.Sprintf("Unclosed channels in session: %+v", unclosedChIDs))
+	if len(unexpectedPhaseChIDs) != 0 {
+		err := fmt.Errorf("Chs in unexpected phase during session close: %v", unexpectedPhaseChIDs)
+		s.Error(err.Error())
+		s.unlockAllChs()
+		return nil, perun.GetAPIError(errors.WithStack(err))
+	}
+	if !force && len(openChsInfo) != 0 {
+		err := fmt.Errorf("Open chs in during session close with force = false: %v", unexpectedPhaseChIDs)
+		s.Error(err.Error())
+		s.unlockAllChs()
+		return nil, perun.GetAPIError(errors.WithStack(err))
 	}
 
-	return s.close()
+	return openChsInfo, s.close()
 }
 
-func (s *session) unclockAllChs() {
+func (s *session) unlockAllChs() {
 	for _, ch := range s.chs {
 		ch.Unlock()
 	}

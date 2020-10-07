@@ -131,8 +131,9 @@ func Test_Integ_Role(t *testing.T) {
 	var alicePeer, bobPeer *pb.Peer
 	var chID string
 	prng := rand.New(rand.NewSource(1729))
-	aliceCfgFile := sessiontest.NewConfigFile(t, sessiontest.NewConfig(t, prng))
-	bobCfgFile := sessiontest.NewConfigFile(t, sessiontest.NewConfig(t, prng))
+	aliceCfg, bobCfg := sessiontest.NewConfig(t, prng), sessiontest.NewConfig(t, prng)
+	aliceCfgFile := sessiontest.NewConfigFile(t, aliceCfg)
+	bobCfgFile := sessiontest.NewConfigFile(t, bobCfg)
 	wg := &sync.WaitGroup{}
 
 	// Run OpenSession for Alice, Bob in top level test, because cleaup functions
@@ -175,6 +176,11 @@ func Test_Integ_Role(t *testing.T) {
 		UnsubPayChProposal(t, bobSessionID)
 
 		wg.Wait()
+	})
+
+	t.Run("CloseSession_NoForce_ErrOpenPayChs", func(t *testing.T) {
+		_ = CloseSession(t, aliceSessionID, false, true)
+		_ = CloseSession(t, bobSessionID, false, true)
 	})
 
 	t.Run("OpenCh_Sub_Unsub_Respond_Reject", func(t *testing.T) {
@@ -259,6 +265,11 @@ func Test_Integ_Role(t *testing.T) {
 
 		wg.Wait()
 	})
+
+	t.Run("CloseSession_NoForce_", func(t *testing.T) {
+		_ = CloseSession(t, aliceSessionID, false, false)
+		_ = CloseSession(t, bobSessionID, false, false)
+	})
 }
 
 func OpenSession(t *testing.T, cfgFile string) string {
@@ -270,6 +281,25 @@ func OpenSession(t *testing.T, cfgFile string) string {
 	msg, ok := resp.Response.(*pb.OpenSessionResp_MsgSuccess_)
 	require.True(t, ok, "OpenSession returned error response")
 	return msg.MsgSuccess.SessionID
+}
+
+func CloseSession(t *testing.T, sessionID string, force bool, wantErr bool) []*pb.PayChInfo {
+	req := pb.CloseSessionReq{
+		SessionID: sessionID,
+		Force:     force,
+	}
+	resp, err := client.CloseSession(ctx, &req)
+	require.NoErrorf(t, err, "CloseSession")
+	if wantErr {
+		errMsg, ok := resp.Response.(*pb.CloseSessionResp_Error)
+		require.True(t, ok, "CloseSession returned success response")
+		t.Log(errMsg)
+		return nil
+	}
+
+	msg, ok := resp.Response.(*pb.CloseSessionResp_MsgSuccess_)
+	require.True(t, ok, "CloseSession returned error response")
+	return msg.MsgSuccess.OpenPayChsInfo
 }
 
 func GetContact(t *testing.T, sessionID string, alias string) *pb.Peer {
