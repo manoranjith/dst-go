@@ -544,5 +544,48 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 }
 
 func (s *session) Close(force bool) error {
-	return nil
+	s.Debug("Received request: session.Close")
+	s.Lock()
+	defer s.Unlock()
+
+	unclosedChIDs := []string{}
+	unexpectedPhaseChIDs := []string{}
+
+	for _, ch := range s.chs {
+		// Acquire channel mutex to ensure any ongoing operation on the channel initiated by perun-node is finished.
+		ch.Lock()
+
+		// Calling Phase() also waits for the mutex on pchannel that ensures any handling of Registered event
+		// in the Watch routine is also completed.
+		// Hence, the Phase should return one of the two stable phases: Acting or Withdrawn.
+		phase := ch.pch.Phase()
+		if phase != pchannel.Acting && phase != pchannel.Withdrawn {
+			unexpectedPhaseChIDs = append(unexpectedPhaseChIDs, ch.ID())
+			s.Errorf("Ch %v in unexpected phase during session close", ch.ID)
+		}
+		if phase == pchannel.Acting {
+			unclosedChIDs = append(unclosedChIDs, ch.ID())
+			s.Infof("Channel %v in open phase during session close", unclosedChIDs)
+			// TODO (mano): Close channel watcher here, and restore all of them, when unlocking channels.
+			// Watch() for channels in Withdrawn state will have already been closed.
+		}
+	}
+	if !force && len(unclosedChIDs) != 0 {
+		s.unclockAllChs()
+		return errors.New(fmt.Sprintf("Unclosed channels in session: %+v", unclosedChIDs))
+	}
+
+	return s.close()
+}
+
+func (s *session) unclockAllChs() {
+	for _, ch := range s.chs {
+		ch.Unlock()
+	}
+}
+
+func (s *session) close() error {
+	s.user.OnChain.Wallet.LockAll()
+	s.user.OffChain.Wallet.LockAll()
+	return errors.WithMessage(s.chClient.Close(), "closing session")
 }
