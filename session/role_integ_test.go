@@ -54,8 +54,8 @@ func Test_Integ_Role(t *testing.T) {
 	aliceAlias, bobAlias := "alice", "bob"
 
 	// Start with empty contacts.
-	aliceCfg := sessiontest.NewConfig(t, prng)
-	bobCfg := sessiontest.NewConfig(t, prng)
+	aliceCfg := sessiontest.NewConfigT(t, prng)
+	bobCfg := sessiontest.NewConfigT(t, prng)
 
 	alice, err := session.New(aliceCfg)
 	require.NoErrorf(t, err, "initializing alice session")

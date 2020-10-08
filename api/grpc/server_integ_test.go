@@ -132,9 +132,9 @@ func Test_Integ_Role(t *testing.T) {
 	var alicePeer, bobPeer *pb.Peer
 	var chID string
 	prng := rand.New(rand.NewSource(1729))
-	aliceCfg, bobCfg := sessiontest.NewConfig(t, prng), sessiontest.NewConfig(t, prng)
-	aliceCfgFile := sessiontest.NewConfigFile(t, aliceCfg)
-	bobCfgFile := sessiontest.NewConfigFile(t, bobCfg)
+	aliceCfg, bobCfg := sessiontest.NewConfigT(t, prng), sessiontest.NewConfigT(t, prng)
+	aliceCfgFile := sessiontest.NewConfigFileT(t, aliceCfg)
+	bobCfgFile := sessiontest.NewConfigFileT(t, bobCfg)
 	wg := &sync.WaitGroup{}
 
 	// Run OpenSession for Alice, Bob in top level test, because cleaup functions

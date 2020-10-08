@@ -22,6 +22,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gorilla/websocket"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	pethwallet "perun.network/go-perun/backend/ethereum/wallet"
 	pwallet "perun.network/go-perun/wallet"
@@ -52,11 +53,23 @@ const (
 
 var adjudicatorAddr, assetAddr pwallet.Address
 
+// SetupContractsT is the test friendly version of SetupContracts.
+// It uses the passed testing.T to handle the errors and registers the cleanup functions on it.
+func SetupContractsT(t *testing.T, onChainCred perun.Credential, chainURL string, onChainTxTimeout time.Duration) (
+	adjudicator, asset pwallet.Address) {
+	var err error
+	adjudicator, asset, err = SetupContracts(onChainCred, chainURL, onChainTxTimeout)
+	require.NoError(t, err)
+	return adjudicator, asset
+}
+
 // SetupContracts checks if valid contracts are deployed in pre-computed addresses, if not it deployes them.
 // Address generation mechanism in ethereum is used to pre-compute the contract address.
-func SetupContracts(t *testing.T, onChainCred perun.Credential, chainURL string, onChainTxTimeout time.Duration) (
-	adjudicator, asset pwallet.Address) {
-	require.Truef(t, isBlockchainRunning(chainURL), "cannot connect to ganache-cli node at "+chainURL)
+func SetupContracts(onChainCred perun.Credential, chainURL string, onChainTxTimeout time.Duration) (
+	adjudicator, asset pwallet.Address, _ error) {
+	if !isBlockchainRunning(chainURL) {
+		return nil, nil, errors.New("cannot connect to ganache-cli node at " + chainURL)
+	}
 
 	if adjudicatorAddr == nil && assetAddr == nil {
 		adjudicator = pethwallet.AsWalletAddr(crypto.CreateAddress(pethwallet.AsEthAddr(onChainCred.Addr), 0))
@@ -69,14 +82,22 @@ func SetupContracts(t *testing.T, onChainCred perun.Credential, chainURL string,
 	}
 
 	chain, err := ethereum.NewChainBackend(chainURL, chainConnTimeout, onChainTxTimeout, onChainCred)
-	require.NoError(t, err)
-
-	if err = chain.ValidateContracts(adjudicator, asset); err != nil {
-		t.Log("\nFirst run of test for this ganache-cli instance. Deploying contracts.\n")
-		return deployContracts(t, chain)
+	if err != nil {
+		return nil, nil, errors.WithMessage(err, "initializaing chain backend")
 	}
-	t.Log("\nRepeated run of test for this ganache-cli instance. Using deployed contracts.\n")
-	return adjudicator, asset
+
+	err = chain.ValidateContracts(adjudicator, asset)
+	if err == nil {
+		// Contracts already deployed for  this ganache-cli instance. Using deployed contracts.
+		return adjudicator, asset, nil
+	}
+
+	// Contracts not yet deployed for  this ganache-cli instance. Using deployed contracts.
+	adjudicator, asset, err = deployContracts(chain)
+	if err != nil {
+		return nil, nil, errors.WithMessage(err, "initializaing chain backend")
+	}
+	return adjudicator, asset, nil
 }
 
 func isBlockchainRunning(url string) bool {
@@ -84,10 +105,12 @@ func isBlockchainRunning(url string) bool {
 	return err == nil
 }
 
-func deployContracts(t *testing.T, chain perun.ChainBackend) (adjudicator, asset pwallet.Address) {
-	adjudicator, err := chain.DeployAdjudicator()
-	require.NoError(t, err)
+func deployContracts(chain perun.ChainBackend) (adjudicator, asset pwallet.Address, _ error) {
+	var err error
+	adjudicator, err = chain.DeployAdjudicator()
+	if err != nil {
+		return nil, nil, err
+	}
 	asset, err = chain.DeployAsset(adjudicator)
-	require.NoError(t, err)
-	return adjudicator, asset
+	return adjudicator, asset, err
 }
