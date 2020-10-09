@@ -50,7 +50,7 @@ func NewConfigFileT(t *testing.T, config session.Config) string {
 
 // NewConfigFile creates a temporary file containing the given session configuration and
 // returns the path to it. It also registers a cleanup function on the passed test handler.
-func NewConfigFile(config session.Config) (string, error) {
+func NewConfigFile(config interface{}) (string, error) {
 	tempFile, err := ioutil.TempFile("", "*.yaml")
 	if err != nil {
 		return "", errors.Wrap(err, "creating temp file for config")
