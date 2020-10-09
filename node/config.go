@@ -24,9 +24,10 @@ import (
 	"github.com/hyperledger-labs/perun-node"
 )
 
-// ParseConfig parses the node configuration from a file.
-func ParseConfig(configFile string) (perun.NodeConfig, error) {
-	v := viper.New()
+// ParseConfig parses the node configuration from a file using the given viper instance.
+// Any overrides set in the viper instance (such as binding flags from a command) will be
+// applied as per the precedence order defined in viper.
+func ParseConfig(v *viper.Viper, configFile string) (perun.NodeConfig, error) {
 	v.SetConfigFile(filepath.Clean(configFile))
 
 	var cfg perun.NodeConfig

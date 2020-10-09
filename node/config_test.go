@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 
@@ -48,17 +49,17 @@ var (
 
 func Test_ParseConfig(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
-		gotCfg, err := perunnode.ParseConfig(filepath.Join(testdataDir, validConfigFile))
+		gotCfg, err := perunnode.ParseConfig(viper.New(), filepath.Join(testdataDir, validConfigFile))
 		require.NoError(t, err)
 		assert.DeepEqual(t, testCfg, gotCfg)
 	})
 	t.Run("err_invalid_file", func(t *testing.T) {
-		_, err := perunnode.ParseConfig(filepath.Join(testdataDir, invalidConfigFile))
+		_, err := perunnode.ParseConfig(viper.New(), filepath.Join(testdataDir, invalidConfigFile))
 		require.Error(t, err)
 		t.Log(err)
 	})
 	t.Run("err_missingFile", func(t *testing.T) {
-		_, err := perunnode.ParseConfig("missing_file")
+		_, err := perunnode.ParseConfig(viper.New(), "missing_file")
 		require.Error(t, err)
 		t.Log(err)
 	})

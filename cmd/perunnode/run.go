@@ -19,16 +19,74 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/hyperledger-labs/perun-node/api/grpc"
 	"github.com/hyperledger-labs/perun-node/node"
 )
 
+const (
+	// flag names for run command.
+	configfileF       = "configfile"
+	loglevelF         = "loglevel"
+	logfileF          = "logfile"
+	chainurlF         = "chainurl"
+	adjudicatorF      = "adjudicator"
+	assetF            = "asset"
+	chainconntimeoutF = "chainconntimeout"
+	onchaintxtimeoutF = "onchaintxtimeout"
+	responsetimeoutF  = "responsetimeout"
+	grpcPortF         = "grpcport"
+
+	// default values for flags in run command.
+	defaultConfigFile = "node.yaml"
+	defaultGrpcPort   = 50001
+)
+
+var (
+	// node level viper instance for parsing configuration from flags and configuration files.
+	nodeViper *viper.Viper
+
+	// flags in the run command is binded with the viper instance to override values from config file.
+	flagsToBind = []string{
+		logfileF,
+		loglevelF,
+		chainurlF,
+		adjudicatorF,
+		assetF,
+		chainconntimeoutF,
+		onchaintxtimeoutF,
+		responsetimeoutF,
+	}
+)
+
 func init() {
-	runCmd.Flags().String("configFile", "node.yaml", "node config file")
+	nodeViper = viper.New()
 	rootCmd.AddCommand(runCmd)
+
+	runCmd.Flags().String(configfileF, defaultConfigFile, "node config file")
+
+	runCmd.Flags().String(loglevelF, "", "Log level. Supported levels: debug, info, error")
+	runCmd.Flags().String(logfileF, "", "Log file path. Use empty string for stdout")
+	runCmd.Flags().String(chainurlF, "", "URL of the blockchain node")
+	runCmd.Flags().String(adjudicatorF, "", "Address as of the adjudicator contract as hex string with 0x prefix")
+	runCmd.Flags().String(assetF, "", "Address as of the asset contract as hex string with 0x prefix")
+	runCmd.Flags().Duration(chainconntimeoutF, time.Duration(0),
+		"Connection timeout for connecting to the blockchain node")
+	runCmd.Flags().Duration(onchaintxtimeoutF, time.Duration(0),
+		"Max duration to wait for an on-chain transaction to be mined.")
+	runCmd.Flags().Duration(responsetimeoutF, time.Duration(0),
+		"Max duration to wait for a response in off-chain communication.")
+
+	runCmd.Flags().Uint64(grpcPortF, defaultGrpcPort, "port at which grpc payment channel API server should listen")
+
+	// Bind the configuration flags to viper instance used for to override the values defined in config file.
+	for i := range flagsToBind {
+		nodeViper.BindPFlag(flagsToBind[i], runCmd.Flags().Lookup(flagsToBind[i]))
+	}
 }
 
 var runCmd = &cobra.Command{
@@ -37,25 +95,20 @@ var runCmd = &cobra.Command{
 	Long: `
 Start the perun node. Currently, the node serves the payment API via grpc
 interface. Configuration can be specified in the config file or via flags.
-If both config file and flags are given, values in flags are used.`,
+If both config file and flags are given, values in flags are used.
+
+Specify configFile with some config flags or all of the config flags.`,
 	Run: run,
 }
 
 func run(cmd *cobra.Command, args []string) {
-	if !cmd.Flags().Changed("configFile") {
-		fmt.Printf("Error required flags(s) not set: %v", "configFile")
-		cmd.Usage() // nolint: errcheck, gosec	// This will not error.
-		return
-	}
-
-	nodeCfgFile, err := cmd.Flags().GetString("configFile")
+	nodeCfgFile, err := cmd.Flags().GetString(configfileF)
 	if err != nil {
-		fmt.Printf("App internal error: unknonw flag configFile\n")
-		return
+		panic("unknown flag configFile\n")
 	}
 	fmt.Printf("Using node config file - %s\n", nodeCfgFile)
 
-	nodeCfg, err := node.ParseConfig(nodeCfgFile)
+	nodeCfg, err := node.ParseConfig(nodeViper, nodeCfgFile)
 	if err != nil {
 		fmt.Printf("Error reading node config file: %v\n", err)
 		return
@@ -67,9 +120,14 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	grpcPort := ":50001"
-	fmt.Printf("Started ListenAndServePayChAPI\n")
-	if err := grpc.ListenAndServePayChAPI(nodeAPI, grpcPort); err != nil {
+	grpcPort, err := cmd.Flags().GetUint64(grpcPortF)
+	if err != nil {
+		panic("unknown flag port\n")
+	}
+	grpcAddr := fmt.Sprintf(":%d", grpcPort)
+	fmt.Printf("%s\n\n", prettify(nodeCfg))
+	fmt.Printf("Started perun payment channel API server with the above config at %s\n", grpcAddr)
+	if err := grpc.ListenAndServePayChAPI(nodeAPI, grpcAddr); err != nil {
 		log.Printf("server returned with error: %v", err)
 	}
 }
