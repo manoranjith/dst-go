@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package perunnode_test
+package node_test
 
 import (
 	"path/filepath"
@@ -25,11 +25,11 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/cmd/perunnode"
+	perunnode "github.com/hyperledger-labs/perun-node/node"
 )
 
 var (
-	testdataDir       = "../../testdata/perunnode"
+	testdataDir       = "../testdata/node"
 	validConfigFile   = "valid.yaml"
 	invalidConfigFile = "invalid.yaml"
 	// test config as expected from the testdata file at
