@@ -18,19 +18,20 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/api/grpc"
 	"github.com/hyperledger-labs/perun-node/node"
 )
 
 const (
 	// flag names for run command.
-	configfileF       = "configfile"
 	loglevelF         = "loglevel"
 	logfileF          = "logfile"
 	chainurlF         = "chainurl"
@@ -39,7 +40,8 @@ const (
 	chainconntimeoutF = "chainconntimeout"
 	onchaintxtimeoutF = "onchaintxtimeout"
 	responsetimeoutF  = "responsetimeout"
-	grpcPortF         = "grpcport"
+	configfileF       = "configfile" // can only be specified in flag, not via config file.
+	grpcPortF         = "grpcport"   // can only be specified in flag, not via config file.
 
 	// default values for flags in run command.
 	defaultConfigFile = "node.yaml"
@@ -47,11 +49,16 @@ const (
 )
 
 var (
-	// node level viper instance for parsing configuration from flags and configuration files.
-	nodeViper *viper.Viper
+	// Viper instance for parsing node configuration file. Each flag in the nodeCfgFlags list (that are defined
+	// on the run command) will also be attached to the viper instance, so that the values from flags (when
+	// specified), override the values defined in the configuration files.
+	nodeCfgViper *viper.Viper
 
-	// flags in the run command is binded with the viper instance to override values from config file.
-	flagsToBind = []string{
+	// Flags corresponding to node configuration parameters. Each of this flag can individually override the
+	// values default in config file. Also, the node configuration can be fully specified by using all of these
+	// flags, in which case no config file
+	// is needed and configFile flag can be unspecified.
+	nodeCfgFlags = []string{
 		logfileF,
 		loglevelF,
 		chainurlF,
@@ -61,14 +68,38 @@ var (
 		onchaintxtimeoutF,
 		responsetimeoutF,
 	}
+
+	// List of supported adapters by the node for the respective components.
+	// Currently this is fixed and hence hard coded here.
+	// It can be moved to config file or flags at the point when the user will
+	// be able to choose (when starting the node) which ones to load or support.
+	supportedCommTypes             = []string{"tcp"}
+	supportedContactTypes          = []string{"yaml"}
+	supportedCurrencyInterpretters = []string{"ETH"}
 )
 
 func init() {
-	nodeViper = viper.New()
 	rootCmd.AddCommand(runCmd)
+	defineFlags()
 
+	nodeCfgViper = viper.New()
+
+	// Bind the configuration flags to viper instance,
+	// values in flags (when specified), takes precedence over those in config file.
+	var err error
+	for i := range nodeCfgFlags {
+		if err = nodeCfgViper.BindPFlag(nodeCfgFlags[i], runCmd.Flags().Lookup(nodeCfgFlags[i])); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func defineFlags() {
 	runCmd.Flags().String(configfileF, defaultConfigFile, "node config file")
+	runCmd.Flags().Uint64(grpcPortF, defaultGrpcPort, "port for grpc payment channel API server to listen")
 
+	// All these flags should have zero values for defaults, as their only purpose is allow	the user to
+	// explicitly specify the configuration.
 	runCmd.Flags().String(loglevelF, "", "Log level. Supported levels: debug, info, error")
 	runCmd.Flags().String(logfileF, "", "Log file path. Use empty string for stdout")
 	runCmd.Flags().String(chainurlF, "", "URL of the blockchain node")
@@ -80,39 +111,28 @@ func init() {
 		"Max duration to wait for an on-chain transaction to be mined.")
 	runCmd.Flags().Duration(responsetimeoutF, time.Duration(0),
 		"Max duration to wait for a response in off-chain communication.")
-
-	runCmd.Flags().Uint64(grpcPortF, defaultGrpcPort, "port at which grpc payment channel API server should listen")
-
-	// Bind the configuration flags to viper instance used for to override the values defined in config file.
-	for i := range flagsToBind {
-		nodeViper.BindPFlag(flagsToBind[i], runCmd.Flags().Lookup(flagsToBind[i]))
-	}
 }
 
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Start the perunnode",
-	Long: `
-Start the perun node. Currently, the node serves the payment API via grpc
-interface. Configuration can be specified in the config file or via flags.
-If both config file and flags are given, values in flags are used.
+	Long: `Start the perun node. Currently, the node serves the payment API via grpc.
 
-Specify configFile with some config flags or all of the config flags.`,
+Configuration can be specified in the config file or via flags. Values in the flags
+override that in the config file.
+
+If no flags are specified, default path for config file is used. However,
+if all the config flags are specified, config file is ignored.`,
 	Run: run,
 }
 
 func run(cmd *cobra.Command, args []string) {
-	nodeCfgFile, err := cmd.Flags().GetString(configfileF)
+	nodeCfg := parseNodeConfig(cmd, nodeCfgViper)
+	grpcPort, err := cmd.Flags().GetUint64(grpcPortF)
 	if err != nil {
-		panic("unknown flag configFile\n")
+		panic("unknown flag port\n")
 	}
-	fmt.Printf("Using node config file - %s\n", nodeCfgFile)
-
-	nodeCfg, err := node.ParseConfig(nodeViper, nodeCfgFile)
-	if err != nil {
-		fmt.Printf("Error reading node config file: %v\n", err)
-		return
-	}
+	grpcAddr := fmt.Sprintf(":%d", grpcPort)
 
 	nodeAPI, err := node.New(nodeCfg)
 	if err != nil {
@@ -120,14 +140,40 @@ func run(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	grpcPort, err := cmd.Flags().GetUint64(grpcPortF)
-	if err != nil {
-		panic("unknown flag port\n")
-	}
-	grpcAddr := fmt.Sprintf(":%d", grpcPort)
-	fmt.Printf("%s\n\n", prettify(nodeCfg))
-	fmt.Printf("Started perun payment channel API server with the above config at %s\n", grpcAddr)
+	fmt.Printf("Running perun node with the below config:\n%s.\n\nServing payment channel API via grpc at port %s\n\n",
+		prettify(nodeCfg), grpcAddr)
 	if err := grpc.ListenAndServePayChAPI(nodeAPI, grpcAddr); err != nil {
-		log.Printf("server returned with error: %v", err)
+		fmt.Printf("Server returned with error: %v\n", err)
 	}
+}
+
+func parseNodeConfig(cmd *cobra.Command, v *viper.Viper) perun.NodeConfig {
+	// Ignore config file, if all config flags are specified.
+	if !areAllFlagsSpecified(cmd.Flags(), nodeCfgFlags...) {
+		nodeCfgFile, err := cmd.Flags().GetString(configfileF)
+		if err != nil {
+			panic("unknown flag configfile\n")
+		}
+
+		v.SetConfigFile(filepath.Clean(nodeCfgFile))
+		v.SetConfigType("yaml")
+		err = v.ReadInConfig()
+		if err != nil {
+			fmt.Printf("Error reading node config file: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Using node config file - %s\n", nodeCfgFile)
+	}
+
+	var nodeCfg perun.NodeConfig
+	err := v.Unmarshal(&nodeCfg)
+	if err != nil {
+		fmt.Printf("Error marshaling node config from viper instance: %v\n", err)
+		os.Exit(1)
+	}
+
+	nodeCfg.CommTypes = supportedCommTypes
+	nodeCfg.ContactTypes = supportedContactTypes
+	nodeCfg.CurrencyInterpreters = supportedCurrencyInterpretters
+	return nodeCfg
 }
