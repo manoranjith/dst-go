@@ -77,6 +77,19 @@ var (
 	supportedCommTypes             = []string{"tcp"}
 	supportedContactTypes          = []string{"yaml"}
 	supportedCurrencyInterpretters = []string{"ETH"}
+
+	runCmd = &cobra.Command{
+		Use:   "run",
+		Short: "Start the perunnode",
+		Long: `Start the perun node. Currently, the node serves the payment API via grpc.
+
+Configuration can be specified in the config file or via flags. Values in the flags
+override that in the config file.
+
+If no flags are specified, default path for config file is used. However,
+if all the config flags are specified, config file is ignored.`,
+		Run: run,
+	}
 )
 
 func init() {
@@ -114,19 +127,6 @@ func defineFlags() {
 		"Max duration to wait for a response in off-chain communication.")
 }
 
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Start the perunnode",
-	Long: `Start the perun node. Currently, the node serves the payment API via grpc.
-
-Configuration can be specified in the config file or via flags. Values in the flags
-override that in the config file.
-
-If no flags are specified, default path for config file is used. However,
-if all the config flags are specified, config file is ignored.`,
-	Run: run,
-}
-
 func run(cmd *cobra.Command, args []string) {
 	nodeCfg := parseNodeConfig(cmd.LocalNonPersistentFlags(), nodeCfgViper)
 	grpcPort, err := cmd.Flags().GetUint64(grpcPortF)
@@ -153,7 +153,7 @@ func parseNodeConfig(fs *pflag.FlagSet, v *viper.Viper) perun.NodeConfig {
 	if !areAllFlagsSpecified(fs, nodeCfgFlags...) {
 		nodeCfgFile, err := fs.GetString(configfileF)
 		if err != nil {
-			panic("unknown flag configfile\n")
+			panic("unknown flag " + configfileF + "\n")
 		}
 
 		// Read config from file.
