@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
 	"github.com/hyperledger-labs/perun-node"
@@ -127,7 +128,7 @@ if all the config flags are specified, config file is ignored.`,
 }
 
 func run(cmd *cobra.Command, args []string) {
-	nodeCfg := parseNodeConfig(cmd, nodeCfgViper)
+	nodeCfg := parseNodeConfig(cmd.LocalNonPersistentFlags(), nodeCfgViper)
 	grpcPort, err := cmd.Flags().GetUint64(grpcPortF)
 	if err != nil {
 		panic("unknown flag port\n")
@@ -147,14 +148,15 @@ func run(cmd *cobra.Command, args []string) {
 	}
 }
 
-func parseNodeConfig(cmd *cobra.Command, v *viper.Viper) perun.NodeConfig {
+func parseNodeConfig(fs *pflag.FlagSet, v *viper.Viper) perun.NodeConfig {
 	// Ignore config file, if all config flags are specified.
-	if !areAllFlagsSpecified(cmd.Flags(), nodeCfgFlags...) {
-		nodeCfgFile, err := cmd.Flags().GetString(configfileF)
+	if !areAllFlagsSpecified(fs, nodeCfgFlags...) {
+		nodeCfgFile, err := fs.GetString(configfileF)
 		if err != nil {
 			panic("unknown flag configfile\n")
 		}
 
+		// Read config from file.
 		v.SetConfigFile(filepath.Clean(nodeCfgFile))
 		v.SetConfigType("yaml")
 		err = v.ReadInConfig()
@@ -165,6 +167,7 @@ func parseNodeConfig(cmd *cobra.Command, v *viper.Viper) perun.NodeConfig {
 		fmt.Printf("Using node config file - %s\n", nodeCfgFile)
 	}
 
+	// Copy the configuration from viper to struct.
 	var nodeCfg perun.NodeConfig
 	err := v.Unmarshal(&nodeCfg)
 	if err != nil {
