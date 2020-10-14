@@ -18,7 +18,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/abiosoft/ishell"
 
@@ -26,50 +25,42 @@ import (
 )
 
 var (
-	sessCmd = &ishell.Cmd{
-		Name: "sess",
-		Help: "Session Command. Usage: sess [command]",
-		Func: sess,
+	sessionCmd = &ishell.Cmd{
+		Name: "session",
+		Help: "Use this command to open and close sessions. Usage: session [sub-command]",
+		Func: sessionFn,
 	}
 
-	sessOpenCmd = &ishell.Cmd{
+	sessionOpenCmd = &ishell.Cmd{
 		Name: "open",
-		Help: "Open a new session. Usage: sess open [session config file].",
-		Func: sessOpen,
+		Help: "Open a new session. Usage: session open [session config file]",
+		Func: sessionOpenFn,
 	}
-	sessCloseCmd = &ishell.Cmd{
+	sessionCloseCmd = &ishell.Cmd{
 		Name: "close",
-		Help: "Close the current session",
-		Func: sessClose,
+		Help: "Close the current session. Usage: session close",
+		Func: sessionCloseFn,
 	}
-	sessCounter = 0 // counter to track the number of sessions opened to assign alias numbers.
-
-	sessMap    map[string]string // Map of session alias to session id.
-	revSessMap map[string]string // Map of session id to session alias.
 )
 
 func init() {
-	sessCmd.AddCmd(sessOpenCmd)
-	sessCmd.AddCmd(sessCloseCmd)
-
-	sessMap = make(map[string]string)
-	revSessMap = make(map[string]string)
+	sessionCmd.AddCmd(sessionOpenCmd)
+	sessionCmd.AddCmd(sessionCloseCmd)
 }
 
-// creates an alias for the session id, adds it to the local map and returns the alias.
-func addSessID(id string) (alias string) {
-	sessCounter = sessCounter + 1
-	alias = fmt.Sprintf("s%d", sessCounter)
-	sessMap[alias] = id
-	revSessMap[id] = alias
-	return alias
-}
-
-func sess(c *ishell.Context) {
+func sessionFn(c *ishell.Context) {
+	if client == nil {
+		c.Printf("%s\n\n", redf("Not connected to perun node, connect using 'node connect' command"))
+		return
+	}
 	c.Println(c.Cmd.HelpText())
 }
 
-func sessOpen(c *ishell.Context) {
+func sessionOpenFn(c *ishell.Context) {
+	if client == nil {
+		c.Printf("%s\n\n", redf("Not connected to perun node, connect using 'node connect' command"))
+		return
+	}
 	noArgsReq := 1
 	if len(c.Args) != noArgsReq {
 		c.Printf("%s\n\n", redf("Got %d arg(s). Want %d.", len(c.Args), noArgsReq))
@@ -91,26 +82,29 @@ func sessOpen(c *ishell.Context) {
 		return
 	}
 	msg, ok := resp.Response.(*pb.OpenSessionResp_MsgSuccess_)
-	sessAlias := addSessID(msg.MsgSuccess.SessionID)
-	c.Printf("%s\n\n", greenf("Session opened. ID: %s. Alias: %s", msg.MsgSuccess.SessionID, sessAlias))
+	sessionID = msg.MsgSuccess.SessionID
+	c.Printf("%s\n\n", greenf("Session opened. ID: %s. %s", sessionID))
+
+	// Automatically subscribe to channel opening request notifications in this session.
+	channelSub(c)
 }
 
-func sessClose(c *ishell.Context) {
-	noArgsReq := 1
+func sessionCloseFn(c *ishell.Context) {
+	if client == nil {
+		c.Printf("%s\n\n", redf("Not connected to perun node, connect using 'node connect' command"))
+		return
+	}
+	noArgsReq := 0
 	if len(c.Args) != noArgsReq {
 		c.Printf("%s\n\n", redf("Got %d arg(s). Want %d.", len(c.Args), noArgsReq))
 		c.Printf("Command help:\t%s\n\n", c.Cmd.Help)
 		return
 	}
-	sessID, ok := sessMap[c.Args[0]]
-	if !ok {
-		c.Printf("%s\n\n", redf("Unknown session alias %s", c.Args[0]))
-		c.Printf("%s\n\n", redf("Known session aliases:\n%v", prettify(sessMap)))
-		return
-	}
+
+	channelUnsub(c) // Close the channel opening request subscriptions before closing the session.
 
 	req := pb.CloseSessionReq{
-		SessionID: sessID,
+		SessionID: sessionID,
 		Force:     false,
 	}
 	resp, err := client.CloseSession(context.Background(), &req)
@@ -120,9 +114,11 @@ func sessClose(c *ishell.Context) {
 	}
 	msgErr, ok := resp.Response.(*pb.CloseSessionResp_Error)
 	if ok {
+		channelSub(c) // If there is an error in session close, re-subscribe to channel opening request notifications.
+
 		c.Printf("%s\n\n", redf("Error closing session : %v", msgErr.Error.Error))
 		return
 	}
 	_, ok = resp.Response.(*pb.CloseSessionResp_MsgSuccess_)
-	c.Printf("%s\n\n", greenf("Session closed. ID: %s. Alias: %s", sessID, c.Args[0]))
+	c.Printf("%s\n\n", greenf("Session closed. ID: %s."))
 }

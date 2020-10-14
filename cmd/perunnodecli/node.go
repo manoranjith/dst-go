@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/abiosoft/ishell"
+	grpclib "google.golang.org/grpc"
 
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 )
@@ -32,11 +33,18 @@ var (
 		Func: node,
 	}
 
+	nodeConnectCmd = &ishell.Cmd{
+		Name: "connect",
+		Help: "Connect to a running perun node instance. Usage: node connect [url]",
+		Func: nodeConnect,
+	}
+
 	nodeTimeCmd = &ishell.Cmd{
 		Name: "time",
 		Help: "Print node time. Usage: node time",
 		Func: nodeTime,
 	}
+
 	nodeConfigCmd = &ishell.Cmd{
 		Name: "config",
 		Help: "Print node config. Usage: node config",
@@ -45,6 +53,7 @@ var (
 )
 
 func init() {
+	nodeCmd.AddCmd(nodeConnectCmd)
 	nodeCmd.AddCmd(nodeTimeCmd)
 	nodeCmd.AddCmd(nodeConfigCmd)
 }
@@ -53,7 +62,33 @@ func node(c *ishell.Context) {
 	c.Println(c.Cmd.HelpText())
 }
 
+func nodeConnect(c *ishell.Context) {
+	noArgsReq := 1
+	if len(c.Args) != noArgsReq {
+		c.Printf("%s\n\n", redf("Got %d arg(s). Want %d.", len(c.Args), noArgsReq))
+		c.Printf("Command help:\t%s\n\n", c.Cmd.Help)
+		return
+	}
+
+	nodeAddr := c.Args[0]
+	conn, err := grpclib.Dial(nodeAddr, grpclib.WithInsecure())
+	if err != nil {
+		sh.Printf("Error connecting to perun node at %s: %v", nodeAddr, err)
+	}
+	client = pb.NewPayment_APIClient(conn)
+	t, err := getNodeTime()
+	if err != nil {
+		c.Printf("%s\n\n", redf("Error connecting to perun node: %v", err))
+		return
+	}
+	sh.Printf("Connected to perun node at %s. Node time is %v\n\n", nodeAddr, time.Unix(t, 0))
+}
+
 func nodeTime(c *ishell.Context) {
+	if client == nil {
+		c.Printf("%s\n\n", redf("Not connected to perun node, connect using 'node connect' command"))
+		return
+	}
 	noArgsReq := 0
 	if len(c.Args) != noArgsReq {
 		c.Printf("%s\n\n", redf("Got %d arg(s). Want %d.", len(c.Args), noArgsReq))
@@ -61,16 +96,28 @@ func nodeTime(c *ishell.Context) {
 		return
 	}
 
-	timeReq := pb.TimeReq{}
-	timeResp, err := client.Time(context.Background(), &timeReq)
+	t, err := getNodeTime()
 	if err != nil {
 		c.Printf("%s\n\n", redf("Error sending command to perun node: %v", err))
 		return
 	}
-	c.Printf("%s\n\n", greenf("Perun node time: %s", time.Unix(timeResp.Time, 0)))
+	c.Printf("%s\n\n", greenf("Perun node time: %s", time.Unix(t, 0)))
+}
+
+func getNodeTime() (int64, error) {
+	timeReq := pb.TimeReq{}
+	timeResp, err := client.Time(context.Background(), &timeReq)
+	if err != nil {
+		return 0, err
+	}
+	return timeResp.Time, err
 }
 
 func nodeConfig(c *ishell.Context) {
+	if client == nil {
+		c.Printf("%s\n\n", redf("Not connected to perun node, connect using 'node connect' command"))
+		return
+	}
 	noArgsReq := 0
 	if len(c.Args) != noArgsReq {
 		c.Printf("%s\n\n", redf("Got %d arg(s). Want %d.", len(c.Args), noArgsReq))

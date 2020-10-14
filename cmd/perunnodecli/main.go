@@ -22,63 +22,65 @@ import (
 	"github.com/abiosoft/ishell"
 	"github.com/fatih/color"
 
-	grpclib "google.golang.org/grpc"
-
 	"github.com/hyperledger-labs/perun-node/api/grpc/pb"
 )
 
-// ishell is a wrapper around the shell type that includes a mutex.
-// the mutex will be locked by subscription go-routines when printing
-// the received notification.
-
+// shell is a wrapper around the ishell.Shell type to includes a mutex. The
+// mutex will be locked by subscription go-routines when printing the received
+// notification.
 type shell struct {
 	*ishell.Shell
 	sync.Mutex
 }
 
-// singleton instance of ishell that can be accessed throught this program.
-var sh *shell
-
 var (
-	grpcPort = ":50001"
+	// File that stores history of commands used in the interactive shell.
+	// This will be preserved accross the multiple runs of perunnode cli.
+	// It will be located in the home directory.
+	historyFile = ".perunnode_history"
 
-	// singleton instance of client and context that will be used for all tests.
+	// Singleton instance of ishell that is used throughout this program.
+	// this will be initialized in main() and be accessed by subscription
+	// handler go-routines that run concurrently to print the received
+	// notification messages.
+	sh *shell
+
+	// Singleton instance of grpc payment channel client that will be
+	// used by all functions in this program. This is safe for concurrent
+	// access without a mutex.
 	client pb.Payment_APIClient
 
+	// Session ID for the currently active session. The cli application
+	// allows only one session to be open at a time and all channel requests,
+	// payments and payment requests are sent and received in this context of
+	// this session.
+	// It is set when a session is opened and closed when a session is closed.
+	sessionID string
+
+	// standard value of challenge duration for all outgoing channel open requests.
+	challengeDurSecs uint64 = 10
+
 	// SPrintf style functions that produce colored text.
-	redf, greenf func(format string, a ...interface{}) string
-)
-
-func init() {
-	redf = color.New(color.FgRed).SprintfFunc()
+	redf   = color.New(color.FgRed).SprintfFunc()
 	greenf = color.New(color.FgGreen).SprintfFunc()
-}
-
-func defaultHandler(c *ishell.Context) {
-	c.Printf("Got command %v with args %v\n", c.Cmd.Name, c.Args)
-}
+)
 
 func main() {
 	// New shell includes help, clear, exit commands by default.
 	sh = &shell{
 		Shell: ishell.New(),
 	}
-	// Read and write history to $HOME/.ishell_history
-	sh.SetHomeHistoryPath(".ishell_history")
+
+	// Read and write history to $HOME/historyFile
+	sh.SetHomeHistoryPath(historyFile)
 
 	sh.AddCmd(nodeCmd)
-	sh.AddCmd(sessCmd)
-	sh.AddCmd(propCmd)
-	sh.AddCmd(chCmd)
+	sh.AddCmd(sessionCmd)
+	sh.AddCmd(channelCmd)
+	sh.AddCmd(paymentCmd)
 
 	sh.Printf("Perun node cli application.\n\n")
-
-	conn, err := grpclib.Dial(grpcPort, grpclib.WithInsecure())
-	client = pb.NewPayment_APIClient(conn)
-	if err != nil {
-		sh.Printf("Error connecting to perun node at %s: %v", grpcPort, err)
-	}
-	sh.Printf("Connected to perun node at %s\n\n", grpcPort)
+	sh.Printf("%s\n\n", greenf("Connect to a perun node instance using 'node connect' for making any transactions."))
 
 	sh.Run()
 }
