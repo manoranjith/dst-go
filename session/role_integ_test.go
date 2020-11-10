@@ -51,7 +51,7 @@ func init() {
 // This test includes all methods on SessionAPI and ChAPI.
 func Test_Integ_Role(t *testing.T) {
 	// Deploy contracts.
-	ethereumtest.SetupContractsT(t, ethereumtest.ChainURL, ethereumtest.ChainTxTimeout)
+	ethereumtest.SetupContractsT(t, ethereumtest.ChainURL, ethereumtest.OnChainTxTimeout)
 
 	aliceAlias, bobAlias := "alice", "bob"
 

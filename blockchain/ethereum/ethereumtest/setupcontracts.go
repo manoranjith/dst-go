@@ -46,11 +46,6 @@ import (
 //
 // The contracts will be deployed only during the first run of tests and will be resused in subsequent runs. This
 // saves ~0.3s of setup time in each run. Hence when running tests on development machine, START THE NODE ONLY ONCE.
-const (
-	OnChainTxTimeout = 10 * time.Second
-	ChainURL         = "ws://127.0.0.1:8545"
-	chainConnTimeout = 10 * time.Second
-)
 
 var adjudicatorAddr, assetAddr pwallet.Address
 
@@ -108,7 +103,7 @@ func SetupContracts(chainURL string, onChainTxTimeout time.Duration) (
 		asset = assetAddr
 	}
 
-	chain, err := ethereum.NewChainBackend(chainURL, chainConnTimeout, onChainTxTimeout, onChainCred)
+	chain, err := ethereum.NewChainBackend(chainURL, ChainConnTimeout, onChainTxTimeout, onChainCred)
 	if err != nil {
 		return nil, nil, errors.WithMessage(err, "initializaing chain backend")
 	}
