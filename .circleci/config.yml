@@ -1,14 +1,14 @@
 version: 2.1
 
 executors:
-  dst-go-executor:
+  perun-node-executor:
     docker:
       - image: cimg/go:1.14.1-node
     environment:
       RESULTS: /tmp/results
       ARTIFACTS: /tmp/artifacts
       TERM: xterm
-    working_directory: ~/dst-go
+    working_directory: ~/perun-node
 
 commands:
   checkout-code:
@@ -52,7 +52,7 @@ commands:
 jobs:
 
   lint:
-    executor: dst-go-executor
+    executor: perun-node-executor
     steps:
       - checkout-code
       - make-results-artifacts-dir
@@ -71,7 +71,7 @@ jobs:
 
 
   unit_test:
-    executor: dst-go-executor
+    executor: perun-node-executor
     steps:
       - checkout-code
       - make-results-artifacts-dir
@@ -85,7 +85,7 @@ jobs:
       - uploakd-results-artifacts
 
   integration-tests:
-    executor: dst-go-executor
+    executor: perun-node-executor
     steps:
       - checkout-code
       - make-results-artifacts-dir
@@ -94,8 +94,8 @@ jobs:
       - wait-until-ganache-cli-is-running
       - run: echo "ganache-cli-running"
       - run:
-          name: Run integration tests
-          command: gotestsum --junitfile ${RESULTS}/unit-tests.xml --format=short-verbose -- -tags=integration -coverprofile=c.out ./...
+          name: Run integration tests for all but session, api/grpc.
+          command: gotestsum --junitfile ${RESULTS}/unit-tests.xml --format=short-verbose -- -tags=integration -coverprofile=c.out -p 1 ./...
       - run:
           name: Generate coverage report
           command: go tool cover -html=c.out -o ${ARTIFACTS}/unit_test_coverage.html
