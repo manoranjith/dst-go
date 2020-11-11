@@ -3,7 +3,7 @@ version: 2.1
 executors:
   dst-go-executor:
     docker:
-      - image: cimg/go:1.14.1
+      - image: cimg/go:1.14.1-node
     environment:
       RESULTS: /tmp/results
       ARTIFACTS: /tmp/artifacts
@@ -29,6 +29,20 @@ commands:
           path: /tmp/results
       - store_artifacts:
           path: /tmp/artifacts
+
+  install-ganache-cli:
+      steps:
+        - run: sudo npm install -g ganache-cli
+
+  run-ganache-cli:
+      steps:
+        - run:
+            command: ganache-cli -b 1 --account="0x1fedd636dbc7e8d41a0622a2040b86fea8842cef9d4aa4c582aad00465b7acff,100000000000000000000" --account="0xb0309c60b4622d3071fad3e16c2ce4d0b1e7758316c187754f4dd0cfb44ceb33,100000000000000000000"
+            background: true
+
+  wait-until-ganache-cli-is-running:
+      steps:
+        - run: timeout 15 bash -c 'until nc -z 127.0.0.1 8545; do sleep 1; done'
 
   install-txt-to-html-coverter-aha:
     steps:
@@ -68,11 +82,19 @@ jobs:
           name: Generate coverage report
           command: go tool cover -html=c.out -o ${ARTIFACTS}/unit_test_coverage.html
           when: always
-      - upload-results-artifacts
+      - uploakd-results-artifacts
 
+  ganache-cli-node:
+    executor: dst-go-executor
+    steps:
+      - install-ganache-cli
+      - run-ganache-cli
+      - wait-until-ganache-cli-is-running
+      - run: echo "ganache-cli-running"
 
 workflows:
   build-lint-test:
     jobs:
-      - lint
-      - unit_test
+      # - lint
+      # - unit_test
+      - ganache-cli-node
