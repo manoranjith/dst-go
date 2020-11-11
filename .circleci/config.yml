@@ -84,17 +84,27 @@ jobs:
           when: always
       - uploakd-results-artifacts
 
-  ganache-cli-node:
+  integration-tests:
     executor: dst-go-executor
     steps:
+      - checkout-code
+      - make-results-artifacts-dir
       - install-ganache-cli
       - run-ganache-cli
       - wait-until-ganache-cli-is-running
       - run: echo "ganache-cli-running"
+      - run:
+          name: Run integration tests
+          command: gotestsum --junitfile ${RESULTS}/unit-tests.xml --format=short-verbose -- -tags=integration -coverprofile=c.out ./...
+      - run:
+          name: Generate coverage report
+          command: go tool cover -html=c.out -o ${ARTIFACTS}/unit_test_coverage.html
+          when: always
+      - upload-results-artifacts
 
 workflows:
   build-lint-test:
     jobs:
       # - lint
       # - unit_test
-      - ganache-cli-node
+      - integration-tests
