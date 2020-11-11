@@ -75,9 +75,9 @@ jobs:
     steps:
       - checkout-code
       - make-results-artifacts-dir
-      - install-ganache-cli
-      - run-ganache-cli
-      - wait-until-ganache-cli-is-running
+      # - install-ganache-cli
+      # - run-ganache-cli
+      # - wait-until-ganache-cli-is-running
       - run: echo "ganache-cli-running"
       - run:
           name: Run unit and integration tests
