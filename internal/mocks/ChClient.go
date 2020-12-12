@@ -13,6 +13,8 @@ import (
 
 	persistence "perun.network/go-perun/channel/persistence"
 
+	perun "github.com/hyperledger-labs/perun-node"
+
 	wallet "perun.network/go-perun/wallet"
 )
 
@@ -90,15 +92,15 @@ func (_m *ChClient) OnNewChannel(handler func(*client.Channel)) {
 }
 
 // ProposeChannel provides a mock function with given fields: _a0, _a1
-func (_m *ChClient) ProposeChannel(_a0 context.Context, _a1 client.ChannelProposal) (*client.Channel, error) {
+func (_m *ChClient) ProposeChannel(_a0 context.Context, _a1 client.ChannelProposal) (perun.PerunChannel, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 *client.Channel
-	if rf, ok := ret.Get(0).(func(context.Context, client.ChannelProposal) *client.Channel); ok {
+	var r0 perun.PerunChannel
+	if rf, ok := ret.Get(0).(func(context.Context, client.ChannelProposal) perun.PerunChannel); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*client.Channel)
+			r0 = ret.Get(0).(perun.PerunChannel)
 		}
 	}
 

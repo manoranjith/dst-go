@@ -127,6 +127,24 @@ type Session struct {
 	ChClient ChClient
 }
 
+type PerunChannel interface {
+	Close() error
+	Ctx() context.Context
+	ID() pchannel.ID
+	Idx() pchannel.Index
+	IsClosed() bool
+	Params() *pchannel.Params
+	Peers() []pwire.Address
+	Phase() pchannel.Phase
+	State() *pchannel.State
+	OnUpdate(cb func(from, to *pchannel.State))
+	Update(ctx context.Context, next *pchannel.State) error
+	UpdateBy(ctx context.Context, update func(*pchannel.State)) error
+	Settle(ctx context.Context) error
+	SettleSecondary(ctx context.Context) error
+	Watch() error
+}
+
 //go:generate mockery --name ChClient --output ./internal/mocks
 
 // ChClient allows the user to establish off-chain channels and transact on these channels.
@@ -139,7 +157,7 @@ type Session struct {
 // Hence it is highly recommended not to stop the channel client if there are open channels.
 type ChClient interface {
 	Registerer
-	ProposeChannel(context.Context, pclient.ChannelProposal) (*pclient.Channel, error)
+	ProposeChannel(context.Context, pclient.ChannelProposal) (PerunChannel, error)
 	Handle(pclient.ProposalHandler, pclient.UpdateHandler)
 	Channel(pchannel.ID) (*pclient.Channel, error)
 	Close() error

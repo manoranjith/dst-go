@@ -60,7 +60,8 @@ type client struct {
 
 // pClient represents the methods on client.Client that are used by client.
 type pClient interface {
-	ProposeChannel(context.Context, pclient.ChannelProposal) (*pclient.Channel, error)
+	ProposeChannel(context.Context, pclient.ChannelProposal) (perun.PerunChannel, error)
+	// ProposeChannel(context.Context, pclient.ChannelProposal) (*pclient.Channel, error)
 	Handle(pclient.ProposalHandler, pclient.UpdateHandler)
 	Channel(pchannel.ID) (*pclient.Channel, error)
 	Close() error
@@ -70,6 +71,14 @@ type pClient interface {
 	Restore(context.Context) error
 
 	Log() plog.Logger
+}
+
+type pclientWInterfaceReturns struct {
+	*pclient.Client
+}
+
+func (c *pclientWInterfaceReturns) ProposeChannel(ctx context.Context, proposal pclient.ChannelProposal) (perun.PerunChannel, error) {
+	return c.Client.ProposeChannel(ctx, proposal)
 }
 
 // NewEthereumPaymentClient initializes a two party, ethereum payment channel client for the given user.
@@ -93,7 +102,7 @@ func NewEthereumPaymentClient(cfg Config, user perun.User, comm perun.CommBacken
 	}
 
 	c := &client{
-		pClient:        pcClient,
+		pClient:        &pclientWInterfaceReturns{pcClient},
 		msgBus:         msgBus,
 		msgBusRegistry: dialer,
 		dbPath:         cfg.DatabaseDir,
