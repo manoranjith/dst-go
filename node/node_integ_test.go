@@ -28,22 +28,14 @@ import (
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/node"
+	"github.com/hyperledger-labs/perun-node/node/nodetest"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
-var validConfig = perun.NodeConfig{
-	LogFile:              "",
-	LogLevel:             "debug",
-	ChainURL:             "ws://127.0.0.1:8545",
-	Adjudicator:          "0x9daEdAcb21dce86Af8604Ba1A1D7F9BFE55ddd63",
-	Asset:                "0x5992089d61cE79B6CF90506F70DD42B8E42FB21d",
-	CommTypes:            []string{"tcp"},
-	ContactTypes:         []string{"yaml"},
-	CurrencyInterpreters: []string{"ETH"},
+var validConfig perun.NodeConfig
 
-	ChainConnTimeout: 30 * time.Second,
-	OnChainTxTimeout: 10 * time.Second,
-	ResponseTimeout:  10 * time.Second,
+func init() {
+	validConfig = nodetest.NewConfig()
 }
 
 // This NodeAPI instance will be set upon first happy test.

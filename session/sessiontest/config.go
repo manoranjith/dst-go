@@ -31,9 +31,13 @@ import (
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
+	"github.com/hyperledger-labs/perun-node/client/clienttest"
 	"github.com/hyperledger-labs/perun-node/contacts/contactstest"
 	"github.com/hyperledger-labs/perun-node/session"
 )
+
+// ResponseTimeout is the suggested value for peer response timeout for use in tests.
+const ResponseTimeout = 10 * time.Second
 
 // NewConfigFileT is the test friendly version of NewConfigFile.
 // It uses the passed testing.T to handle the errors and registers the cleanup functions on it.
@@ -116,11 +120,11 @@ func NewConfig(rng *rand.Rand, contacts ...perun.Peer) (session.Config, error) {
 		ChainURL:          ethereumtest.ChainURL,
 		Adjudicator:       adjudicator.String(),
 		Asset:             asset.String(),
-		ChainConnTimeout:  30 * time.Second,
-		ResponseTimeout:   10 * time.Second,
-		OnChainTxTimeout:  5 * time.Second,
+		ChainConnTimeout:  ethereumtest.ChainConnTimeout,
+		ResponseTimeout:   ResponseTimeout,
+		OnChainTxTimeout:  ethereumtest.OnChainTxTimeout,
 		DatabaseDir:       databaseDir,
-		PeerReconnTimeout: 20 * time.Second,
+		PeerReconnTimeout: clienttest.PeerReconnTimeout,
 
 		ContactsType: "yaml",
 		ContactsURL:  contactsYAMLFile,
