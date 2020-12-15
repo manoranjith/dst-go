@@ -99,7 +99,7 @@ func NewConfigT(t *testing.T, rng *rand.Rand, contacts ...perun.Peer) session.Co
 //
 // This function returns a session config with user on-chain addresses that are funded on blockchain when
 // using a particular seed for prng. The first two consecutive calls to this function will return
-// funded accounts when using prng := rand.New(rand.NewSource(1729)).
+// funded accounts when using prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs)).
 func NewConfig(rng *rand.Rand, contacts ...perun.Peer) (session.Config, error) {
 	_, userCfg, err := newUserConfig(rng, 0)
 	if err != nil {

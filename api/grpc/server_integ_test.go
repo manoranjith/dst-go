@@ -110,7 +110,7 @@ func Test_Integ_Role(t *testing.T) {
 	var aliceSessionID, bobSessionID string
 	var alicePeer, bobPeer *pb.Peer
 	var chID string
-	prng := rand.New(rand.NewSource(1729))
+	prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
 	aliceCfg := sessiontest.NewConfigT(t, prng)
 	bobCfg := sessiontest.NewConfigT(t, prng)
 	aliceCfgFile := sessiontest.NewConfigFileT(t, aliceCfg)

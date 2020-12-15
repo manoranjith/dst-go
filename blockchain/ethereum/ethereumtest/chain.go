@@ -34,11 +34,12 @@ import (
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/internal"
 )
 
-// Chain related parameters for connecting to  ganache-cli node in integration test environment.
+// Chain related parameters for connecting to ganache-cli node in integration test environment.
 const (
-	OnChainTxTimeout = 10 * time.Second
-	ChainURL         = "ws://127.0.0.1:8545"
-	ChainConnTimeout = 10 * time.Second
+	RandSeedForTestAccs = 1729 // Seed required for generating accounts used in integration tests.
+	OnChainTxTimeout    = 1 * time.Minute
+	ChainURL            = "ws://127.0.0.1:8545"
+	ChainConnTimeout    = 10 * time.Second
 )
 
 // ChainBackendSetup is a test setup that uses a simulated blockchain backend (for details on this backend,

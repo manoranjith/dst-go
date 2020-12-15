@@ -42,10 +42,10 @@ func init() {
 }
 
 func Test_Integ_New(t *testing.T) {
-	prng := rand.New(rand.NewSource(1729))
+	prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
 	peers := newPeers(t, prng, uint(2))
 
-	prng = rand.New(rand.NewSource(1729))
+	prng = rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
 	cfg := sessiontest.NewConfigT(t, prng, peers...)
 
 	t.Run("happy", func(t *testing.T) {
@@ -144,7 +144,7 @@ func Test_Integ_New(t *testing.T) {
 }
 
 func Test_Integ_Persistence(t *testing.T) {
-	prng := rand.New(rand.NewSource(1729))
+	prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
 
 	aliceCfg := sessiontest.NewConfigT(t, prng)
 	// Use contacts and database directory from a session that was persisted already.

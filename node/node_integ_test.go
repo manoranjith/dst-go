@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/node"
 	"github.com/hyperledger-labs/perun-node/node/nodetest"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
@@ -88,7 +89,7 @@ func Test_Integ_New(t *testing.T) {
 		assert.Equal(t, []string{"payment"}, apis)
 	})
 	var sessionID string
-	prng := rand.New(rand.NewSource(1729))
+	prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
 	t.Run("happy_OpenSession", func(t *testing.T) {
 		var err error
 		sessionCfg := sessiontest.NewConfigT(t, prng)

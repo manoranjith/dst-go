@@ -152,9 +152,9 @@ func generateSessionConfig() error {
 		return err
 	}
 
-	// Generate session config, the seed 1729 generates two accounts which were funded when starting
-	// the ganache cli node with the command documented in help message.
-	prng := rand.New(rand.NewSource(1729))
+	// Generate session config, the seed ethereumtest.RandSeedForTestAccs generates two accounts which were funded
+	// when starting the ganache cli node with the command documented in help message.
+	prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
 	aliceCfg, err := sessiontest.NewConfig(prng)
 	if err != nil {
 		return err
