@@ -90,14 +90,14 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("happy_2_own_alias_not_first", func(t *testing.T) {
-		validOpeningBalInfo_2 := perun.BalInfo{
+		validOpeningBalInfo2 := perun.BalInfo{
 			Currency: currency.ETH,
 			Parts:    []string{"1", perun.OwnAlias},
 			Bal:      []string{"1", "2"},
 		}
 
 		// == Prepare mocks ==
-		ch := prepareChMock(validOpeningBalInfo_2)
+		ch := prepareChMock(validOpeningBalInfo2)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -106,7 +106,7 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo_2, app, 10)
+		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo2, app, 10)
 		require.NoError(t, err)
 		require.NotZero(t, chInfo)
 	})
