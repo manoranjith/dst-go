@@ -17,6 +17,8 @@
 package session
 
 import (
+	pchannel "perun.network/go-perun/channel"
+
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/log"
 )
@@ -60,4 +62,8 @@ func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*sessi
 		chs:                  make(map[string]*channel),
 		chProposalResponders: make(map[string]chProposalResponderEntry),
 	}, nil
+}
+
+func MakeAllocation(openingBalInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
+	return makeAllocation(openingBalInfo, chAsset)
 }

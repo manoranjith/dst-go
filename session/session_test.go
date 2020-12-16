@@ -23,18 +23,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
-	"github.com/hyperledger-labs/perun-node/currency"
-	"github.com/hyperledger-labs/perun-node/internal/mocks"
-	"github.com/hyperledger-labs/perun-node/session"
-	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 	"github.com/phayes/freeport"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
+
+	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
+	"github.com/hyperledger-labs/perun-node/currency"
+	"github.com/hyperledger-labs/perun-node/internal/mocks"
+	"github.com/hyperledger-labs/perun-node/session"
+	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
 func Test_OpenCh(t *testing.T) {
@@ -43,7 +44,7 @@ func Test_OpenCh(t *testing.T) {
 	peers := newPeers(t, prng, uint(3)) // Peer at index 0 is self and those at index 1,2 are peers.
 	prng = rand.New(rand.NewSource(1729))
 	cfg := sessiontest.NewConfigT(t, prng, peers[1], peers[2]) // Register peers at index 1,2 in contacts.
-	openingBalInfo := perun.BalInfo{
+	validOpeningBalInfo := perun.BalInfo{
 		Currency: currency.ETH,
 		Parts:    []string{perun.OwnAlias, "1"},
 		Bal:      []string{"1", "2"},
@@ -53,35 +54,7 @@ func Test_OpenCh(t *testing.T) {
 		Data: pchannel.NoData(),
 	}
 
-	// == Prepare mocks ==
-	ch := &mocks.Channel{}
-	ch.On("ID").Return([32]byte{0, 1, 2})
-	allocation, err := session.MakeAllocation(openingBalInfo, nil)
-	require.NoError(t, err)
-	state := &pchannel.State{
-		ID:         [32]byte{0},
-		Version:    0,
-		App:        pchannel.NoApp(),
-		Allocation: *allocation,
-		Data:       pchannel.NoData(),
-		IsFinal:    false,
-	}
-	ch.On("State").Return(state)
-	watcherSignal := make(chan time.Time)
-	ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-
-	t.Run("happy_1_own_alias_first", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{perun.OwnAlias, "1"},
-			Bal:      []string{"1", "2"},
-		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
-
-		// == Prepare mocks ==
+	prepareChMock := func(openingBalInfo perun.BalInfo) perun.Channel {
 		ch := &mocks.Channel{}
 		ch.On("ID").Return([32]byte{0, 1, 2})
 		allocation, err := session.MakeAllocation(openingBalInfo, nil)
@@ -97,8 +70,12 @@ func Test_OpenCh(t *testing.T) {
 		ch.On("State").Return(state)
 		watcherSignal := make(chan time.Time)
 		ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
+		return ch
+	}
 
-		// == Prepare testcase specific mocks ==
+	t.Run("happy_1_own_alias_first", func(t *testing.T) {
+		// == Prepare mocks ==
+		ch := prepareChMock(validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -107,40 +84,20 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		chInfo, err := session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.NoError(t, err)
 		require.NotZero(t, chInfo)
 	})
 
 	t.Run("happy_2_own_alias_not_first", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
+		validOpeningBalInfo_2 := perun.BalInfo{
 			Currency: currency.ETH,
 			Parts:    []string{"1", perun.OwnAlias},
 			Bal:      []string{"1", "2"},
 		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
 
 		// == Prepare mocks ==
-		ch := &mocks.Channel{}
-		ch.On("ID").Return([32]byte{0, 1, 2})
-		allocation, err := session.MakeAllocation(openingBalInfo, nil)
-		require.NoError(t, err)
-		state := &pchannel.State{
-			ID:         [32]byte{0},
-			Version:    0,
-			App:        pchannel.NoApp(),
-			Allocation: *allocation,
-			Data:       pchannel.NoData(),
-			IsFinal:    false,
-		}
-		ch.On("State").Return(state)
-		watcherSignal := make(chan time.Time)
-		ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-
-		// == Prepare testcase specific mocks ==
+		ch := prepareChMock(validOpeningBalInfo_2)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -149,13 +106,14 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		chInfo, err := session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo_2, app, 10)
 		require.NoError(t, err)
 		require.NotZero(t, chInfo)
 	})
 
 	t.Run("error_session_closed", func(t *testing.T) {
-		// == Prepare testcase specific mocks ==
+		// == Prepare mocks ==
+		ch := prepareChMock(validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -164,148 +122,81 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 
 	t.Run("error_missing_parts", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
+		invalidOpeningBalInfo := perun.BalInfo{
 			Currency: currency.ETH,
 			Parts:    []string{perun.OwnAlias, "3"},
 			Bal:      []string{"1", "2"},
 		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
 
 		// == Prepare mocks ==
-		ch := &mocks.Channel{}
-		ch.On("ID").Return([32]byte{0, 1, 2})
-		allocation, err := session.MakeAllocation(openingBalInfo, nil)
-		require.NoError(t, err)
-		state := &pchannel.State{
-			ID:         [32]byte{0},
-			Version:    0,
-			App:        pchannel.NoApp(),
-			Allocation: *allocation,
-			Data:       pchannel.NoData(),
-			IsFinal:    false,
-		}
-		ch.On("State").Return(state)
-		watcherSignal := make(chan time.Time)
-		ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-
-		// == Prepare testcase specific mocks ==
+		// Ignore ch and define only chClient mock with no method on it,
+		// because the test will fail before ProposeChannel call.
 		chClient := &mocks.ChClient{}
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 
 	t.Run("error_repeated_parts", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
+		invalidOpeningBalInfo := perun.BalInfo{
 			Currency: currency.ETH,
 			Parts:    []string{"1", "1"},
 			Bal:      []string{"1", "2"},
 		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
 
 		// == Prepare mocks ==
-		ch := &mocks.Channel{}
-		ch.On("ID").Return([32]byte{0, 1, 2})
-		allocation, err := session.MakeAllocation(openingBalInfo, nil)
-		require.NoError(t, err)
-		state := &pchannel.State{
-			ID:         [32]byte{0},
-			Version:    0,
-			App:        pchannel.NoApp(),
-			Allocation: *allocation,
-			Data:       pchannel.NoData(),
-			IsFinal:    false,
-		}
-		ch.On("State").Return(state)
-		watcherSignal := make(chan time.Time)
-		ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-
-		// == Prepare testcase specific mocks ==
+		// Ignore ch and define only chClient mock with no method on it,
+		// because the test will fail before ProposeChannel call.
 		chClient := &mocks.ChClient{}
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 
 	t.Run("error_missing_own_alias", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
+		invalidOpeningBalInfo := perun.BalInfo{
 			Currency: currency.ETH,
 			Parts:    []string{"1", "2"},
 			Bal:      []string{"1", "2"},
 		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
 
 		// == Prepare mocks ==
-		ch := &mocks.Channel{}
-		ch.On("ID").Return([32]byte{0, 1, 2})
-		allocation, err := session.MakeAllocation(openingBalInfo, nil)
-		require.NoError(t, err)
-		state := &pchannel.State{
-			ID:         [32]byte{0},
-			Version:    0,
-			App:        pchannel.NoApp(),
-			Allocation: *allocation,
-			Data:       pchannel.NoData(),
-			IsFinal:    false,
-		}
-		ch.On("State").Return(state)
-		watcherSignal := make(chan time.Time)
-		ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-
-		// == Prepare testcase specific mocks ==
+		// Ignore ch and define only chClient mock with no method on it,
+		// because the test will fail before ProposeChannel call.
 		chClient := &mocks.ChClient{}
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 
 	t.Run("error_unsupported_currency", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
+		invalidOpeningBalInfo := perun.BalInfo{
 			Currency: "unsupported-currency",
 			Parts:    []string{"1", perun.OwnAlias},
 			Bal:      []string{"1", "2"},
 		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
 
 		// == Prepare mocks ==
-		ch := &mocks.Channel{} // Define no method on ch, because the test will fail before ProposeChannel call.
-
-		// == Prepare testcase specific mocks ==
+		// Ignore ch and define only chClient mock with just Register method.
+		// because the test will fail before ProposeChannel call.
+		ch := prepareChMock(validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -314,7 +205,7 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 
@@ -324,15 +215,11 @@ func Test_OpenCh(t *testing.T) {
 			Parts:    []string{"1", perun.OwnAlias},
 			Bal:      []string{"abc", "gef"},
 		}
-		app := perun.App{
-			Def:  pchannel.NoApp(),
-			Data: pchannel.NoData(),
-		}
 
 		// == Prepare mocks ==
-		ch := &mocks.Channel{} // Define no method on ch, because the test will fail before ProposeChannel call.
-
-		// == Prepare testcase specific mocks ==
+		// Ignore ch and define only chClient mock with just Register method.
+		// because the test will fail before ProposeChannel call.
+		ch := prepareChMock(validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -347,6 +234,7 @@ func Test_OpenCh(t *testing.T) {
 
 	t.Run("error_ProposeChannel_AnError", func(t *testing.T) {
 		// == Prepare testcase specific mocks ==
+		ch := prepareChMock(validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, assert.AnError)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -355,12 +243,13 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 
 	t.Run("error_ProposeChannel_PeerRejected", func(t *testing.T) {
 		// == Prepare testcase specific mocks ==
+		ch := prepareChMock(validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, errors.New("channel proposal rejected"))
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -369,7 +258,7 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
 	})
 }
