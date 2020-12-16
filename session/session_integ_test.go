@@ -19,14 +19,12 @@
 package session_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"os"
 	"testing"
 
 	copyutil "github.com/otiai10/copy"
-	"github.com/phayes/freeport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -163,19 +161,6 @@ func Test_Integ_Persistence(t *testing.T) {
 			require.Equal(t, 3, len(alice.GetChsInfo()))
 		})
 	})
-}
-
-func newPeers(t *testing.T, prng *rand.Rand, n uint) []perun.Peer {
-	peers := make([]perun.Peer, n)
-	for i := range peers {
-		port, err := freeport.GetFreePort()
-		require.NoError(t, err)
-		peers[i].Alias = fmt.Sprintf("%d", i)
-		peers[i].OffChainAddrString = ethereumtest.NewRandomAddress(prng).String()
-		peers[i].CommType = "tcp"
-		peers[i].CommAddr = fmt.Sprintf("127.0.0.1:%d", port)
-	}
-	return peers
 }
 
 func newCorruptedYAMLFile(t *testing.T) string {

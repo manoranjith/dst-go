@@ -271,7 +271,7 @@ func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app
 	}
 	registerParts(parts, s.chClient)
 
-	allocations, err := makeAllocation(openingBalInfo, s.chAsset)
+	allocations, err := MakeAllocation(openingBalInfo, s.chAsset)
 	if err != nil {
 		s.Error(err, "making allocations")
 		return perun.ChInfo{}, perun.GetAPIError(err)
@@ -379,10 +379,10 @@ func makeOffChainAddrs(parts []perun.Peer) []pwallet.Address {
 	return addrs
 }
 
-// makeAllocation makes an allocation using the BalanceInfo and the chAsset.
+// MakeAllocation makes an allocation using the BalanceInfo and the chAsset.
 // Order of amounts in the balance is same as the order of Aliases in the Balance Info.
 // It errors if any of the amounts cannot be parsed using the interpreter corresponding to the currency.
-func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
+func MakeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
 	if !currency.IsSupported(balInfo.Currency) {
 		return nil, perun.ErrUnsupportedCurrency
 	}
