@@ -45,7 +45,7 @@ type (
 		log.Logger
 
 		id               string
-		pch              perun.PerunChannel
+		pch              perun.Channel
 		status           chStatus
 		currency         string
 		parts            []string
@@ -79,7 +79,7 @@ type (
 )
 
 // newCh sets up a channel object from the passed pchannel.
-func newCh(pch perun.PerunChannel, currency string, parts []string, timeoutCfg timeoutConfig,
+func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeoutConfig,
 	challengeDurSecs uint64) *channel {
 	ch := &channel{
 		id:                 fmt.Sprintf("%x", pch.ID()),

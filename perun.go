@@ -127,9 +127,11 @@ type Session struct {
 	ChClient ChClient
 }
 
-type PerunChannel interface {
+//go:generate mockery --name Channel --output ./internal/mocks
+
+// Channel represents  state channel established among the participants of the off-chain network.
+type Channel interface {
 	Close() error
-	Ctx() context.Context
 	ID() pchannel.ID
 	Idx() pchannel.Index
 	IsClosed() bool
@@ -138,7 +140,6 @@ type PerunChannel interface {
 	Phase() pchannel.Phase
 	State() *pchannel.State
 	OnUpdate(cb func(from, to *pchannel.State))
-	Update(ctx context.Context, next *pchannel.State) error
 	UpdateBy(ctx context.Context, update func(*pchannel.State)) error
 	Settle(ctx context.Context) error
 	SettleSecondary(ctx context.Context) error
@@ -157,15 +158,15 @@ type PerunChannel interface {
 // Hence it is highly recommended not to stop the channel client if there are open channels.
 type ChClient interface {
 	Registerer
-	ProposeChannel(context.Context, pclient.ChannelProposal) (PerunChannel, error)
+	ProposeChannel(context.Context, pclient.ChannelProposal) (Channel, error)
 	Handle(pclient.ProposalHandler, pclient.UpdateHandler)
-	Channel(pchannel.ID) (*pclient.Channel, error)
+	Channel(pchannel.ID) (Channel, error)
 	Close() error
 
 	EnablePersistence(ppersistence.PersistRestorer)
-	OnNewChannel(handler func(*pclient.Channel))
+	OnNewChannel(handler func(Channel))
 	Restore(context.Context) error
-	RestoreChs(func(*pclient.Channel)) error
+	RestoreChs(func(Channel)) error
 
 	Log() pLog.Logger
 }

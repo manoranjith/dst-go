@@ -80,10 +80,22 @@ type (
 
 	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
 	chProposalResponder interface {
-		Accept(context.Context, *pclient.ChannelProposalAcc) (*pclient.Channel, error)
+		Accept(context.Context, *pclient.ChannelProposalAcc) (perun.Channel, error)
 		Reject(ctx context.Context, reason string) error
 	}
 )
+
+// chProposalResponderWrapped is a wrapper around pclient.ProposalResponder that returns a channel of
+// interface type instead of struct type. This enables easier mocking of the returned value in tests.
+type chProposalResponderWrapped struct {
+	*pclient.ProposalResponder
+}
+
+// Accept is a wrapper around the original function, that returns a channel of interface type instead of struct type.
+func (r *chProposalResponderWrapped) Accept(ctx context.Context, proposalAcc *pclient.ChannelProposalAcc) (
+	perun.Channel, error) {
+	return r.ProposalResponder.Accept(ctx, proposalAcc)
+}
 
 // New initializes a SessionAPI instance for the given configuration and returns an
 // instance of it. All methods on it are safe for concurrent use.
@@ -182,7 +194,7 @@ func (s *session) ID() string {
 	return s.id
 }
 
-func (s *session) handleRestoredCh(pch *pclient.Channel) {
+func (s *session) handleRestoredCh(pch perun.Channel) {
 	s.Debugf("found channel in persistence: 0x%x", pch.ID())
 
 	// Restore only those channels that are in acting phase.
@@ -415,7 +427,8 @@ func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *
 		if !ok {
 			s.Info("Received channel proposal from unknonwn peer", chProposal.Proposal().PeerAddrs[i].String())
 			// nolint: errcheck, gosec		// It is sufficient to just log this error.
-			s.rejectChProposal(context.Background(), responder, "peer not found in session contacts")
+			s.rejectChProposal(context.Background(), &chProposalResponderWrapped{responder},
+				"peer not found in session contacts")
 			expiry = 0
 			break
 		}
@@ -426,7 +439,7 @@ func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *
 	entry := chProposalResponderEntry{
 		proposal:  chProposal,
 		notif:     notif,
-		responder: responder,
+		responder: &chProposalResponderWrapped{responder},
 	}
 
 	s.Lock()
