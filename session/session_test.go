@@ -124,6 +124,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_missing_parts", func(t *testing.T) {
@@ -144,6 +145,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_repeated_parts", func(t *testing.T) {
@@ -164,6 +166,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_missing_own_alias", func(t *testing.T) {
@@ -184,6 +187,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_unsupported_currency", func(t *testing.T) {
@@ -207,6 +211,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_invalid_amount", func(t *testing.T) {
@@ -230,6 +235,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_ProposeChannel_AnError", func(t *testing.T) {
@@ -245,6 +251,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 
 	t.Run("error_ProposeChannel_PeerRejected", func(t *testing.T) {
@@ -260,6 +267,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Test ==
 		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
+		t.Log(err)
 	})
 }
 
