@@ -32,60 +32,82 @@ import (
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
+	"github.com/hyperledger-labs/perun-node/contacts/contactsyaml"
 	"github.com/hyperledger-labs/perun-node/currency"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 	"github.com/hyperledger-labs/perun-node/session"
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
+func sessionWithDummyChClient(t *testing.T, isOpen bool, peers ...perun.Peer) perun.SessionAPI {
+	prng := rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	chClient := &mocks.ChClient{}
+	session, err := session.NewSessionForTest(cfg, isOpen, chClient)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	return session
+}
+
 func Test_AddContact(t *testing.T) {
 	// == Setup ==
 	prng := rand.New(rand.NewSource(1729))
 	peers := newPeers(t, prng, uint(2))
 
-	prepareSession := func(isOpen bool, peers ...perun.Peer) perun.SessionAPI {
-		prng = rand.New(rand.NewSource(1729))
-		cfg := sessiontest.NewConfigT(t, prng, peers...)
-		chClient := &mocks.ChClient{}
-		session, err := session.NewSessionForTest(cfg, true, chClient)
-		require.NoError(t, err)
-		require.NotNil(t, session)
-		return session
-	}
+	// In openSession, peer0 is already present, peer1 can be added.
+	openSession := sessionWithDummyChClient(t, true, peers[0])
+	closedSession := sessionWithDummyChClient(t, false, peers[0])
 
 	t.Run("happy_add_contact", func(t *testing.T) {
-		session := prepareSession(true)
-
-		// == Test ==
-		err := session.AddContact(peers[0])
+		err := openSession.AddContact(peers[1])
 		require.NoError(t, err)
 	})
 
 	t.Run("error_alias_used_for_diff_peer_id", func(t *testing.T) {
-		session := prepareSession(true, peers[0])
-
 		// == Test ==
 		peer1WithAlias0 := peers[1]
 		peer1WithAlias0.Alias = "0"
-		err := session.AddContact(peer1WithAlias0)
+		err := openSession.AddContact(peer1WithAlias0)
 		require.Error(t, err)
 		t.Log(err)
 	})
 
 	t.Run("error_peerID_already_registered", func(t *testing.T) {
-		session := prepareSession(true, peers[0])
-
-		// == Test ==
-		err := session.AddContact(peers[0])
+		err := openSession.AddContact(peers[0])
 		require.Error(t, err)
 		t.Log(err)
 	})
 
 	t.Run("error_session_closed", func(t *testing.T) {
-		session := prepareSession(false)
+		err := closedSession.AddContact(peers[0])
+		require.Error(t, err)
+		t.Log(err)
+	})
+}
 
-		// == Test ==
-		err := session.AddContact(peers[0])
+func Test_GetContact(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(1))
+
+	// In openSession, peer0 is present and peer1 is not present.
+	openSession := sessionWithDummyChClient(t, true, peers[0])
+	closedSession := sessionWithDummyChClient(t, false, peers[0])
+
+	t.Run("happy_get_contact", func(t *testing.T) {
+		peerID, err := openSession.GetContact(peers[0].Alias)
+		require.NoError(t, err)
+		assert.True(t, contactsyaml.PeerEqual(peerID, peers[0]))
+	})
+
+	t.Run("error_contact_not_found", func(t *testing.T) {
+		_, err := openSession.GetContact("unknown-alias")
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_session_closed", func(t *testing.T) {
+		_, err := closedSession.GetContact(peers[0].Alias)
 		require.Error(t, err)
 		t.Log(err)
 	})
@@ -94,9 +116,9 @@ func Test_AddContact(t *testing.T) {
 func Test_OpenCh(t *testing.T) {
 	// == Setup ==
 	prng := rand.New(rand.NewSource(1729))
-	peers := newPeers(t, prng, uint(3)) // Peer at index 0 is self and those at index 1,2 are peers.
+	peers := newPeers(t, prng, uint(2)) // Aliases of peers are their respective indices in the array.
 	prng = rand.New(rand.NewSource(1729))
-	cfg := sessiontest.NewConfigT(t, prng, peers[1], peers[2]) // Register peers at index 1,2 in contacts.
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
 	validOpeningBalInfo := perun.BalInfo{
 		Currency: currency.ETH,
 		Parts:    []string{perun.OwnAlias, "1"},
