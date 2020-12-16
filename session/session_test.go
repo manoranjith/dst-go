@@ -38,6 +38,59 @@ import (
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
+func Test_AddContact(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+
+	prepareSession := func(isOpen bool, peers ...perun.Peer) perun.SessionAPI {
+		prng = rand.New(rand.NewSource(1729))
+		cfg := sessiontest.NewConfigT(t, prng, peers...)
+		chClient := &mocks.ChClient{}
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+		return session
+	}
+
+	t.Run("happy_add_contact", func(t *testing.T) {
+		session := prepareSession(true)
+
+		// == Test ==
+		err := session.AddContact(peers[0])
+		require.NoError(t, err)
+	})
+
+	t.Run("error_alias_used_for_diff_peer_id", func(t *testing.T) {
+		session := prepareSession(true, peers[0])
+
+		// == Test ==
+		peer1WithAlias0 := peers[1]
+		peer1WithAlias0.Alias = "0"
+		err := session.AddContact(peer1WithAlias0)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_peerID_already_registered", func(t *testing.T) {
+		session := prepareSession(true, peers[0])
+
+		// == Test ==
+		err := session.AddContact(peers[0])
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_session_closed", func(t *testing.T) {
+		session := prepareSession(false)
+
+		// == Test ==
+		err := session.AddContact(peers[0])
+		require.Error(t, err)
+		t.Log(err)
+	})
+}
+
 func Test_OpenCh(t *testing.T) {
 	// == Setup ==
 	prng := rand.New(rand.NewSource(1729))
