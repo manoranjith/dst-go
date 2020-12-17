@@ -620,11 +620,7 @@ func Test_HandleProposalWInterface_Respond(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		ch := prepareChMock(t, openingBalInfo)
-		responder := &mocks.ChProposalResponder{}
-		responder.On("Accept", mock.Anything, mock.Anything).Return(ch, nil)
-		session.HandleProposalWInterface(chProposal, responder)
-
+		chProposalID := "any-proposal-id" // A closed session returns error irrespective of proposal id.
 		_, err = session.RespondChProposal(context.Background(), chProposalID, true)
 		assert.Error(t, err)
 		t.Log(err)

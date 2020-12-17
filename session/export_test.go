@@ -17,6 +17,8 @@
 package session
 
 import (
+	"time"
+
 	pchannel "perun.network/go-perun/channel"
 
 	"github.com/hyperledger-labs/perun-node"
@@ -65,7 +67,8 @@ func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*Sessi
 }
 
 func NewChForTest(pch perun.Channel, currency string, parts []string, challengeDurSecs uint64, isOpen bool) *Channel {
-	ch := newCh(pch, currency, parts, timeoutConfig{}, challengeDurSecs)
+	timeoutCfg := timeoutConfig{response: 1 * time.Second}
+	ch := newCh(pch, currency, parts, timeoutCfg, challengeDurSecs)
 	if isOpen {
 		ch.status = open
 	} else {

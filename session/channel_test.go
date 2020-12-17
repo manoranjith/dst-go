@@ -18,6 +18,7 @@ package session_test
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -132,7 +133,7 @@ func Test_HandleUpdate(t *testing.T) {
 		ch.HandleUpdateWInterface(*chUpdate, &mocks.ChUpdateResponder{})
 	})
 
-	t.Run("happy", func(t *testing.T) {
+	t.Run("happy_unexpected_chUpdate", func(t *testing.T) {
 		chUpdate := &pclient.ChannelUpdate{
 			State: state,
 		}
@@ -182,4 +183,195 @@ func Test_SubUnsubChUpdate(t *testing.T) {
 		err = ch.UnsubChUpdates()
 		require.Error(t, err)
 	})
+}
+
+func Test_HandleUpdate_Sub(t *testing.T) {
+
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	updatedBalInfo := validOpeningBalInfo
+	updatedBalInfo.Bal = []string{"0.5", "2.5"}
+	pch := prepareChMockC2(t, validOpeningBalInfo)
+
+	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
+	require.NoError(t, err)
+	state := &pchannel.State{
+		ID:         [32]byte{0},
+		Version:    0,
+		App:        pchannel.NoApp(),
+		Allocation: *allocation,
+		Data:       pchannel.NoData(),
+		IsFinal:    false,
+	}
+
+	t.Run("happy_HandleSub", func(t *testing.T) {
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch.HandleUpdateWInterface(*chUpdate, &mocks.ChUpdateResponder{})
+
+		notifs := make([]perun.ChUpdateNotif, 0, 2)
+		notifier := func(notif perun.ChUpdateNotif) {
+			notifs = append(notifs, notif)
+		}
+		err := ch.SubChUpdates(notifier)
+		require.NoError(t, err)
+		notifRecieved := func() bool {
+			return len(notifs) == 1
+		}
+		assert.Eventually(t, notifRecieved, 2*time.Second, 100*time.Millisecond)
+	})
+	t.Run("happy_SubHandle", func(t *testing.T) {
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+		notifs := make([]perun.ChUpdateNotif, 0, 2)
+		notifier := func(notif perun.ChUpdateNotif) {
+			notifs = append(notifs, notif)
+		}
+		err := ch.SubChUpdates(notifier)
+		require.NoError(t, err)
+		notifRecieved := func() bool {
+			return len(notifs) == 1
+		}
+
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch.HandleUpdateWInterface(*chUpdate, &mocks.ChUpdateResponder{})
+		assert.Eventually(t, notifRecieved, 2*time.Second, 100*time.Millisecond)
+	})
+
+}
+
+func Test_HandleUpdate_Respond(t *testing.T) {
+
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	updatedBalInfo := validOpeningBalInfo
+	updatedBalInfo.Bal = []string{"0.5", "2.5"}
+	pch := prepareChMockC2(t, validOpeningBalInfo)
+
+	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
+	require.NoError(t, err)
+	state := &pchannel.State{
+		ID:         [32]byte{0},
+		Version:    1,
+		App:        pchannel.NoApp(),
+		Allocation: *allocation,
+		Data:       pchannel.NoData(),
+		IsFinal:    false,
+	}
+
+	t.Run("happy_Handle_Respond_Accept", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Accept", mock.Anything).Return(nil)
+		updateID := fmt.Sprintf("%s_%d", ch.ID(), chUpdate.State.Version)
+		ch.HandleUpdateWInterface(*chUpdate, responder)
+
+		chInfo, err := ch.RespondChUpdate(context.Background(), updateID, true)
+		require.NoError(t, err)
+		assert.NotZero(t, chInfo)
+	})
+
+	t.Run("happy_Handle_Respond_Reject", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(nil)
+		updateID := fmt.Sprintf("%s_%d", ch.ID(), chUpdate.State.Version)
+		ch.HandleUpdateWInterface(*chUpdate, responder)
+
+		chInfo, err := ch.RespondChUpdate(context.Background(), updateID, false)
+		require.NoError(t, err)
+		assert.NotZero(t, chInfo)
+	})
+
+	t.Run("error_Handle_Respond_Accept_Error", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Accept", mock.Anything).Return(assert.AnError)
+		updateID := fmt.Sprintf("%s_%d", ch.ID(), chUpdate.State.Version)
+		ch.HandleUpdateWInterface(*chUpdate, responder)
+
+		_, err := ch.RespondChUpdate(context.Background(), updateID, true)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_Handle_Respond_Reject_Error", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(assert.AnError)
+		updateID := fmt.Sprintf("%s_%d", ch.ID(), chUpdate.State.Version)
+		ch.HandleUpdateWInterface(*chUpdate, responder)
+
+		_, err := ch.RespondChUpdate(context.Background(), updateID, false)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_Handle_Respond_Unknown_UpdateID", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Accept", mock.Anything).Return(nil)
+		updateID := "random-update-id"
+		ch.HandleUpdateWInterface(*chUpdate, responder)
+
+		_, err := ch.RespondChUpdate(context.Background(), updateID, true)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_Handle_Respond_Expired", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Accept", mock.Anything).Return(nil)
+		updateID := fmt.Sprintf("%s_%d", ch.ID(), chUpdate.State.Version)
+		ch.HandleUpdateWInterface(*chUpdate, responder)
+
+		time.Sleep(2 * time.Second)
+		_, err := ch.RespondChUpdate(context.Background(), updateID, true)
+		require.Error(t, err)
+	})
+
+	t.Run("error_Handle_Respond_ChannelClosed", func(t *testing.T) {
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
+		updateID := "any-update-id" // A closed channel returns error irrespective of update id.
+
+		_, err := ch.RespondChUpdate(context.Background(), updateID, true)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	// TODO: for final call.... because preparation of settleSecondary is required.
 }
