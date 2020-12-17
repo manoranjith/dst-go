@@ -450,6 +450,60 @@ func Test_SubUnsubChProposal(t *testing.T) {
 	})
 }
 
+func Test_HandleProposalWInterface_Sub(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(1)) // Aliases of peers are their respective indices in the array.
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
+	require.NoError(t, err)
+
+	t.Run("happy_HandleSub", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{}
+		session.HandleProposalWInterface(chProposal, responder)
+		notifs := make([]perun.ChProposalNotif, 0, 2)
+		notifier := func(notif perun.ChProposalNotif) {
+			notifs = append(notifs, notif)
+		}
+		err = session.SubChProposals(notifier)
+		require.NoError(t, err)
+		notifRecieved := func() bool {
+			return len(notifs) == 1
+		}
+		assert.Eventually(t, notifRecieved, 2*time.Second, 100*time.Millisecond)
+	})
+
+	t.Run("happy_SubHandle", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		notifs := make([]perun.ChProposalNotif, 0, 2)
+		notifier := func(notif perun.ChProposalNotif) {
+			notifs = append(notifs, notif)
+		}
+		err = session.SubChProposals(notifier)
+		require.NoError(t, err)
+		responder := &mocks.ChProposalResponder{}
+		session.HandleProposalWInterface(chProposal, responder)
+		notifRecieved := func() bool {
+			return len(notifs) == 1
+		}
+		assert.Eventually(t, notifRecieved, 2*time.Second, 100*time.Millisecond)
+	})
+}
+
 func newPeers(t *testing.T, prng *rand.Rand, n uint) []perun.Peer {
 	ethereumBackend := ethereumtest.NewTestWalletBackend()
 	peers := make([]perun.Peer, n)
