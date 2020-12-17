@@ -459,10 +459,10 @@ func (s *session) HandleProposalWInterface(chProposal pclient.ChannelProposal, r
 	// TODO: (mano) Provide an option for user to configure when more currency interpretters are supported.
 	if s.chProposalNotifier == nil {
 		s.chProposalNotifsCache = append(s.chProposalNotifsCache, notif)
-		s.Debugf("HandleProposal: Notification cached", notif)
+		s.Debug("HandleProposal: Notification cached", notif)
 	} else {
 		go s.chProposalNotifier(notif)
-		s.Debugf("HandleProposal: Notification sent", notif)
+		s.Debug("HandleProposal: Notification sent", notif)
 	}
 }
 

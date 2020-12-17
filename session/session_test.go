@@ -340,26 +340,27 @@ func Test_HandleProposalWInterface(t *testing.T) {
 	peers := newPeers(t, prng, uint(1)) // Aliases of peers are their respective indices in the array.
 	prng = rand.New(rand.NewSource(1729))
 	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
+	require.NoError(t, err)
 
-	t.Run("happy", func(t *testing.T) {
+	prepareChProposal := func(peer perun.Peer) pclient.ChannelProposal {
 		chAsset, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.Asset)
-		require.NoError(t, err)
-		ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
-		require.NoError(t, err)
-		peerAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(peers[0].OffChainAddrString)
 		require.NoError(t, err)
 
 		openingBalInfo := perun.BalInfo{
 			Currency: currency.ETH,
-			Parts:    []string{peers[0].Alias, perun.OwnAlias},
+			Parts:    []string{peer.Alias, perun.OwnAlias},
 			Bal:      []string{"1", "2"},
 		}
 		allocation, err := session.MakeAllocation(openingBalInfo, chAsset)
 		require.NoError(t, err)
 
-		chProposal := pclient.NewLedgerChannelProposal(10, ownAddr, allocation, []wire.Address{peerAddr, ownAddr},
+		return pclient.NewLedgerChannelProposal(10, ownAddr, allocation,
+			[]wire.Address{peer.OffChainAddr, ownAddr},
 			pclient.WithApp(pchannel.NoApp(), pchannel.NoData()), pclient.WithRandomNonce())
+	}
 
+	t.Run("happy", func(t *testing.T) {
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
@@ -367,28 +368,11 @@ func Test_HandleProposalWInterface(t *testing.T) {
 
 		// == Test ==
 		responder := &mocks.ChProposalResponder{}
-		session.HandleProposalWInterface(chProposal, responder)
+		session.HandleProposalWInterface(prepareChProposal(peers[0]), responder)
 	})
 
 	t.Run("error_unknown_peer", func(t *testing.T) {
-		chAsset, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.Asset)
-		require.NoError(t, err)
-		ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
-		require.NoError(t, err)
-		peerAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(peers[0].OffChainAddrString)
-		require.NoError(t, err)
-
-		openingBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{"unknown-peer", perun.OwnAlias},
-			Bal:      []string{"1", "2"},
-		}
-		allocation, err := session.MakeAllocation(openingBalInfo, chAsset)
-		require.NoError(t, err)
-
-		chProposal := pclient.NewLedgerChannelProposal(10, ownAddr, allocation, []wire.Address{peerAddr, ownAddr},
-			pclient.WithApp(pchannel.NoApp(), pchannel.NoData()), pclient.WithRandomNonce())
-
+		unknownPeer := newPeers(t, prng, 1)[0]
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
@@ -397,7 +381,7 @@ func Test_HandleProposalWInterface(t *testing.T) {
 		// == Test ==
 		responder := &mocks.ChProposalResponder{}
 		responder.On("Reject", mock.Anything, mock.Anything).Return(nil)
-		session.HandleProposalWInterface(chProposal, responder)
+		session.HandleProposalWInterface(prepareChProposal(unknownPeer), responder)
 	})
 
 	t.Run("error_session_closed", func(t *testing.T) {
@@ -415,6 +399,7 @@ func Test_HandleProposalWInterface(t *testing.T) {
 }
 
 func newPeers(t *testing.T, prng *rand.Rand, n uint) []perun.Peer {
+	ethereumBackend := ethereumtest.NewTestWalletBackend()
 	peers := make([]perun.Peer, n)
 	for i := range peers {
 		port, err := freeport.GetFreePort()
@@ -423,6 +408,9 @@ func newPeers(t *testing.T, prng *rand.Rand, n uint) []perun.Peer {
 		peers[i].OffChainAddrString = ethereumtest.NewRandomAddress(prng).String()
 		peers[i].CommType = "tcp"
 		peers[i].CommAddr = fmt.Sprintf("127.0.0.1:%d", port)
+
+		peers[i].OffChainAddr, err = ethereumBackend.ParseAddr(peers[i].OffChainAddrString)
+		require.NoError(t, err)
 	}
 	return peers
 }
