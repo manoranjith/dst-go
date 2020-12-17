@@ -29,6 +29,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
+	pclient "perun.network/go-perun/client"
+	"perun.network/go-perun/wire"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
@@ -66,7 +68,7 @@ func Test_AddContact(t *testing.T) {
 	t.Run("error_alias_used_for_diff_peer_id", func(t *testing.T) {
 		// == Test ==
 		peer1WithAlias0 := peers[1]
-		peer1WithAlias0.Alias = "0"
+		peer1WithAlias0.Alias = peers[0].Alias
 		err := openSession.AddContact(peer1WithAlias0)
 		require.Error(t, err)
 		t.Log(err)
@@ -116,12 +118,12 @@ func Test_GetContact(t *testing.T) {
 func Test_OpenCh(t *testing.T) {
 	// == Setup ==
 	prng := rand.New(rand.NewSource(1729))
-	peers := newPeers(t, prng, uint(2)) // Aliases of peers are their respective indices in the array.
+	peers := newPeers(t, prng, uint(2))
 	prng = rand.New(rand.NewSource(1729))
 	cfg := sessiontest.NewConfigT(t, prng, peers...)
 	validOpeningBalInfo := perun.BalInfo{
 		Currency: currency.ETH,
-		Parts:    []string{perun.OwnAlias, "1"},
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
 		Bal:      []string{"1", "2"},
 	}
 	app := perun.App{
@@ -165,11 +167,8 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("happy_2_own_alias_not_first", func(t *testing.T) {
-		validOpeningBalInfo2 := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{"1", perun.OwnAlias},
-			Bal:      []string{"1", "2"},
-		}
+		validOpeningBalInfo2 := validOpeningBalInfo
+		validOpeningBalInfo2.Parts = []string{peers[0].Alias, perun.OwnAlias}
 
 		// == Prepare mocks ==
 		ch := prepareChMock(validOpeningBalInfo2)
@@ -203,11 +202,8 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("error_missing_parts", func(t *testing.T) {
-		invalidOpeningBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{perun.OwnAlias, "3"},
-			Bal:      []string{"1", "2"},
-		}
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Parts = []string{perun.OwnAlias, "missing-part"}
 
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with no method on it,
@@ -224,11 +220,8 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("error_repeated_parts", func(t *testing.T) {
-		invalidOpeningBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{"1", "1"},
-			Bal:      []string{"1", "2"},
-		}
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Parts = []string{peers[0].Alias, peers[0].Alias}
 
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with no method on it,
@@ -245,11 +238,8 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("error_missing_own_alias", func(t *testing.T) {
-		invalidOpeningBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{"1", "2"},
-			Bal:      []string{"1", "2"},
-		}
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Parts = []string{peers[0].Alias, peers[1].Alias}
 
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with no method on it,
@@ -266,11 +256,8 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("error_unsupported_currency", func(t *testing.T) {
-		invalidOpeningBalInfo := perun.BalInfo{
-			Currency: "unsupported-currency",
-			Parts:    []string{"1", perun.OwnAlias},
-			Bal:      []string{"1", "2"},
-		}
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Currency = "unsupported-currency"
 
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with just Register method.
@@ -290,11 +277,8 @@ func Test_OpenCh(t *testing.T) {
 	})
 
 	t.Run("error_invalid_amount", func(t *testing.T) {
-		openingBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{"1", perun.OwnAlias},
-			Bal:      []string{"abc", "gef"},
-		}
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Bal = []string{"abc", "gef"}
 
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with just Register method.
@@ -308,7 +292,7 @@ func Test_OpenCh(t *testing.T) {
 		require.NotNil(t, session)
 
 		// == Test ==
-		_, err = session.OpenCh(context.Background(), openingBalInfo, app, 10)
+		_, err = session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 		t.Log(err)
 	})
@@ -343,6 +327,86 @@ func Test_OpenCh(t *testing.T) {
 		_, err = session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
 		t.Log(err)
+	})
+}
+
+func Test_HandleProposalWInterface(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(1)) // Aliases of peers are their respective indices in the array.
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+
+	t.Run("happy", func(t *testing.T) {
+		chAsset, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.Asset)
+		require.NoError(t, err)
+		ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
+		require.NoError(t, err)
+		peerAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(peers[0].OffChainAddrString)
+		require.NoError(t, err)
+
+		openingBalInfo := perun.BalInfo{
+			Currency: currency.ETH,
+			Parts:    []string{peers[0].Alias, perun.OwnAlias},
+			Bal:      []string{"1", "2"},
+		}
+		allocation, err := session.MakeAllocation(openingBalInfo, chAsset)
+		require.NoError(t, err)
+
+		chProposal := pclient.NewLedgerChannelProposal(10, ownAddr, allocation, []wire.Address{peerAddr, ownAddr},
+			pclient.WithApp(pchannel.NoApp(), pchannel.NoData()), pclient.WithRandomNonce())
+
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{}
+		session.HandleProposalWInterface(chProposal, responder)
+	})
+
+	t.Run("error_unknown_peer", func(t *testing.T) {
+		chAsset, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.Asset)
+		require.NoError(t, err)
+		ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
+		require.NoError(t, err)
+		peerAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(peers[0].OffChainAddrString)
+		require.NoError(t, err)
+
+		openingBalInfo := perun.BalInfo{
+			Currency: currency.ETH,
+			Parts:    []string{"unknown-peer", perun.OwnAlias},
+			Bal:      []string{"1", "2"},
+		}
+		allocation, err := session.MakeAllocation(openingBalInfo, chAsset)
+		require.NoError(t, err)
+
+		chProposal := pclient.NewLedgerChannelProposal(10, ownAddr, allocation, []wire.Address{peerAddr, ownAddr},
+			pclient.WithApp(pchannel.NoApp(), pchannel.NoData()), pclient.WithRandomNonce())
+
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(nil)
+		session.HandleProposalWInterface(chProposal, responder)
+	})
+
+	t.Run("error_session_closed", func(t *testing.T) {
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, false, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		// Use mocks with no registered calls, as no methods on them will be invoked.
+		chProposal := &mocks.ChannelProposal{}
+		responder := &mocks.ChProposalResponder{}
+		session.HandleProposalWInterface(chProposal, responder)
 	})
 }
 

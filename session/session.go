@@ -73,17 +73,17 @@ type (
 	chProposalResponderEntry struct {
 		proposal  pclient.ChannelProposal
 		notif     perun.ChProposalNotif
-		responder chProposalResponder
+		responder ChProposalResponder
 	}
 
-	//go:generate mockery --name chProposalResponder --output ../internal/mocks
-
-	// Proposal Responder defines the methods on proposal responder that will be used by the perun node.
-	chProposalResponder interface {
+	// ChProposalResponder defines the methods on proposal responder that will be used by the perun node.
+	ChProposalResponder interface {
 		Accept(context.Context, *pclient.ChannelProposalAcc) (perun.Channel, error)
 		Reject(ctx context.Context, reason string) error
 	}
 )
+
+//go:generate mockery --name ChProposalResponder --output ../internal/mocks
 
 // chProposalResponderWrapped is a wrapper around pclient.ProposalResponder that returns a channel of
 // interface type instead of struct type. This enables easier mocking of the returned value in tests.
@@ -284,6 +284,7 @@ func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app
 		makeOffChainAddrs(parts),
 		pclient.WithApp(app.Def, app.Data),
 		pclient.WithRandomNonce())
+
 	ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.proposeCh(challengeDurSecs))
 	defer cancel()
 	pch, err := s.chClient.ProposeChannel(ctx, proposal)
@@ -412,6 +413,10 @@ func (s *session) addCh(ch *channel) {
 }
 
 func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *pclient.ProposalResponder) {
+	s.HandleProposalWInterface(chProposal, &chProposalResponderWrapped{responder})
+}
+
+func (s *session) HandleProposalWInterface(chProposal pclient.ChannelProposal, responder ChProposalResponder) {
 	s.Debugf("SDK Callback: HandleProposal. Params: %+v", chProposal)
 	expiry := time.Now().UTC().Add(s.timeoutCfg.response).Unix()
 
@@ -427,7 +432,7 @@ func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *
 		if !ok {
 			s.Info("Received channel proposal from unknonwn peer", chProposal.Proposal().PeerAddrs[i].String())
 			// nolint: errcheck, gosec		// It is sufficient to just log this error.
-			s.rejectChProposal(context.Background(), &chProposalResponderWrapped{responder},
+			s.rejectChProposal(context.Background(), responder,
 				"peer not found in session contacts")
 			expiry = 0
 			break
@@ -439,7 +444,7 @@ func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *
 	entry := chProposalResponderEntry{
 		proposal:  chProposal,
 		notif:     notif,
-		responder: &chProposalResponderWrapped{responder},
+		responder: responder,
 	}
 
 	s.Lock()
@@ -565,7 +570,7 @@ func (s *session) acceptChProposal(pctx context.Context, entry chProposalRespond
 	return ch.getChInfo(), nil
 }
 
-func (s *session) rejectChProposal(pctx context.Context, responder chProposalResponder, reason string) error {
+func (s *session) rejectChProposal(pctx context.Context, responder ChProposalResponder, reason string) error {
 	ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.respChProposalReject())
 	defer cancel()
 	err := responder.Reject(ctx, reason)
