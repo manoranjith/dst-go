@@ -51,7 +51,7 @@ func init() {
 }
 
 type (
-	session struct {
+	Session struct {
 		log.Logger
 		psync.Mutex
 
@@ -99,7 +99,7 @@ func (r *chProposalResponderWrapped) Accept(ctx context.Context, proposalAcc *pc
 
 // New initializes a SessionAPI instance for the given configuration and returns an
 // instance of it. All methods on it are safe for concurrent use.
-func New(cfg Config) (*session, error) {
+func New(cfg Config) (*Session, error) {
 	user, err := NewUnlockedUser(walletBackend, cfg.User)
 	if err != nil {
 		return nil, err
@@ -141,7 +141,7 @@ func New(cfg Config) (*session, error) {
 		onChainTx: cfg.OnChainTxTimeout,
 		response:  cfg.ResponseTimeout,
 	}
-	sess := &session{
+	sess := &Session{
 		Logger:               log.NewLoggerWithField("session-id", sessionID),
 		id:                   sessionID,
 		isOpen:               true,
@@ -190,11 +190,11 @@ func calcSessionID(userOffChainAddr []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func (s *session) ID() string {
+func (s *Session) ID() string {
 	return s.id
 }
 
-func (s *session) handleRestoredCh(pch perun.Channel) {
+func (s *Session) handleRestoredCh(pch perun.Channel) {
 	s.Debugf("found channel in persistence: 0x%x", pch.ID())
 
 	// Restore only those channels that are in acting phase.
@@ -221,7 +221,7 @@ func (s *session) handleRestoredCh(pch perun.Channel) {
 	s.Debugf("restored channel from persistence: %v", ch.getChInfo())
 }
 
-func (s *session) AddContact(peer perun.Peer) error {
+func (s *Session) AddContact(peer perun.Peer) error {
 	s.Debugf("Received request: session.AddContact. Params %+v", peer)
 	s.Lock()
 	defer s.Unlock()
@@ -237,7 +237,7 @@ func (s *session) AddContact(peer perun.Peer) error {
 	return perun.GetAPIError(err)
 }
 
-func (s *session) GetContact(alias string) (perun.Peer, error) {
+func (s *Session) GetContact(alias string) (perun.Peer, error) {
 	s.Debugf("Received request: session.GetContact. Params %+v", alias)
 	s.Lock()
 	defer s.Unlock()
@@ -254,7 +254,7 @@ func (s *session) GetContact(alias string) (perun.Peer, error) {
 	return peer, nil
 }
 
-func (s *session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app perun.App, challengeDurSecs uint64) (
+func (s *Session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app perun.App, challengeDurSecs uint64) (
 	perun.ChInfo, error) {
 	s.Debugf("\nReceived request:session.OpenCh Params %+v,%+v,%+v", openingBalInfo, app, challengeDurSecs)
 	// Session is locked only when adding the channel to session.
@@ -404,7 +404,7 @@ func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Al
 }
 
 // addCh adds the channel to session. It locks the session mutex during the operation.
-func (s *session) addCh(ch *channel) {
+func (s *Session) addCh(ch *channel) {
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.id)
 	s.Lock()
 	// TODO: (mano) use logger with multiple fields and use session-id, channel-id.
@@ -412,11 +412,11 @@ func (s *session) addCh(ch *channel) {
 	s.Unlock()
 }
 
-func (s *session) HandleProposal(chProposal pclient.ChannelProposal, responder *pclient.ProposalResponder) {
+func (s *Session) HandleProposal(chProposal pclient.ChannelProposal, responder *pclient.ProposalResponder) {
 	s.HandleProposalWInterface(chProposal, &chProposalResponderWrapped{responder})
 }
 
-func (s *session) HandleProposalWInterface(chProposal pclient.ChannelProposal, responder ChProposalResponder) {
+func (s *Session) HandleProposalWInterface(chProposal pclient.ChannelProposal, responder ChProposalResponder) {
 	s.Debugf("SDK Callback: HandleProposal. Params: %+v", chProposal)
 	expiry := time.Now().UTC().Add(s.timeoutCfg.response).Unix()
 
@@ -477,7 +477,7 @@ func chProposalNotif(parts []string, curr string, chProposal *pclient.BaseChanne
 	}
 }
 
-func (s *session) SubChProposals(notifier perun.ChProposalNotifier) error {
+func (s *Session) SubChProposals(notifier perun.ChProposalNotifier) error {
 	s.Debug("Received request: session.SubChProposals")
 	s.Lock()
 	defer s.Unlock()
@@ -499,7 +499,7 @@ func (s *session) SubChProposals(notifier perun.ChProposalNotifier) error {
 	return nil
 }
 
-func (s *session) UnsubChProposals() error {
+func (s *Session) UnsubChProposals() error {
 	s.Debug("Received request: session.UnsubChProposals")
 	s.Lock()
 	defer s.Unlock()
@@ -515,7 +515,7 @@ func (s *session) UnsubChProposals() error {
 	return nil
 }
 
-func (s *session) RespondChProposal(pctx context.Context, chProposalID string, accept bool) (perun.ChInfo, error) {
+func (s *Session) RespondChProposal(pctx context.Context, chProposalID string, accept bool) (perun.ChInfo, error) {
 	s.Debugf("Received request: session.RespondChProposal. Params: %+v, %+v", chProposalID, accept)
 
 	if !s.isOpen {
@@ -551,7 +551,7 @@ func (s *session) RespondChProposal(pctx context.Context, chProposalID string, a
 	return openedChInfo, perun.GetAPIError(err)
 }
 
-func (s *session) acceptChProposal(pctx context.Context, entry chProposalResponderEntry) (perun.ChInfo, error) {
+func (s *Session) acceptChProposal(pctx context.Context, entry chProposalResponderEntry) (perun.ChInfo, error) {
 	ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.respChProposalAccept(entry.notif.ChallengeDurSecs))
 	defer cancel()
 
@@ -570,7 +570,7 @@ func (s *session) acceptChProposal(pctx context.Context, entry chProposalRespond
 	return ch.getChInfo(), nil
 }
 
-func (s *session) rejectChProposal(pctx context.Context, responder ChProposalResponder, reason string) error {
+func (s *Session) rejectChProposal(pctx context.Context, responder ChProposalResponder, reason string) error {
 	ctx, cancel := context.WithTimeout(pctx, s.timeoutCfg.respChProposalReject())
 	defer cancel()
 	err := responder.Reject(ctx, reason)
@@ -580,7 +580,7 @@ func (s *session) rejectChProposal(pctx context.Context, responder ChProposalRes
 	return err
 }
 
-func (s *session) GetChsInfo() []perun.ChInfo {
+func (s *Session) GetChsInfo() []perun.ChInfo {
 	s.Debug("Received request: session.GetChInfos")
 	s.Lock()
 	defer s.Unlock()
@@ -594,7 +594,7 @@ func (s *session) GetChsInfo() []perun.ChInfo {
 	return openChsInfo
 }
 
-func (s *session) GetCh(chID string) (perun.ChAPI, error) {
+func (s *Session) GetCh(chID string) (perun.ChAPI, error) {
 	s.Debugf("Internal call to get channel instance. Params: %+v", chID)
 
 	s.Lock()
@@ -608,7 +608,7 @@ func (s *session) GetCh(chID string) (perun.ChAPI, error) {
 	return ch, nil
 }
 
-func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
+func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
 	s.Debugf("SDK Callback: HandleUpdate. Params: %+v", chUpdate)
 	s.Lock()
 	defer s.Unlock()
@@ -630,7 +630,7 @@ func (s *session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclien
 	go ch.HandleUpdate(chUpdate, responder)
 }
 
-func (s *session) Close(force bool) ([]perun.ChInfo, error) {
+func (s *Session) Close(force bool) ([]perun.ChInfo, error) {
 	s.Debug("Received request: session.Close")
 	s.Lock()
 	defer s.Unlock()
@@ -681,13 +681,13 @@ func (s *session) Close(force bool) ([]perun.ChInfo, error) {
 	return openChsInfo, s.close()
 }
 
-func (s *session) unlockAllChs() {
+func (s *Session) unlockAllChs() {
 	for _, ch := range s.chs {
 		ch.Unlock()
 	}
 }
 
-func (s *session) close() error {
+func (s *Session) close() error {
 	s.user.OnChain.Wallet.LockAll()
 	s.user.OffChain.Wallet.LockAll()
 	return errors.WithMessage(s.chClient.Close(), "closing session")

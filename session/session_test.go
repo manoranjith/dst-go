@@ -45,6 +45,10 @@ func init() {
 	session.SetWalletBackend(ethereumtest.NewTestWalletBackend())
 }
 
+func Test_SessionAPI_Interface(t *testing.T) {
+	assert.Implements(t, (*perun.SessionAPI)(nil), new(session.Session))
+}
+
 func sessionWithDummyChClient(t *testing.T, isOpen bool, peers ...perun.Peer) perun.SessionAPI {
 	prng := rand.New(rand.NewSource(1729))
 	cfg := sessiontest.NewConfigT(t, prng, peers...)
@@ -519,13 +523,19 @@ func Test_HandleProposalWInterface_Respond(t *testing.T) {
 		Bal:      []string{"1", "2"},
 	}
 
-	t.Run("happy_Handle_Respond_Accept", func(t *testing.T) {
-		chProposal := prepareChProposal(t, ownAddr, peers[0])
-		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+	chProposal := prepareChProposal(t, ownAddr, peers[0])
+	chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+
+	newValidSession := func(t *testing.T) *session.Session {
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
 		require.NotNil(t, session)
+		return session
+	}
+
+	t.Run("happy_Handle_Respond_Accept", func(t *testing.T) {
+		session := newValidSession(t)
 
 		// == Test ==
 		ch := prepareChMock(t, openingBalInfo)
@@ -539,12 +549,7 @@ func Test_HandleProposalWInterface_Respond(t *testing.T) {
 	})
 
 	t.Run("happy_Handle_Respond_Reject", func(t *testing.T) {
-		chProposal := prepareChProposal(t, ownAddr, peers[0])
-		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
-		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
-		session, err := session.NewSessionForTest(cfg, true, chClient)
-		require.NoError(t, err)
-		require.NotNil(t, session)
+		session := newValidSession(t)
 
 		// == Test ==
 		responder := &mocks.ChProposalResponder{}
@@ -555,9 +560,43 @@ func Test_HandleProposalWInterface_Respond(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("happy_Handle_Respond_Accept_Error", func(t *testing.T) {
+		session := newValidSession(t)
+
+		// == Test ==
+		ch := prepareChMock(t, openingBalInfo)
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Accept", mock.Anything, mock.Anything).Return(ch, assert.AnError)
+		session.HandleProposalWInterface(chProposal, responder)
+
+		_, err = session.RespondChProposal(context.Background(), chProposalID, true)
+		assert.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_Handle_Respond_Reject_Error", func(t *testing.T) {
+		session := newValidSession(t)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(assert.AnError)
+		session.HandleProposalWInterface(chProposal, responder)
+
+		_, err = session.RespondChProposal(context.Background(), chProposalID, false)
+		assert.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_Respond_Unknonwn_ProposalID", func(t *testing.T) {
+		session := newValidSession(t)
+
+		// == Test ==
+		_, err = session.RespondChProposal(context.Background(), "unknown-proposal-id", true)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
 	t.Run("error_Handle_Respond_Timeout", func(t *testing.T) {
-		chProposal := prepareChProposal(t, ownAddr, peers[0])
-		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		modifiedCfg := cfg
 		modifiedCfg.ResponseTimeout = 1 * time.Second
@@ -574,52 +613,20 @@ func Test_HandleProposalWInterface_Respond(t *testing.T) {
 		t.Log(err)
 	})
 
-	t.Run("happy_Handle_Respond_Accept_Error", func(t *testing.T) {
-		chProposal := prepareChProposal(t, ownAddr, peers[0])
-		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+	t.Run("error_Respond_Session_Closed", func(t *testing.T) {
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
-		session, err := session.NewSessionForTest(cfg, true, chClient)
+		session, err := session.NewSessionForTest(cfg, false, chClient)
 		require.NoError(t, err)
 		require.NotNil(t, session)
 
 		// == Test ==
 		ch := prepareChMock(t, openingBalInfo)
 		responder := &mocks.ChProposalResponder{}
-		responder.On("Accept", mock.Anything, mock.Anything).Return(ch, assert.AnError)
+		responder.On("Accept", mock.Anything, mock.Anything).Return(ch, nil)
 		session.HandleProposalWInterface(chProposal, responder)
 
 		_, err = session.RespondChProposal(context.Background(), chProposalID, true)
 		assert.Error(t, err)
-		t.Log(err)
-	})
-
-	t.Run("error_Handle_Respond_Reject_Error", func(t *testing.T) {
-		chProposal := prepareChProposal(t, ownAddr, peers[0])
-		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
-		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
-		session, err := session.NewSessionForTest(cfg, true, chClient)
-		require.NoError(t, err)
-		require.NotNil(t, session)
-
-		// == Test ==
-		responder := &mocks.ChProposalResponder{}
-		responder.On("Reject", mock.Anything, mock.Anything).Return(assert.AnError)
-		session.HandleProposalWInterface(chProposal, responder)
-
-		_, err = session.RespondChProposal(context.Background(), chProposalID, false)
-		assert.Error(t, err)
-		t.Log(err)
-	})
-
-	t.Run("happy_Handle_Respond_Accept_Error", func(t *testing.T) {
-		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
-		session, err := session.NewSessionForTest(cfg, true, chClient)
-		require.NoError(t, err)
-		require.NotNil(t, session)
-
-		// == Test ==
-		_, err = session.RespondChProposal(context.Background(), "unknown-proposal-id", true)
-		require.Error(t, err)
 		t.Log(err)
 	})
 }

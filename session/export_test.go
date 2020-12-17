@@ -28,7 +28,7 @@ func SetWalletBackend(wb perun.WalletBackend) {
 	walletBackend = wb
 }
 
-func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*session, error) {
+func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*Session, error) {
 	user, err := NewUnlockedUser(walletBackend, cfg.User)
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*sessi
 		response:  cfg.ResponseTimeout,
 	}
 
-	return &session{
+	return &Session{
 		Logger:               log.NewLoggerWithField("session-id", sessionID),
 		id:                   sessionID,
 		isOpen:               isOpen,
