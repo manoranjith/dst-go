@@ -64,8 +64,13 @@ func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*Sessi
 	}, nil
 }
 
-func NewChForTest(pch perun.Channel, currency string, parts []string, challengeDurSecs uint64) *Channel {
+func NewChForTest(pch perun.Channel, currency string, parts []string, challengeDurSecs uint64, isOpen bool) *Channel {
 	ch := newCh(pch, currency, parts, timeoutConfig{}, challengeDurSecs)
+	if isOpen {
+		ch.status = open
+	} else {
+		ch.status = closed
+	}
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.id)
 	return ch
 }

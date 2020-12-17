@@ -421,7 +421,7 @@ func Test_SubUnsubChProposal(t *testing.T) {
 	err = openSession.SubChProposals(dummyNotifier)
 	require.NoError(t, err)
 
-	// == SubTest 2: Sub again, should error. ==
+	// == SubTest 2: Sub again, should error ==
 	err = openSession.SubChProposals(dummyNotifier)
 	require.Error(t, err)
 
@@ -429,7 +429,7 @@ func Test_SubUnsubChProposal(t *testing.T) {
 	err = openSession.UnsubChProposals()
 	require.NoError(t, err)
 
-	// == SubTest 4: Unsub successfully ==
+	// == SubTest 4: Unsub again, should error ==
 	err = openSession.UnsubChProposals()
 	require.Error(t, err)
 

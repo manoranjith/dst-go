@@ -71,7 +71,7 @@ func Test_SendChUpdate(t *testing.T) {
 	t.Run("happy", func(t *testing.T) {
 
 		pch := prepareChMockC2(t, validOpeningBalInfo)
-		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
 
 		// == Test case specific prep ==
 		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(nil)
@@ -82,10 +82,19 @@ func Test_SendChUpdate(t *testing.T) {
 
 	t.Run("error_UpdateBy_RejectedByPeer", func(t *testing.T) {
 		pch := prepareChMockC2(t, validOpeningBalInfo)
-		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
 
 		// == Test case specific prep ==
 		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(errors.New("rejected by user"))
+		_, err := ch.SendChUpdate(context.Background(), func(s *pchannel.State) {})
+		require.Error(t, err)
+	})
+
+	t.Run("error_channel_closed", func(t *testing.T) {
+		pch := prepareChMockC2(t, validOpeningBalInfo)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
+
+		// == Test case specific prep ==
 		_, err := ch.SendChUpdate(context.Background(), func(s *pchannel.State) {})
 		require.Error(t, err)
 	})
@@ -103,7 +112,6 @@ func Test_HandleUpdate(t *testing.T) {
 	updatedBalInfo := validOpeningBalInfo
 	updatedBalInfo.Bal = []string{"0.5", "2.5"}
 	pch := prepareChMockC2(t, validOpeningBalInfo)
-	ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10)
 
 	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
 	require.NoError(t, err)
@@ -120,7 +128,58 @@ func Test_HandleUpdate(t *testing.T) {
 		chUpdate := &pclient.ChannelUpdate{
 			State: state,
 		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
 		ch.HandleUpdateWInterface(*chUpdate, &mocks.ChUpdateResponder{})
 	})
 
+	t.Run("happy", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
+		ch.HandleUpdateWInterface(*chUpdate, &mocks.ChUpdateResponder{})
+	})
+
+}
+
+func Test_SubUnsubChUpdate(t *testing.T) {
+
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+
+	dummyNotifier := func(notif perun.ChUpdateNotif) {}
+	pch := prepareChMockC2(t, validOpeningBalInfo)
+	ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+	// SubTest 1: Sub succesfully ==
+	err := ch.SubChUpdates(dummyNotifier)
+	require.NoError(t, err)
+
+	// SubTest 2: Sub again, should error ==
+	err = ch.SubChUpdates(dummyNotifier)
+	require.Error(t, err)
+
+	// SubTest 3: UnSub succesfully ==
+	err = ch.UnsubChUpdates()
+	require.NoError(t, err)
+
+	// SubTest 4: UnSub again, should error ==
+	err = ch.UnsubChUpdates()
+	require.Error(t, err)
+
+	t.Run("error_Sub_channelClosed", func(t *testing.T) {
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
+		err = ch.SubChUpdates(dummyNotifier)
+		require.Error(t, err)
+	})
+	t.Run("error_Unsub_channelClosed", func(t *testing.T) {
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
+		err = ch.UnsubChUpdates()
+		require.Error(t, err)
+	})
 }
