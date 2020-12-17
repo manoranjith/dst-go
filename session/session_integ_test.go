@@ -35,10 +35,6 @@ import (
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
-func init() {
-	session.SetWalletBackend(ethereumtest.NewTestWalletBackend())
-}
-
 func Test_Integ_New(t *testing.T) {
 	prng := rand.New(rand.NewSource(1729))
 	peers := newPeers(t, prng, uint(2))

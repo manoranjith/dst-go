@@ -41,6 +41,10 @@ import (
 	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
+func init() {
+	session.SetWalletBackend(ethereumtest.NewTestWalletBackend())
+}
+
 func sessionWithDummyChClient(t *testing.T, isOpen bool, peers ...perun.Peer) perun.SessionAPI {
 	prng := rand.New(rand.NewSource(1729))
 	cfg := sessiontest.NewConfigT(t, prng, peers...)
