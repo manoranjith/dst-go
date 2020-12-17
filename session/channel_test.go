@@ -18,21 +18,21 @@ package session_test
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
+	pclient "perun.network/go-perun/client"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/currency"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 	"github.com/hyperledger-labs/perun-node/session"
-	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
 func Test_ChAPI_Interface(t *testing.T) {
@@ -62,37 +62,16 @@ func Test_SendChUpdate(t *testing.T) {
 
 	prng := rand.New(rand.NewSource(1729))
 	peers := newPeers(t, prng, uint(2))
-	prng = rand.New(rand.NewSource(1729))
-	cfg := sessiontest.NewConfigT(t, prng, peers...)
 	validOpeningBalInfo := perun.BalInfo{
 		Currency: currency.ETH,
 		Parts:    []string{perun.OwnAlias, peers[0].Alias},
 		Bal:      []string{"1", "2"},
 	}
-	app := perun.App{
-		Def:  pchannel.NoApp(),
-		Data: pchannel.NoData(),
-	}
 
 	t.Run("happy", func(t *testing.T) {
 
 		pch := prepareChMockC2(t, validOpeningBalInfo)
-		chClient := &mocks.ChClient{}
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(pch, nil)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
-
-		session, err := session.NewSessionForTest(cfg, true, chClient)
-		require.NoError(t, err)
-		require.NotNil(t, session)
-
-		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
-		require.NoError(t, err)
-		require.NotZero(t, chInfo)
-
-		chID := fmt.Sprintf("%x", pch.ID())
-		ch, err := session.GetCh(chID)
-		require.NoError(t, err)
-		assert.Equal(t, ch.ID(), chID)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10)
 
 		// == Test case specific prep ==
 		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(nil)
@@ -101,28 +80,47 @@ func Test_SendChUpdate(t *testing.T) {
 		assert.NotZero(t, gotChInfo)
 	})
 
-	t.Run("error_UpdateBy_error", func(t *testing.T) {
+	t.Run("error_UpdateBy_RejectedByPeer", func(t *testing.T) {
 		pch := prepareChMockC2(t, validOpeningBalInfo)
-		chClient := &mocks.ChClient{}
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(pch, nil)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
-
-		session, err := session.NewSessionForTest(cfg, true, chClient)
-		require.NoError(t, err)
-		require.NotNil(t, session)
-
-		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
-		require.NoError(t, err)
-		require.NotZero(t, chInfo)
-
-		chID := fmt.Sprintf("%x", pch.ID())
-		ch, err := session.GetCh(chID)
-		require.NoError(t, err)
-		assert.Equal(t, ch.ID(), chID)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10)
 
 		// == Test case specific prep ==
-		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(assert.AnError)
-		_, err = ch.SendChUpdate(context.Background(), func(s *pchannel.State) {})
+		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(errors.New("rejected by user"))
+		_, err := ch.SendChUpdate(context.Background(), func(s *pchannel.State) {})
 		require.Error(t, err)
 	})
+}
+
+func Test_HandleUpdate(t *testing.T) {
+
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	updatedBalInfo := validOpeningBalInfo
+	updatedBalInfo.Bal = []string{"0.5", "2.5"}
+	pch := prepareChMockC2(t, validOpeningBalInfo)
+	ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10)
+
+	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
+	require.NoError(t, err)
+	state := &pchannel.State{
+		ID:         [32]byte{0},
+		Version:    0,
+		App:        pchannel.NoApp(),
+		Allocation: *allocation,
+		Data:       pchannel.NoData(),
+		IsFinal:    false,
+	}
+
+	t.Run("happy", func(t *testing.T) {
+		chUpdate := &pclient.ChannelUpdate{
+			State: state,
+		}
+		ch.HandleUpdateWInterface(*chUpdate, &mocks.ChUpdateResponder{})
+	})
+
 }

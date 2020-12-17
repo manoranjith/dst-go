@@ -65,18 +65,18 @@ type (
 
 	chUpdateResponderEntry struct {
 		notif       perun.ChUpdateNotif
-		responder   chUpdateResponder
+		responder   ChUpdateResponder
 		notifExpiry int64
 	}
 
-	//go:generate mockery --name ProposalResponder --output ../internal/mocks
-
 	// ChUpdaterResponder represents the methods on channel update responder that will be used the perun node.
-	chUpdateResponder interface {
+	ChUpdateResponder interface {
 		Accept(ctx context.Context) error
 		Reject(ctx context.Context, reason string) error
 	}
 )
+
+//go:generate mockery --name ChUpdateResponder --output ../internal/mocks
 
 // newCh sets up a channel object from the passed pchannel.
 func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeoutConfig,
@@ -166,6 +166,9 @@ func (ch *Channel) sendChUpdate(pctx context.Context, updater perun.StateUpdater
 }
 
 func (ch *Channel) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
+	ch.HandleUpdate(chUpdate, responder)
+}
+func (ch *Channel) HandleUpdateWInterface(chUpdate pclient.ChannelUpdate, responder ChUpdateResponder) {
 	ch.Lock()
 	defer ch.Unlock()
 
