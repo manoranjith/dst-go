@@ -63,7 +63,7 @@ type (
 		chClient   perun.ChClient
 		contacts   perun.Contacts
 
-		chs map[string]*channel
+		chs map[string]*Channel
 
 		chProposalNotifier    perun.ChProposalNotifier
 		chProposalNotifsCache []perun.ChProposalNotif
@@ -150,7 +150,7 @@ func New(cfg Config) (*Session, error) {
 		chAsset:              chAsset,
 		chClient:             chClient,
 		contacts:             contacts,
-		chs:                  make(map[string]*channel),
+		chs:                  make(map[string]*Channel),
 		chProposalResponders: make(map[string]chProposalResponderEntry),
 	}
 	err = sess.chClient.RestoreChs(sess.handleRestoredCh)
@@ -404,7 +404,7 @@ func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Al
 }
 
 // addCh adds the channel to session. It locks the session mutex during the operation.
-func (s *Session) addCh(ch *channel) {
+func (s *Session) addCh(ch *Channel) {
 	ch.Logger = log.NewLoggerWithField("channel-id", ch.id)
 	s.Lock()
 	// TODO: (mano) use logger with multiple fields and use session-id, channel-id.

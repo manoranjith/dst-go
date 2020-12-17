@@ -59,7 +59,7 @@ func NewSessionForTest(cfg Config, isOpen bool, chClient perun.ChClient) (*Sessi
 		chAsset:              chAsset,
 		chClient:             chClient,
 		contacts:             contacts,
-		chs:                  make(map[string]*channel),
+		chs:                  make(map[string]*Channel),
 		chProposalResponders: make(map[string]chProposalResponderEntry),
 	}, nil
 }
