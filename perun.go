@@ -276,14 +276,14 @@ type (
 		Expiry           int64
 	}
 
-	// ChCloseNotifier is the notifier function that is used for sending channel close notifications.
-	ChCloseNotifier func(ChCloseNotif)
+	// // ChCloseNotifier is the notifier function that is used for sending channel close notifications.
+	// ChCloseNotifier func(ChCloseNotif)
 
-	// ChCloseNotif represents the parameters sent in a channel close notifications.
-	ChCloseNotif struct {
-		ClosedChInfo ChInfo
-		Error        string
-	}
+	// // ChCloseNotif represents the parameters sent in a channel close notifications.
+	// ChCloseNotif struct {
+	// 	ClosedChInfo ChInfo
+	// 	Error        string
+	// }
 )
 
 //go:generate mockery --name ChAPI --output ./internal/mocks

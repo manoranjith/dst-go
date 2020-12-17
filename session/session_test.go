@@ -49,7 +49,7 @@ func Test_SessionAPI_Interface(t *testing.T) {
 	assert.Implements(t, (*perun.SessionAPI)(nil), new(session.Session))
 }
 
-func sessionWithDummyChClient(t *testing.T, isOpen bool, peers ...perun.Peer) perun.SessionAPI {
+func sessionWithDummyChClient(t *testing.T, isOpen bool, peers ...perun.Peer) *session.Session {
 	prng := rand.New(rand.NewSource(1729))
 	cfg := sessiontest.NewConfigT(t, prng, peers...)
 	chClient := &mocks.ChClient{}
@@ -837,6 +837,44 @@ func Test_ProposeCh_CloseSession(t *testing.T) {
 		_, err := session.Close(false)
 		require.Error(t, err)
 		t.Log(err)
+	})
+}
+
+func Test_Session_HandleUpdate(t *testing.T) {
+	t.Run("error_session_closed", func(t *testing.T) {
+		prng := rand.New(rand.NewSource(1729))
+		peers := newPeers(t, prng, uint(2))
+		validOpeningBalInfo := perun.BalInfo{
+			Currency: currency.ETH,
+			Parts:    []string{perun.OwnAlias, peers[0].Alias},
+			Bal:      []string{"1", "2"},
+		}
+		updatedBalInfo := validOpeningBalInfo
+		updatedBalInfo.Bal = []string{"0.5", "2.5"}
+		// pch, _ := prepareChMockC2(t, validOpeningBalInfo)
+
+		allocation, err := session.MakeAllocation(updatedBalInfo, nil)
+		require.NoError(t, err)
+		nonFinalState := pchannel.State{
+			ID:         [32]byte{0},
+			Version:    0,
+			App:        pchannel.NoApp(),
+			Allocation: *allocation,
+			Data:       pchannel.NoData(),
+			IsFinal:    false,
+		}
+
+		chUpdate := &pclient.ChannelUpdate{
+			State: &nonFinalState,
+		}
+		// == Test ==
+		session := sessionWithDummyChClient(t, true)
+		session.HandleUpdate(*chUpdate, new(pclient.UpdateResponder))
+	})
+	t.Run("error_session_closed", func(t *testing.T) {
+		// == Test ==
+		session := sessionWithDummyChClient(t, false)
+		session.HandleUpdate(pclient.ChannelUpdate{}, new(pclient.UpdateResponder))
 	})
 }
 

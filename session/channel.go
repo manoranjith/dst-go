@@ -339,6 +339,9 @@ func (ch *Channel) getChInfo() perun.ChInfo {
 }
 
 func makeChInfo(chID string, parts []string, curr string, state *pchannel.State) perun.ChInfo {
+	if state == nil {
+		return perun.ChInfo{}
+	}
 	return perun.ChInfo{
 		ChID:    chID,
 		BalInfo: makeBalInfoFromState(parts, curr, state),
@@ -357,9 +360,6 @@ func makeApp(def pchannel.App, data pchannel.Data) perun.App {
 
 // makeBalInfoFromState retrieves balance information from the channel state.
 func makeBalInfoFromState(parts []string, curr string, state *pchannel.State) perun.BalInfo {
-	if state == nil {
-		return perun.BalInfo{}
-	}
 	return makeBalInfoFromRawBal(parts, curr, state.Balances[0])
 }
 
