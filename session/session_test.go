@@ -119,6 +119,25 @@ func Test_GetContact(t *testing.T) {
 	})
 }
 
+func prepareChMock(t *testing.T, openingBalInfo perun.BalInfo) perun.Channel {
+	ch := &mocks.Channel{}
+	ch.On("ID").Return([32]byte{0, 1, 2})
+	allocation, err := session.MakeAllocation(openingBalInfo, nil)
+	require.NoError(t, err)
+	state := &pchannel.State{
+		ID:         [32]byte{0},
+		Version:    0,
+		App:        pchannel.NoApp(),
+		Allocation: *allocation,
+		Data:       pchannel.NoData(),
+		IsFinal:    false,
+	}
+	ch.On("State").Return(state)
+	watcherSignal := make(chan time.Time)
+	ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
+	return ch
+}
+
 func Test_OpenCh(t *testing.T) {
 	// == Setup ==
 	prng := rand.New(rand.NewSource(1729))
@@ -135,28 +154,9 @@ func Test_OpenCh(t *testing.T) {
 		Data: pchannel.NoData(),
 	}
 
-	prepareChMock := func(openingBalInfo perun.BalInfo) perun.Channel {
-		ch := &mocks.Channel{}
-		ch.On("ID").Return([32]byte{0, 1, 2})
-		allocation, err := session.MakeAllocation(openingBalInfo, nil)
-		require.NoError(t, err)
-		state := &pchannel.State{
-			ID:         [32]byte{0},
-			Version:    0,
-			App:        pchannel.NoApp(),
-			Allocation: *allocation,
-			Data:       pchannel.NoData(),
-			IsFinal:    false,
-		}
-		ch.On("State").Return(state)
-		watcherSignal := make(chan time.Time)
-		ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-		return ch
-	}
-
 	t.Run("happy_1_own_alias_first", func(t *testing.T) {
 		// == Prepare mocks ==
-		ch := prepareChMock(validOpeningBalInfo)
+		ch := prepareChMock(t, validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -175,7 +175,7 @@ func Test_OpenCh(t *testing.T) {
 		validOpeningBalInfo2.Parts = []string{peers[0].Alias, perun.OwnAlias}
 
 		// == Prepare mocks ==
-		ch := prepareChMock(validOpeningBalInfo2)
+		ch := prepareChMock(t, validOpeningBalInfo2)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -191,7 +191,7 @@ func Test_OpenCh(t *testing.T) {
 
 	t.Run("error_session_closed", func(t *testing.T) {
 		// == Prepare mocks ==
-		ch := prepareChMock(validOpeningBalInfo)
+		ch := prepareChMock(t, validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -266,7 +266,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with just Register method.
 		// because the test will fail before ProposeChannel call.
-		ch := prepareChMock(validOpeningBalInfo)
+		ch := prepareChMock(t, validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -287,7 +287,7 @@ func Test_OpenCh(t *testing.T) {
 		// == Prepare mocks ==
 		// Ignore ch and define only chClient mock with just Register method.
 		// because the test will fail before ProposeChannel call.
-		ch := prepareChMock(validOpeningBalInfo)
+		ch := prepareChMock(t, validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -303,7 +303,7 @@ func Test_OpenCh(t *testing.T) {
 
 	t.Run("error_ProposeChannel_AnError", func(t *testing.T) {
 		// == Prepare testcase specific mocks ==
-		ch := prepareChMock(validOpeningBalInfo)
+		ch := prepareChMock(t, validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, assert.AnError)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -319,7 +319,7 @@ func Test_OpenCh(t *testing.T) {
 
 	t.Run("error_ProposeChannel_PeerRejected", func(t *testing.T) {
 		// == Prepare testcase specific mocks ==
-		ch := prepareChMock(validOpeningBalInfo)
+		ch := prepareChMock(t, validOpeningBalInfo)
 		chClient := &mocks.ChClient{}
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, errors.New("channel proposal rejected"))
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
@@ -501,6 +501,126 @@ func Test_HandleProposalWInterface_Sub(t *testing.T) {
 			return len(notifs) == 1
 		}
 		assert.Eventually(t, notifRecieved, 2*time.Second, 100*time.Millisecond)
+	})
+}
+
+func Test_HandleProposalWInterface_Respond(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(1)) // Aliases of peers are their respective indices in the array.
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
+	require.NoError(t, err)
+
+	openingBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{peers[0].Alias, perun.OwnAlias},
+		Bal:      []string{"1", "2"},
+	}
+
+	t.Run("happy_Handle_Respond_Accept", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		ch := prepareChMock(t, openingBalInfo)
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Accept", mock.Anything, mock.Anything).Return(ch, nil)
+		session.HandleProposalWInterface(chProposal, responder)
+
+		gotChInfo, err := session.RespondChProposal(context.Background(), chProposalID, true)
+		require.NoError(t, err)
+		assert.Equal(t, gotChInfo.ChID, fmt.Sprintf("%x", ch.ID()))
+	})
+
+	t.Run("happy_Handle_Respond_Reject", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(nil)
+		session.HandleProposalWInterface(chProposal, responder)
+
+		_, err = session.RespondChProposal(context.Background(), chProposalID, false)
+		assert.NoError(t, err)
+	})
+
+	t.Run("error_Handle_Respond_Timeout", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		modifiedCfg := cfg
+		modifiedCfg.ResponseTimeout = 1 * time.Second
+		session, err := session.NewSessionForTest(modifiedCfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{} // Dummy responder is sufficient as no methods on it will be invoked.
+		session.HandleProposalWInterface(chProposal, responder)
+		time.Sleep(2 * time.Second) // Wait until the notification expires.
+		_, err = session.RespondChProposal(context.Background(), chProposalID, true)
+		assert.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("happy_Handle_Respond_Accept_Error", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		ch := prepareChMock(t, openingBalInfo)
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Accept", mock.Anything, mock.Anything).Return(ch, assert.AnError)
+		session.HandleProposalWInterface(chProposal, responder)
+
+		_, err = session.RespondChProposal(context.Background(), chProposalID, true)
+		assert.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_Handle_Respond_Reject_Error", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
+		chProposalID := fmt.Sprintf("%x", chProposal.Proposal().ProposalID())
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		responder := &mocks.ChProposalResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(assert.AnError)
+		session.HandleProposalWInterface(chProposal, responder)
+
+		_, err = session.RespondChProposal(context.Background(), chProposalID, false)
+		assert.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("happy_Handle_Respond_Accept_Error", func(t *testing.T) {
+		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+		session, err := session.NewSessionForTest(cfg, true, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, session)
+
+		// == Test ==
+		_, err = session.RespondChProposal(context.Background(), "unknown-proposal-id", true)
+		require.Error(t, err)
+		t.Log(err)
 	})
 }
 
