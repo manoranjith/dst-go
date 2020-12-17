@@ -40,7 +40,7 @@ func Test_ChAPI_Interface(t *testing.T) {
 	assert.Implements(t, (*perun.ChAPI)(nil), new(session.Channel))
 }
 
-func prepareChMockC2(t *testing.T, openingBalInfo perun.BalInfo) *mocks.Channel {
+func prepareChMockC2(t *testing.T, openingBalInfo perun.BalInfo) (*mocks.Channel, chan time.Time) {
 	ch := &mocks.Channel{}
 	ch.On("ID").Return([32]byte{0, 1, 2})
 	allocation, err := session.MakeAllocation(openingBalInfo, nil)
@@ -56,7 +56,7 @@ func prepareChMockC2(t *testing.T, openingBalInfo perun.BalInfo) *mocks.Channel 
 	ch.On("State").Return(state)
 	watcherSignal := make(chan time.Time)
 	ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
-	return ch
+	return ch, watcherSignal
 }
 
 func Test_SendChUpdate(t *testing.T) {
@@ -71,7 +71,7 @@ func Test_SendChUpdate(t *testing.T) {
 
 	t.Run("happy", func(t *testing.T) {
 
-		pch := prepareChMockC2(t, validOpeningBalInfo)
+		pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
 
 		// == Test case specific prep ==
@@ -82,7 +82,7 @@ func Test_SendChUpdate(t *testing.T) {
 	})
 
 	t.Run("error_UpdateBy_RejectedByPeer", func(t *testing.T) {
-		pch := prepareChMockC2(t, validOpeningBalInfo)
+		pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
 
 		// == Test case specific prep ==
@@ -92,7 +92,7 @@ func Test_SendChUpdate(t *testing.T) {
 	})
 
 	t.Run("error_channel_closed", func(t *testing.T) {
-		pch := prepareChMockC2(t, validOpeningBalInfo)
+		pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
 
 		// == Test case specific prep ==
@@ -112,7 +112,7 @@ func Test_HandleUpdate(t *testing.T) {
 	}
 	updatedBalInfo := validOpeningBalInfo
 	updatedBalInfo.Bal = []string{"0.5", "2.5"}
-	pch := prepareChMockC2(t, validOpeningBalInfo)
+	pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 
 	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
 	require.NoError(t, err)
@@ -154,7 +154,7 @@ func Test_SubUnsubChUpdate(t *testing.T) {
 	}
 
 	dummyNotifier := func(notif perun.ChUpdateNotif) {}
-	pch := prepareChMockC2(t, validOpeningBalInfo)
+	pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 	ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
 
 	// SubTest 1: Sub succesfully ==
@@ -196,7 +196,7 @@ func Test_HandleUpdate_Sub(t *testing.T) {
 	}
 	updatedBalInfo := validOpeningBalInfo
 	updatedBalInfo.Bal = []string{"0.5", "2.5"}
-	pch := prepareChMockC2(t, validOpeningBalInfo)
+	pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 
 	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
 	require.NoError(t, err)
@@ -261,7 +261,7 @@ func Test_HandleUpdate_Respond(t *testing.T) {
 	}
 	updatedBalInfo := validOpeningBalInfo
 	updatedBalInfo.Bal = []string{"0.5", "2.5"}
-	pch := prepareChMockC2(t, validOpeningBalInfo)
+	pch, _ := prepareChMockC2(t, validOpeningBalInfo)
 
 	allocation, err := session.MakeAllocation(updatedBalInfo, nil)
 	require.NoError(t, err)
@@ -374,4 +374,85 @@ func Test_HandleUpdate_Respond(t *testing.T) {
 	})
 
 	// TODO: for final call.... because preparation of settleSecondary is required.
+}
+
+func Test_Close(t *testing.T) {
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+
+	t.Run("happy_finalizeNoError_settle", func(t *testing.T) {
+		pch, watcherSignal := prepareChMockC2(t, validOpeningBalInfo)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+		// == Test case specific prep ==
+		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(nil)
+		pch.On("Settle", mock.Anything).Return(nil).Run(func(_ mock.Arguments) {
+			watcherSignal <- time.Now() // Return the watcher once channel is settled.
+		})
+		pch.On("Close").Return(nil)
+
+		gotChInfo, err := ch.Close(context.Background())
+		require.NoError(t, err)
+		assert.NotZero(t, gotChInfo)
+	})
+
+	t.Run("happy_finalizeError_settle", func(t *testing.T) {
+		pch, watcherSignal := prepareChMockC2(t, validOpeningBalInfo)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+		// == Test case specific prep ==
+		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(assert.AnError)
+		pch.On("Settle", mock.Anything).Return(nil).Run(func(_ mock.Arguments) {
+			watcherSignal <- time.Now() // Return the watcher once channel is settled.
+		})
+		pch.On("Close").Return(nil)
+
+		gotChInfo, err := ch.Close(context.Background())
+		require.NoError(t, err)
+		assert.NotZero(t, gotChInfo)
+	})
+
+	t.Run("happy_closeError", func(t *testing.T) {
+		pch, watcherSignal := prepareChMockC2(t, validOpeningBalInfo)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+		// == Test case specific prep ==
+		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(nil)
+		pch.On("Settle", mock.Anything).Return(nil).Run(func(_ mock.Arguments) {
+			watcherSignal <- time.Now() // Return the watcher once channel is settled.
+		})
+		pch.On("Close").Return(assert.AnError)
+
+		gotChInfo, err := ch.Close(context.Background())
+		require.NoError(t, err)
+		assert.NotZero(t, gotChInfo)
+	})
+
+	t.Run("error_settleError", func(t *testing.T) {
+		pch, _ := prepareChMockC2(t, validOpeningBalInfo)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, true)
+
+		// == Test case specific prep ==
+		pch.On("UpdateBy", mock.Anything, mock.Anything).Return(nil)
+		pch.On("Settle", mock.Anything).Return(assert.AnError)
+
+		_, err := ch.Close(context.Background())
+		require.Error(t, err)
+	})
+
+	t.Run("error_channel_closed", func(t *testing.T) {
+
+		pch, _ := prepareChMockC2(t, validOpeningBalInfo)
+		ch := session.NewChForTest(pch, currency.ETH, validOpeningBalInfo.Parts, 10, false)
+
+		// == Test case specific prep ==
+		_, err := ch.Close(context.Background())
+		require.Error(t, err)
+		t.Log(err)
+	})
 }
