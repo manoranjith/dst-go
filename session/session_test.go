@@ -30,7 +30,7 @@ import (
 	"github.com/stretchr/testify/require"
 	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
-	"perun.network/go-perun/wire"
+	pwire "perun.network/go-perun/wire"
 
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
@@ -334,6 +334,23 @@ func Test_OpenCh(t *testing.T) {
 	})
 }
 
+func prepareChProposal(t *testing.T, ownAddr pwire.Address, peer perun.Peer) pclient.ChannelProposal {
+	prng := rand.New(rand.NewSource(121))
+	chAsset := ethereumtest.NewRandomAddress(prng)
+
+	openingBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{peer.Alias, perun.OwnAlias},
+		Bal:      []string{"1", "2"},
+	}
+	allocation, err := session.MakeAllocation(openingBalInfo, chAsset)
+	require.NoError(t, err)
+
+	return pclient.NewLedgerChannelProposal(10, ownAddr, allocation,
+		[]pwire.Address{peer.OffChainAddr, ownAddr},
+		pclient.WithApp(pchannel.NoApp(), pchannel.NoData()), pclient.WithRandomNonce())
+}
+
 func Test_HandleProposalWInterface(t *testing.T) {
 	// == Setup ==
 	prng := rand.New(rand.NewSource(1729))
@@ -343,24 +360,8 @@ func Test_HandleProposalWInterface(t *testing.T) {
 	ownAddr, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.User.OffChainAddr)
 	require.NoError(t, err)
 
-	prepareChProposal := func(peer perun.Peer) pclient.ChannelProposal {
-		chAsset, err := ethereumtest.NewTestWalletBackend().ParseAddr(cfg.Asset)
-		require.NoError(t, err)
-
-		openingBalInfo := perun.BalInfo{
-			Currency: currency.ETH,
-			Parts:    []string{peer.Alias, perun.OwnAlias},
-			Bal:      []string{"1", "2"},
-		}
-		allocation, err := session.MakeAllocation(openingBalInfo, chAsset)
-		require.NoError(t, err)
-
-		return pclient.NewLedgerChannelProposal(10, ownAddr, allocation,
-			[]wire.Address{peer.OffChainAddr, ownAddr},
-			pclient.WithApp(pchannel.NoApp(), pchannel.NoData()), pclient.WithRandomNonce())
-	}
-
 	t.Run("happy", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
@@ -368,11 +369,12 @@ func Test_HandleProposalWInterface(t *testing.T) {
 
 		// == Test ==
 		responder := &mocks.ChProposalResponder{}
-		session.HandleProposalWInterface(prepareChProposal(peers[0]), responder)
+		session.HandleProposalWInterface(chProposal, responder)
 	})
 
 	t.Run("error_unknown_peer", func(t *testing.T) {
 		unknownPeer := newPeers(t, prng, 1)[0]
+		chProposal := prepareChProposal(t, ownAddr, unknownPeer)
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		session, err := session.NewSessionForTest(cfg, true, chClient)
 		require.NoError(t, err)
@@ -381,10 +383,11 @@ func Test_HandleProposalWInterface(t *testing.T) {
 		// == Test ==
 		responder := &mocks.ChProposalResponder{}
 		responder.On("Reject", mock.Anything, mock.Anything).Return(nil)
-		session.HandleProposalWInterface(prepareChProposal(unknownPeer), responder)
+		session.HandleProposalWInterface(chProposal, responder)
 	})
 
 	t.Run("error_session_closed", func(t *testing.T) {
+		chProposal := prepareChProposal(t, ownAddr, peers[0])
 		chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
 		session, err := session.NewSessionForTest(cfg, false, chClient)
 		require.NoError(t, err)
@@ -392,9 +395,58 @@ func Test_HandleProposalWInterface(t *testing.T) {
 
 		// == Test ==
 		// Use mocks with no registered calls, as no methods on them will be invoked.
-		chProposal := &mocks.ChannelProposal{}
 		responder := &mocks.ChProposalResponder{}
 		session.HandleProposalWInterface(chProposal, responder)
+	})
+}
+
+func Test_SubUnsubChProposal(t *testing.T) {
+	prng := rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng)
+	chClient := &mocks.ChClient{} // Dummy ChClient is sufficient as no methods on it will be invoked.
+	openSession, err := session.NewSessionForTest(cfg, true, chClient)
+	require.NoError(t, err)
+	require.NotNil(t, openSession)
+
+	dummyNotifier := func(notif perun.ChProposalNotif) {}
+
+	// Note: All sub tests are written at the same level because each sub test modifies the state of session and
+	// the order of execution needs to be maintained.
+
+	// == SubTest 1: Sub successfully ==
+	err = openSession.SubChProposals(dummyNotifier)
+	require.NoError(t, err)
+
+	// == SubTest 2: Sub again, should error. ==
+	err = openSession.SubChProposals(dummyNotifier)
+	require.Error(t, err)
+
+	// == SubTest 3: Unsub successfully ==
+	err = openSession.UnsubChProposals()
+	require.NoError(t, err)
+
+	// == SubTest 4: Unsub successfully ==
+	err = openSession.UnsubChProposals()
+	require.Error(t, err)
+
+	t.Run("error_Sub_sessionClosed", func(t *testing.T) {
+		closedSession, err := session.NewSessionForTest(cfg, false, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, closedSession)
+
+		// == Test ==
+		err = closedSession.SubChProposals(dummyNotifier)
+		require.Error(t, err)
+	})
+
+	t.Run("error_Unsub_sessionClosed", func(t *testing.T) {
+		closedSession, err := session.NewSessionForTest(cfg, false, chClient)
+		require.NoError(t, err)
+		require.NotNil(t, closedSession)
+
+		// == Test ==
+		err = closedSession.UnsubChProposals()
+		require.Error(t, err)
 	})
 }
 
