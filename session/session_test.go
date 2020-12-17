@@ -835,6 +835,13 @@ func Test_ProposeCh_CloseSession(t *testing.T) {
 		require.Error(t, err)
 		t.Log(err)
 	})
+	t.Run("error_session_closed", func(t *testing.T) {
+		// == Test ==
+		session := sessionWithDummyChClient(t, false)
+		_, err := session.Close(false)
+		require.Error(t, err)
+		t.Log(err)
+	})
 }
 
 func newPeers(t *testing.T, prng *rand.Rand, n uint) []perun.Peer {
