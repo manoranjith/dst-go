@@ -631,6 +631,212 @@ func Test_HandleProposalWInterface_Respond(t *testing.T) {
 	})
 }
 
+func Test_ProposeCh_GetChsInfo(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	app := perun.App{
+		Def:  pchannel.NoApp(),
+		Data: pchannel.NoData(),
+	}
+	ch := prepareChMock(t, validOpeningBalInfo)
+	chClient := &mocks.ChClient{}
+	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
+	chClient.On("Register", mock.Anything, mock.Anything).Return()
+	session, err := session.NewSessionForTest(cfg, true, chClient)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+	require.NoError(t, err)
+	require.NotZero(t, chInfo)
+
+	t.Run("happy", func(t *testing.T) {
+		// == Test ==
+		chID := fmt.Sprintf("%x", ch.ID())
+		chsInfo := session.GetChsInfo()
+		assert.Len(t, chsInfo, 1)
+		assert.Equal(t, chsInfo[0].ChID, chID)
+	})
+}
+
+func Test_ProposeCh_GetCh(t *testing.T) {
+	// == Setup ==
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	app := perun.App{
+		Def:  pchannel.NoApp(),
+		Data: pchannel.NoData(),
+	}
+	ch := prepareChMock(t, validOpeningBalInfo)
+	chClient := &mocks.ChClient{}
+	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
+	chClient.On("Register", mock.Anything, mock.Anything).Return()
+	session, err := session.NewSessionForTest(cfg, true, chClient)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+	require.NoError(t, err)
+	require.NotZero(t, chInfo)
+
+	t.Run("happy", func(t *testing.T) {
+		// == Test ==
+		chID := fmt.Sprintf("%x", ch.ID())
+		gotCh, err := session.GetCh(chID)
+		require.NoError(t, err)
+		assert.Equal(t, gotCh.ID(), chID)
+	})
+
+	t.Run("error_unknownChID", func(t *testing.T) {
+		// == Test ==
+		_, err := session.GetCh("unknown-ch-ID")
+		require.Error(t, err)
+	})
+}
+
+func prepareChMock2(t *testing.T, openingBalInfo perun.BalInfo, phase pchannel.Phase) perun.Channel {
+	ch := &mocks.Channel{}
+	ch.On("ID").Return([32]byte{0, 1, 2})
+	allocation, err := session.MakeAllocation(openingBalInfo, nil)
+	require.NoError(t, err)
+	state := &pchannel.State{
+		ID:         [32]byte{0},
+		Version:    0,
+		App:        pchannel.NoApp(),
+		Allocation: *allocation,
+		Data:       pchannel.NoData(),
+		IsFinal:    false,
+	}
+	ch.On("State").Return(state)
+	ch.On("Phase").Return(phase)
+	watcherSignal := make(chan time.Time)
+	ch.On("Watch").WaitUntil(watcherSignal).Return(nil)
+	return ch
+}
+
+func prepareSessionWithChs(t *testing.T, cntChs uint) (*session.Session, []string) {
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	app := perun.App{
+		Def:  pchannel.NoApp(),
+		Data: pchannel.NoData(),
+	}
+	chClient := &mocks.ChClient{}
+	ch := prepareChMock2(t, validOpeningBalInfo, pchannel.Acting)
+	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
+	chClient.On("Register", mock.Anything, mock.Anything).Return()
+	chClient.On("Close", mock.Anything).Return(nil)
+	session, err := session.NewSessionForTest(cfg, true, chClient)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	chIDs := make([]string, cntChs)
+	for i := uint(0); i < cntChs; i++ {
+		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+		require.NoError(t, err)
+		require.NotZero(t, chInfo)
+		chIDs[i] = chInfo.ChID
+	}
+
+	return session, chIDs
+}
+
+func prepareSessionWithChs2(t *testing.T, cntChs uint) (*session.Session, []string) {
+	prng := rand.New(rand.NewSource(1729))
+	peers := newPeers(t, prng, uint(2))
+	prng = rand.New(rand.NewSource(1729))
+	cfg := sessiontest.NewConfigT(t, prng, peers...)
+	validOpeningBalInfo := perun.BalInfo{
+		Currency: currency.ETH,
+		Parts:    []string{perun.OwnAlias, peers[0].Alias},
+		Bal:      []string{"1", "2"},
+	}
+	app := perun.App{
+		Def:  pchannel.NoApp(),
+		Data: pchannel.NoData(),
+	}
+	chClient := &mocks.ChClient{}
+	ch := prepareChMock2(t, validOpeningBalInfo, pchannel.Registering)
+	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
+	chClient.On("Register", mock.Anything, mock.Anything).Return()
+	chClient.On("Close", mock.Anything).Return(nil)
+	session, err := session.NewSessionForTest(cfg, true, chClient)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+
+	chIDs := make([]string, cntChs)
+	for i := uint(0); i < cntChs; i++ {
+		chInfo, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+		require.NoError(t, err)
+		require.NotZero(t, chInfo)
+		chIDs[i] = chInfo.ChID
+	}
+
+	return session, chIDs
+}
+
+func Test_ProposeCh_CloseSession(t *testing.T) {
+
+	t.Run("happy_no_force", func(t *testing.T) {
+		// == Test ==
+		session, _ := prepareSessionWithChs(t, 0)
+		persistedChs, err := session.Close(false)
+		require.NoError(t, err)
+		assert.Len(t, persistedChs, 0)
+	})
+	t.Run("happy_force", func(t *testing.T) {
+		// == Test ==
+		session, _ := prepareSessionWithChs(t, 1)
+		persistedChs, err := session.Close(true)
+		require.NoError(t, err)
+		assert.Len(t, persistedChs, 1)
+	})
+	t.Run("error_no_force_openChs", func(t *testing.T) {
+		// == Test ==
+		session, _ := prepareSessionWithChs(t, 1)
+		_, err := session.Close(false)
+		require.Error(t, err)
+		t.Log(err)
+	})
+	t.Run("error_no_force_openChs", func(t *testing.T) {
+		// == Test ==
+		session, _ := prepareSessionWithChs(t, 1)
+		_, err := session.Close(false)
+		require.Error(t, err)
+		t.Log(err)
+	})
+
+	t.Run("error_force_unexpectedPhaseChs", func(t *testing.T) {
+		// == Test ==
+		session, _ := prepareSessionWithChs2(t, 1)
+		_, err := session.Close(false)
+		require.Error(t, err)
+		t.Log(err)
+	})
+}
+
 func newPeers(t *testing.T, prng *rand.Rand, n uint) []perun.Peer {
 	ethereumBackend := ethereumtest.NewTestWalletBackend()
 	peers := make([]perun.Peer, n)
