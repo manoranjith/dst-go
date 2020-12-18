@@ -840,8 +840,8 @@ func Test_ProposeCh_CloseSession(t *testing.T) {
 	})
 }
 
-func Test_Session_HandleUpdate(t *testing.T) {
-	t.Run("error_session_closed", func(t *testing.T) {
+func Test_Session_HandleUpdateWInterface(t *testing.T) {
+	t.Run("happy", func(t *testing.T) {
 		prng := rand.New(rand.NewSource(1729))
 		peers := newPeers(t, prng, uint(2))
 		validOpeningBalInfo := perun.BalInfo{
@@ -869,7 +869,9 @@ func Test_Session_HandleUpdate(t *testing.T) {
 		}
 		// == Test ==
 		session := sessionWithDummyChClient(t, true)
-		session.HandleUpdate(*chUpdate, new(pclient.UpdateResponder))
+		responder := &mocks.ChUpdateResponder{}
+		responder.On("Reject", mock.Anything, mock.Anything).Return(nil)
+		session.HandleUpdateWInterface(*chUpdate, responder)
 	})
 	t.Run("error_session_closed", func(t *testing.T) {
 		// == Test ==

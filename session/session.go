@@ -609,6 +609,10 @@ func (s *Session) GetCh(chID string) (perun.ChAPI, error) {
 }
 
 func (s *Session) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
+	s.HandleUpdateWInterface(chUpdate, responder)
+}
+
+func (s *Session) HandleUpdateWInterface(chUpdate pclient.ChannelUpdate, responder ChUpdateResponder) {
 	s.Debugf("SDK Callback: HandleUpdate. Params: %+v", chUpdate)
 	s.Lock()
 	defer s.Unlock()

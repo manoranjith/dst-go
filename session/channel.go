@@ -165,10 +165,7 @@ func (ch *Channel) sendChUpdate(pctx context.Context, updater perun.StateUpdater
 	return perun.GetAPIError(err)
 }
 
-func (ch *Channel) HandleUpdate(chUpdate pclient.ChannelUpdate, responder *pclient.UpdateResponder) {
-	ch.HandleUpdate(chUpdate, responder)
-}
-func (ch *Channel) HandleUpdateWInterface(chUpdate pclient.ChannelUpdate, responder ChUpdateResponder) {
+func (ch *Channel) HandleUpdate(chUpdate pclient.ChannelUpdate, responder ChUpdateResponder) {
 	ch.Lock()
 	defer ch.Unlock()
 
