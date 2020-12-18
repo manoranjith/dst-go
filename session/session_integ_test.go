@@ -138,24 +138,44 @@ func Test_Integ_New(t *testing.T) {
 }
 
 func Test_Integ_Persistence(t *testing.T) {
-	prng := rand.New(rand.NewSource(1729))
 
-	aliceCfg := sessiontest.NewConfigT(t, prng)
-	// Use contacts and database directory from a session that was persisted already.
-	// Copy database directory to tmp before using as it will be modifed when reading as well.
-	// Contacts file can be used as such.
-	aliceCfg.DatabaseDir = copyDirToTmp(t, "../testdata/session/persistence/alice-database")
-	aliceCfg.ContactsURL = "../testdata/session/persistence/alice-contacts.yaml"
+	t.Run("happy", func(t *testing.T) {
+		prng := rand.New(rand.NewSource(1729))
+		aliceCfg := sessiontest.NewConfigT(t, prng)
+		// Use contacts and database directory from a session that was persisted already.
+		// Copy database directory to tmp before using as it will be modifed when reading as well.
+		// Contacts file can be used as such.
+		aliceCfg.DatabaseDir = copyDirToTmp(t, "../testdata/session/persistence/alice-database")
+		aliceCfg.ContactsURL = "../testdata/session/persistence/alice-contacts.yaml"
 
-	alice, err := session.New(aliceCfg)
-	require.NoErrorf(t, err, "initializing alice session")
-	t.Logf("alice session id: %s\n", alice.ID())
-	t.Logf("alice database dir is: %s\n", aliceCfg.DatabaseDir)
+		alice, err := session.New(aliceCfg)
+		require.NoErrorf(t, err, "initializing alice session")
+		t.Logf("alice session id: %s\n", alice.ID())
+		t.Logf("alice database dir is: %s\n", aliceCfg.DatabaseDir)
 
-	t.Run("GetChannelInfos", func(t *testing.T) {
-		t.Run("happy", func(t *testing.T) {
-			require.Equal(t, 3, len(alice.GetChsInfo()))
-		})
+		require.Equal(t, 3, len(alice.GetChsInfo()))
+	})
+
+	t.Run("happy_drop_unknownPeers", func(t *testing.T) {
+		prng := rand.New(rand.NewSource(1729))
+		aliceCfg := sessiontest.NewConfigT(t, prng) // Get a session config with no peerIDs in the ID provider.
+		aliceCfg.DatabaseDir = copyDirToTmp(t, "../testdata/session/persistence/alice-database")
+
+		_, err := session.New(aliceCfg)
+		require.NoErrorf(t, err, "initializing alice session")
+	})
+
+	t.Run("err_database_init", func(t *testing.T) {
+		prng := rand.New(rand.NewSource(1729))
+		aliceCfg := sessiontest.NewConfigT(t, prng) // Get a session config with no peerIDs in the ID provider.
+		tempFile, err := ioutil.TempFile("", "")
+		require.NoError(t, err)
+		tempFile.Close()
+		aliceCfg.DatabaseDir = tempFile.Name()
+
+		_, err = session.New(aliceCfg)
+		require.Errorf(t, err, "initializing alice session")
+		t.Log(err)
 	})
 }
 
