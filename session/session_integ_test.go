@@ -153,7 +153,7 @@ func Test_Integ_Persistence(t *testing.T) {
 		t.Logf("alice session id: %s\n", alice.ID())
 		t.Logf("alice database dir is: %s\n", aliceCfg.DatabaseDir)
 
-		require.Equal(t, 3, len(alice.GetChsInfo()))
+		require.Equal(t, 2, len(alice.GetChsInfo()))
 	})
 
 	t.Run("happy_drop_unknownPeers", func(t *testing.T) {
