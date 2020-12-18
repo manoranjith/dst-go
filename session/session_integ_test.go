@@ -163,7 +163,6 @@ func Test_Integ_Persistence(t *testing.T) {
 		_, err := session.New(aliceCfg)
 		require.NoErrorf(t, err, "initializing alice session")
 	})
-}
 
 	t.Run("err_database_init", func(t *testing.T) {
 		prng := rand.New(rand.NewSource(ethereumtest.RandSeedForTestAccs))
