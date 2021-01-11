@@ -23,6 +23,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
+	"github.com/hyperledger-labs/perun-node/currency"
+	"github.com/hyperledger-labs/perun-node/idprovider/local"
+	"github.com/hyperledger-labs/perun-node/internal/mocks"
+	"github.com/hyperledger-labs/perun-node/session"
+	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 	"github.com/phayes/freeport"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -31,14 +38,6 @@ import (
 	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
 	pwire "perun.network/go-perun/wire"
-
-	"github.com/hyperledger-labs/perun-node"
-	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
-	"github.com/hyperledger-labs/perun-node/currency"
-	"github.com/hyperledger-labs/perun-node/idprovider/local"
-	"github.com/hyperledger-labs/perun-node/internal/mocks"
-	"github.com/hyperledger-labs/perun-node/session"
-	"github.com/hyperledger-labs/perun-node/session/sessiontest"
 )
 
 var RandSeedForNewPeerIDs int64 = 121
@@ -62,8 +61,8 @@ func newSessionWMockChClient(t *testing.T, isOpen bool, peerIDs ...perun.PeerID)
 }
 
 func Test_Session_AddPeerID(t *testing.T) {
-	peerIDs := newPeerIDs(t, uint(2))
-	// In openSession, peer0 is already present, peer1 can be added.
+	peerIDs := newPeerIDs(t, uint(3))
+	// In openSession, peer0 is already present, peer1, peer2 can be added.
 	openSession, _ := newSessionWMockChClient(t, true, peerIDs[0])
 	closedSession, _ := newSessionWMockChClient(t, false, peerIDs[0])
 
@@ -75,28 +74,60 @@ func Test_Session_AddPeerID(t *testing.T) {
 	t.Run("alias_used_for_diff_peerID", func(t *testing.T) {
 		peer1WithAlias0 := peerIDs[1]
 		peer1WithAlias0.Alias = peerIDs[0].Alias
+
 		err := openSession.AddPeerID(peer1WithAlias0)
 		require.Error(t, err)
-		t.Log(err)
+
+		assert.Equal(t, err.Category(), perun.ClientError)
+		assert.Equal(t, err.Code(), perun.InvalidArguments)
+		errInfo, ok := err.AddInfo().(perun.InvalidArgumentsInfo)
+		require.True(t, ok)
+		assert.Equal(t, errInfo.ArgName, "peerAlias")
+		assert.Equal(t, errInfo.ArgValue, peerIDs[0].Alias)
+
+		t.Log(err.Message())
 	})
 
 	t.Run("peerID_already_registered", func(t *testing.T) {
 		err := openSession.AddPeerID(peerIDs[0])
 		require.Error(t, err)
-		t.Log(err)
 
 		assert.Equal(t, err.Category(), perun.ClientError)
 		assert.Equal(t, err.Code(), perun.ResourceAlreadyExists)
 		errInfo, ok := err.AddInfo().(perun.ResourceAlreadyExistsInfo)
 		require.True(t, ok)
-		assert.Equal(t, errInfo.ResourceType, "session-id")
+		assert.Equal(t, errInfo.ResourceType, "peerID")
 		assert.Equal(t, errInfo.ResourceID, peerIDs[0].Alias)
+
+		t.Log(err.Message())
+	})
+
+	t.Run("parsing_offChainAddr", func(t *testing.T) {
+		invalidPeerId := peerIDs[2]
+		invalidPeerId.OffChainAddrString = "invalid-off-chain-addr-is-greater-than-forty-chars"
+
+		err := openSession.AddPeerID(invalidPeerId)
+		require.Error(t, err)
+
+		assert.Equal(t, err.Category(), perun.ClientError)
+		assert.Equal(t, err.Code(), perun.InvalidArguments)
+		errInfo, ok := err.AddInfo().(perun.InvalidArgumentsInfo)
+		require.True(t, ok)
+		assert.Equal(t, errInfo.ArgName, "peerOffChainAddressString")
+		assert.Equal(t, errInfo.ArgValue, peerIDs[0].OffChainAddrString)
+
+		t.Log(err.Message())
 	})
 
 	t.Run("session_closed", func(t *testing.T) {
 		err := closedSession.AddPeerID(peerIDs[0])
 		require.Error(t, err)
-		t.Log(err)
+
+		assert.Equal(t, err.Category(), perun.ClientError)
+		assert.Equal(t, err.Code(), perun.FailedPreCondition)
+		assert.Nil(t, err.AddInfo())
+
+		t.Log(err.Message())
 	})
 }
 

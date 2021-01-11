@@ -32,7 +32,10 @@ const (
 type ErrorCode int
 
 const (
+	ResourceNotFound      ErrorCode = 201
 	ResourceAlreadyExists ErrorCode = 202
+	InvalidArguments      ErrorCode = 203 // TODO: Remove reason, it will go into message.
+	FailedPreCondition    ErrorCode = 204 // TODO: Remove reason and any info, all will go into message.
 )
 
 type ResourceAlreadyExistsInfo struct {
@@ -40,27 +43,64 @@ type ResourceAlreadyExistsInfo struct {
 	ResourceID   string
 }
 
+type InvalidArgumentsInfo struct {
+	ArgName  string
+	ArgValue string
+}
+
 type APIError2 struct {
-	CategoryE ErrorCategory
-	CodeE     ErrorCode
-	MessageE  string
-	AddInfoE  interface{}
+	category ErrorCategory
+	code     ErrorCode
+	message  string
+	addInfo  interface{}
 }
 
 func (e APIError2) Category() ErrorCategory {
-	return e.CategoryE
+	return e.category
 }
 
 func (e APIError2) Code() ErrorCode {
-	return e.CodeE
+	return e.code
 }
 
 func (e APIError2) Message() string {
-	return e.MessageE
+	return e.message
 }
 
 func (e APIError2) AddInfo() interface{} {
-	return e.AddInfoE
+	return e.addInfo
+}
+
+func NewErrorResourceAlreadyExists(resourceType, resourceID, message string) APIError2Inf {
+	return APIError2{
+		category: ClientError,
+		code:     ResourceAlreadyExists,
+		message:  message,
+		addInfo: ResourceAlreadyExistsInfo{
+			ResourceType: resourceType,
+			ResourceID:   resourceID,
+		},
+	}
+}
+
+func NewErrorInvalidArguments(argName, argValue, message string) APIError2Inf {
+	return APIError2{
+		category: ClientError,
+		code:     InvalidArguments,
+		message:  message,
+		addInfo: InvalidArgumentsInfo{
+			ArgName:  argName,
+			ArgValue: argValue,
+		},
+	}
+}
+
+func NewErrorFailedPreCondition(message string) APIError2Inf {
+	return APIError2{
+		category: ClientError,
+		code:     FailedPreCondition,
+		message:  message,
+	}
 }
 
 type APIError2Inf interface {

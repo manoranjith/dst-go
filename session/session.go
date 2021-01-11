@@ -52,6 +52,16 @@ func init() {
 	walletBackend = ethereum.NewWalletBackend()
 }
 
+type Error string
+
+func (e Error) Error() string {
+	return string(e)
+}
+
+const (
+	SessionIsClosed Error = "Operation not allowed when session is closed"
+)
+
 type (
 	// Session implements perun.SessionAPI.
 	Session struct {
@@ -233,29 +243,22 @@ func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIError2Inf {
 	defer s.Unlock()
 
 	if !s.isOpen {
-		return perun.APIError2{}
-		// return perun.ErrSessionClosed
+		return perun.NewErrorFailedPreCondition(SessionIsClosed.Error())
 	}
 
+	fmt.Printf("\n%+v\n", peerID)
 	err := s.idProvider.Write(peerID.Alias, peerID)
 	if err != nil {
 		s.Error(err)
 		switch err {
 		case idprovider.PeerIDAlreadyRegistered:
-			return perun.APIError2{
-				CategoryE: perun.ClientError,
-				CodeE:     perun.ResourceAlreadyExists,
-				MessageE:  err.Error(),
-				AddInfoE: perun.ResourceAlreadyExistsInfo{
-					ResourceType: "session-id",
-					ResourceID:   peerID.Alias,
-				},
-			}
+			return perun.NewErrorResourceAlreadyExists("peerID", peerID.Alias, err.Error())
 		case idprovider.PeerAliasAlreadyUsedError:
-			return perun.APIError2{}
-			// return err
+			return perun.NewErrorInvalidArguments("peerAlias", peerID.Alias, err.Error())
+		case idprovider.ParsingOffChainAddressError:
+			return perun.NewErrorInvalidArguments("peerOffChainAddressString", peerID.OffChainAddrString, err.Error())
 		default:
-			return perun.APIError2{}
+			return nil
 			// return err
 		}
 	}

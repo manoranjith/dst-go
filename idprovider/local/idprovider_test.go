@@ -213,7 +213,8 @@ func Test_YAML_Write_Read(t *testing.T) {
 		peer3Copy := peer3
 		peer3Copy.OffChainAddrString = "invalid-addr"
 		err = c.Write(peer3Copy.Alias, peer3Copy)
-		assert.Error(t, err)
+
+		assert.True(t, errors.Is(err, idprovider.ParsingOffChainAddressError))
 		t.Log(err)
 	})
 }

@@ -17,6 +17,7 @@
 package local
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -100,10 +101,11 @@ func (c *idProviderCache) Write(alias string, p perun.PeerID) error {
 	var err error
 	p.OffChainAddr, err = c.walletBackend.ParseAddr(p.OffChainAddrString)
 	if err != nil {
-		return err
+		return errors.Errorf(idprovider.ParsingOffChainAddressErrorr err.Error())
 	}
 	c.peerIDsByAlias[alias] = p
 	c.aliasByAddr[p.OffChainAddrString] = alias
+	fmt.Printf("\n%+v\n", p)
 	return nil
 }
 
