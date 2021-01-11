@@ -249,7 +249,7 @@ type NodeAPI interface {
 // open channels and accept channel proposals.
 type SessionAPI interface {
 	ID() string
-	AddPeerID(PeerID) error
+	AddPeerID(PeerID) APIError2Inf
 	GetPeerID(alias string) (PeerID, error)
 	OpenCh(context.Context, BalInfo, App, uint64) (ChInfo, error)
 	GetChsInfo() []ChInfo

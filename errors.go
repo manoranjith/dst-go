@@ -20,6 +20,61 @@ import (
 	"errors"
 )
 
+type ErrorCategory int
+
+const (
+	ClientError ErrorCategory = iota
+	ParticipantError
+	ProtocolFatalError
+	InternalError
+)
+
+type ErrorCode int
+
+const (
+	ResourceAlreadyExists ErrorCode = 202
+)
+
+type ResourceAlreadyExistsInfo struct {
+	ResourceType string
+	ResourceID   string
+}
+
+type APIError2 struct {
+	CategoryE ErrorCategory
+	CodeE     ErrorCode
+	MessageE  string
+	AddInfoE  interface{}
+}
+
+func (e APIError2) Category() ErrorCategory {
+	return e.CategoryE
+}
+
+func (e APIError2) Code() ErrorCode {
+	return e.CodeE
+}
+
+func (e APIError2) Message() string {
+	return e.MessageE
+}
+
+func (e APIError2) AddInfo() interface{} {
+	return e.AddInfoE
+}
+
+type APIError2Inf interface {
+	Category() ErrorCategory
+	Code() ErrorCode
+	Message() string
+	AddInfo() interface{}
+	Error() string
+}
+
+func (e APIError2) Error() string {
+	return ""
+}
+
 // APIError represents the errors that will be communicated via the user API.
 type APIError string
 

@@ -84,6 +84,13 @@ func Test_Session_AddPeerID(t *testing.T) {
 		err := openSession.AddPeerID(peerIDs[0])
 		require.Error(t, err)
 		t.Log(err)
+
+		assert.Equal(t, err.Category(), perun.ClientError)
+		assert.Equal(t, err.Code(), perun.ResourceAlreadyExists)
+		errInfo, ok := err.AddInfo().(perun.ResourceAlreadyExistsInfo)
+		require.True(t, ok)
+		assert.Equal(t, errInfo.ResourceType, "session-id")
+		assert.Equal(t, errInfo.ResourceID, peerIDs[0].Alias)
 	})
 
 	t.Run("session_closed", func(t *testing.T) {

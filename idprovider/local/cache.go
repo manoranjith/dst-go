@@ -23,6 +23,7 @@ import (
 	pwire "perun.network/go-perun/wire"
 
 	"github.com/hyperledger-labs/perun-node"
+	"github.com/hyperledger-labs/perun-node/idprovider"
 )
 
 // idProviderCache represents a cached list of peer IDs indexed by both alias and off-chain address.
@@ -89,9 +90,11 @@ func (c *idProviderCache) Write(alias string, p perun.PeerID) error {
 
 	if oldPeerID, ok := c.peerIDsByAlias[alias]; ok {
 		if PeerIDEqual(oldPeerID, p) {
-			return errors.New("peer already present in ID Provider")
+			return idprovider.PeerIDAlreadyRegistered
+			// return errors.New("peer already present in ID Provider")
 		}
-		return errors.New("alias already used by another peer in ID Provider")
+		return idprovider.PeerAliasAlreadyUsedError
+		// return errors.New("alias already used by another peer in ID Provider")
 	}
 
 	var err error

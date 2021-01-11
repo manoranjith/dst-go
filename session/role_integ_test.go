@@ -78,7 +78,7 @@ func Test_Integ_Role(t *testing.T) {
 
 	t.Run("AddPeerID", func(t *testing.T) {
 		t.Run("happy", func(t *testing.T) {
-			err = alice.AddPeerID(bobPeerID)
+			err := alice.AddPeerID(bobPeerID)
 			require.NoErrorf(t, err, "Alice: AddPeerID")
 
 			err = bob.AddPeerID(alicePeerID)
