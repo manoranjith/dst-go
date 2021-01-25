@@ -18,7 +18,6 @@ package session
 
 import (
 	"fmt"
-	"time"
 )
 
 // ErrorCategory represents the category of the error, which describes how the
@@ -92,15 +91,6 @@ const (
 	ErrOffChainComm              ErrorCode = 402
 )
 
-type (
-	// PeerResponseTimedoutInfo represents the fields in the additional info for
-	// ErrPeerResponseTimedout.
-	PeerResponseTimedoutInfo struct {
-		PeerAlias       string
-		ResponseTimeout string
-	}
-)
-
 // APIError represents the error that will returned by the API of perun node.
 type APIError struct {
 	category ErrorCategory
@@ -135,16 +125,69 @@ func (e APIError) Error() string {
 		e.Category(), e.Code(), e.Message(), e.AddInfo())
 }
 
-// NewErrPeerResponseTimedout returns an ErrPeerResponseTimedout API Error with
-// the given peer alias and response timeout.
-func NewErrPeerResponseTimedout(peerAlias string, timeout time.Duration) APIError {
+type (
+	// ResourceNotFoundInfo represents the fields in the additional info for
+	// ErrResourceNotFound.
+	ResourceNotFoundInfo struct {
+		Type string
+		ID   string
+	}
+
+	// ResourceExistsInfo represents the fields in the additional info for
+	// ErrResourceExists.
+	ResourceExistsInfo struct {
+		Type string
+		ID   string
+	}
+
+	// InvalidArgumentInfo represents the fields in the additional info for
+	// ErrInvalidArgument.
+	InvalidArgumentInfo struct {
+		Name        string
+		Value       string
+		Requirement string
+	}
+)
+
+// NewErrResourceNotFound returns an ErrResourceNotFound API Error with
+// the given resource type, ID and error message.
+func NewErrResourceNotFound(resourceType, resourceID, message string) APIError {
 	return APIError{
-		category: ParticipantError,
-		code:     ErrPeerResponseTimedout,
-		message:  "Peer Response Timed Out",
-		addInfo: PeerResponseTimedoutInfo{
-			PeerAlias:       peerAlias,
-			ResponseTimeout: timeout.String(),
+		category: ClientError,
+		code:     ErrResourceNotFound,
+		message:  message,
+		addInfo: ResourceNotFoundInfo{
+			Type: resourceType,
+			ID:   resourceID,
+		},
+	}
+}
+
+// NewErrResourceExists returns an ErrResourceExists API Error with
+// the given resource type, ID and error message.
+func NewErrResourceExists(resourceType, resourceID, message string) APIError {
+	return APIError{
+		category: ClientError,
+		code:     ErrResourceExists,
+		message:  message,
+		addInfo: ResourceExistsInfo{
+			Type: resourceType,
+			ID:   resourceID,
+		},
+	}
+}
+
+// NewErrInvalidArgument returns an ErrInvalidArgument API Error with the given
+// argument name, value, requirement for the argument and the error message.
+func NewErrInvalidArgument(name, value, requirement, message string) APIError {
+	return APIError{
+		category: ClientError,
+		code:     ErrInvalidArgument,
+		message:  message,
+		addInfo: InvalidArgumentInfo{
+			Name:        name,
+			Value:       value,
+			Requirement: requirement,
 		},
 	}
 }

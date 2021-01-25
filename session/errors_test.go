@@ -18,7 +18,6 @@ package session_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,19 +25,60 @@ import (
 	"github.com/hyperledger-labs/perun-node/session"
 )
 
-func Test_NewErrPeerResponseTimeout(t *testing.T) {
-	alias := "alice"
-	timeout := 30 * time.Second
-	timeoutString := "30s"
-	err := session.NewErrPeerResponseTimedout(alias, timeout)
+// nolint: dupl	// not duplicate of test Test_NewErrResourceExists.
+func Test_NewErrResourceNotFound(t *testing.T) {
+	resourceType := "any-type"
+	resourceID := "any-id"
+	message := "any-message"
+
+	err := session.NewErrResourceNotFound(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, session.ParticipantError, err.Category())
-	assert.Equal(t, session.ErrPeerResponseTimedout, err.Code())
-	assert.Equal(t, "Peer Response Timed Out", err.Message())
-	addInfo, ok := err.AddInfo().(session.PeerResponseTimedoutInfo)
+	assert.Equal(t, session.ClientError, err.Category())
+	assert.Equal(t, session.ErrResourceNotFound, err.Code())
+	assert.Equal(t, message, err.Message())
+	addInfo, ok := err.AddInfo().(session.ResourceNotFoundInfo)
 	require.True(t, ok)
-	assert.Equal(t, addInfo.PeerAlias, alias)
-	assert.Equal(t, addInfo.ResponseTimeout, timeoutString)
+	assert.Equal(t, addInfo.Type, resourceType)
+	assert.Equal(t, addInfo.ID, resourceID)
+	t.Log(err.Error())
+}
+
+// nolint: dupl	// not duplicate of test Test_NewErrResourceNotFound.
+func Test_NewErrResourceExists(t *testing.T) {
+	resourceType := "any-type"
+	resourceID := "any-id"
+	message := "any-message"
+
+	err := session.NewErrResourceExists(resourceType, resourceID, message)
+	require.NotNil(t, err)
+
+	assert.Equal(t, session.ClientError, err.Category())
+	assert.Equal(t, session.ErrResourceExists, err.Code())
+	assert.Equal(t, message, err.Message())
+	addInfo, ok := err.AddInfo().(session.ResourceExistsInfo)
+	require.True(t, ok)
+	assert.Equal(t, addInfo.Type, resourceType)
+	assert.Equal(t, addInfo.ID, resourceID)
+	t.Log(err.Error())
+}
+
+func Test_NewErrInvalidArgument(t *testing.T) {
+	resourceType := "any-type"
+	resourceID := "any-id"
+	requirement := "any-requirement"
+	message := "any-message"
+
+	err := session.NewErrInvalidArgument(resourceType, resourceID, requirement, message)
+	require.NotNil(t, err)
+
+	assert.Equal(t, session.ClientError, err.Category())
+	assert.Equal(t, session.ErrInvalidArgument, err.Code())
+	assert.Equal(t, message, err.Message())
+	addInfo, ok := err.AddInfo().(session.InvalidArgumentInfo)
+	require.True(t, ok)
+	assert.Equal(t, addInfo.Name, resourceType)
+	assert.Equal(t, addInfo.Value, resourceID)
+	assert.Equal(t, addInfo.Requirement, requirement)
 	t.Log(err.Error())
 }
