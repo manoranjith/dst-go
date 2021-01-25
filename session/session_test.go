@@ -78,6 +78,17 @@ func Test_Session_AddPeerID(t *testing.T) {
 		err := openSession.AddPeerID(peer1WithAlias0)
 		require.Error(t, err)
 		t.Log(err)
+
+		wantMessage := "Alias already used for another peer ID"
+		wantRequirement := "Peer alias should be unique within an instance of ID provider"
+		assert.Equal(t, session.ClientError, err.Category())
+		assert.Equal(t, session.ErrInvalidArgument, err.Code())
+		assert.Equal(t, wantMessage, err.Message())
+		addInfo, ok := err.AddInfo().(session.InvalidArgumentInfo)
+		require.True(t, ok)
+		assert.Equal(t, addInfo.Name, "PeerAlias")
+		assert.Equal(t, addInfo.Value, peer1WithAlias0)
+		assert.Equal(t, addInfo.Requirement, wantRequirement)
 	})
 
 	t.Run("peerID_already_registered", func(t *testing.T) {
