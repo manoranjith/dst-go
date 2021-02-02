@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package session_test
+package session
 
 import (
 	"testing"
@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hyperledger-labs/perun-node/session"
+	"github.com/hyperledger-labs/perun-node"
 )
 
 // nolint: dupl	// not duplicate of test Test_NewErrResourceExists.
@@ -31,13 +31,13 @@ func Test_NewErrResourceNotFound(t *testing.T) {
 	resourceID := "any-id"
 	message := "any-message"
 
-	err := session.NewErrResourceNotFound(resourceType, resourceID, message)
+	err := NewErrResourceNotFound(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, session.ClientError, err.Category())
-	assert.Equal(t, session.ErrResourceNotFound, err.Code())
+	assert.Equal(t, perun.ClientError, err.Category())
+	assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(session.ResourceNotFoundInfo)
+	addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Type, resourceType)
 	assert.Equal(t, addInfo.ID, resourceID)
@@ -50,13 +50,13 @@ func Test_NewErrResourceExists(t *testing.T) {
 	resourceID := "any-id"
 	message := "any-message"
 
-	err := session.NewErrResourceExists(resourceType, resourceID, message)
+	err := NewErrResourceExists(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, session.ClientError, err.Category())
-	assert.Equal(t, session.ErrResourceExists, err.Code())
+	assert.Equal(t, perun.ClientError, err.Category())
+	assert.Equal(t, perun.ErrV2ResourceExists, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(session.ResourceExistsInfo)
+	addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceExists)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Type, resourceType)
 	assert.Equal(t, addInfo.ID, resourceID)
@@ -69,13 +69,13 @@ func Test_NewErrInvalidArgument(t *testing.T) {
 	requirement := "any-requirement"
 	message := "any-message"
 
-	err := session.NewErrInvalidArgument(resourceType, resourceID, requirement, message)
+	err := NewErrInvalidArgument(resourceType, resourceID, requirement, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, session.ClientError, err.Category())
-	assert.Equal(t, session.ErrInvalidArgument, err.Code())
+	assert.Equal(t, perun.ClientError, err.Category())
+	assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(session.InvalidArgumentInfo)
+	addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Name, resourceType)
 	assert.Equal(t, addInfo.Value, resourceID)
