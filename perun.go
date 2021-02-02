@@ -246,6 +246,7 @@ type APIErrorV2 interface {
 	Code() ErrorCode
 	Message() string
 	AddInfo() interface{}
+	Error() string
 }
 
 // ErrorCategory represents the category of the error, which describes how the
@@ -311,6 +312,7 @@ const (
 	ErrV2InvalidConfig             ErrorCode = 205
 	ErrV2ChainNodeNotReachable     ErrorCode = 206
 	ErrV2InvalidContracts          ErrorCode = 207
+	ErrV2OperationNotAllowed       ErrorCode = 208
 	ErrV2TxTimedOut                ErrorCode = 301
 	ErrV2InsufficientBalForTx      ErrorCode = 302
 	ErrV2ChainNodeDisconnected     ErrorCode = 303
@@ -364,7 +366,7 @@ type NodeAPI interface {
 // open channels and accept channel proposals.
 type SessionAPI interface {
 	ID() string
-	AddPeerID(PeerID) error
+	AddPeerID(PeerID) APIErrorV2
 	GetPeerID(alias string) (PeerID, error)
 	OpenCh(context.Context, BalInfo, App, uint64) (ChInfo, error)
 	GetChsInfo() []ChInfo

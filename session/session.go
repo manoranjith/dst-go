@@ -36,6 +36,7 @@ import (
 	"github.com/hyperledger-labs/perun-node/comm/tcp"
 	"github.com/hyperledger-labs/perun-node/comm/tcp/tcptest"
 	"github.com/hyperledger-labs/perun-node/currency"
+	"github.com/hyperledger-labs/perun-node/idprovider"
 	"github.com/hyperledger-labs/perun-node/idprovider/local"
 	"github.com/hyperledger-labs/perun-node/log"
 )
@@ -226,20 +227,28 @@ func (s *Session) handleRestoredCh(pch perun.Channel) {
 }
 
 // AddPeerID implements sessionAPI.AddPeerID.
-func (s *Session) AddPeerID(peerID perun.PeerID) error {
+func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIErrorV2 {
 	s.Debugf("Received request: session.AddPeerID. Params %+v", peerID)
 	s.Lock()
 	defer s.Unlock()
 
 	if !s.isOpen {
-		return perun.ErrSessionClosed
+		return APIError{}
+		// return perun.ErrSessionClosed
 	}
 
 	err := s.idProvider.Write(peerID.Alias, peerID)
-	if err != nil {
-		s.Error(err)
+	switch {
+	case errors.Is(err, idprovider.ErrPeerAliasAlreadyUsed):
+		return NewErrInvalidArgument("peerAlias", peerID.Alias, "peer alias should be unique for each peer ID", err.Error())
+	case errors.Is(err, idprovider.ErrPeerIDAlreadyRegistered):
+		return NewErrResourceExists("peerAlias", peerID.Alias, err.Error())
+	default:
+		return nil
 	}
-	return perun.GetAPIError(err)
+	// s.Error(err)
+	// return nil
+	// return perun.GetAPIError(err)
 }
 
 // GetPeerID implements sessionAPI.GetPeerID.

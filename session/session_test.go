@@ -35,6 +35,7 @@ import (
 	"github.com/hyperledger-labs/perun-node"
 	"github.com/hyperledger-labs/perun-node/blockchain/ethereum/ethereumtest"
 	"github.com/hyperledger-labs/perun-node/currency"
+	"github.com/hyperledger-labs/perun-node/idprovider"
 	"github.com/hyperledger-labs/perun-node/idprovider/local"
 	"github.com/hyperledger-labs/perun-node/internal/mocks"
 	"github.com/hyperledger-labs/perun-node/session"
@@ -65,43 +66,52 @@ func Test_Session_AddPeerID(t *testing.T) {
 	peerIDs := newPeerIDs(t, uint(2))
 	// In openSession, peer0 is already present, peer1 can be added.
 	openSession, _ := newSessionWMockChClient(t, true, peerIDs[0])
-	closedSession, _ := newSessionWMockChClient(t, false, peerIDs[0])
+	// closedSession, _ := newSessionWMockChClient(t, false, peerIDs[0])
 
 	t.Run("happy_add_peerID", func(t *testing.T) {
 		err := openSession.AddPeerID(peerIDs[1])
-		require.NoError(t, err)
+		assert.NoError(t, err)
+		assert.Nil(t, err)
 	})
 
-	// t.Run("alias_used_for_diff_peerID", func(t *testing.T) {
-	// 	peer1WithAlias0 := peerIDs[1]
-	// 	peer1WithAlias0.Alias = peerIDs[0].Alias
-	// 	err := openSession.AddPeerID(peer1WithAlias0)
-	// 	require.Error(t, err)
-	// 	t.Log(err)
+	t.Run("alias_used_for_diff_peerID", func(t *testing.T) {
+		peer1WithAlias0 := peerIDs[1]
+		peer1WithAlias0.Alias = peerIDs[0].Alias
+		err := openSession.AddPeerID(peer1WithAlias0)
+		require.Error(t, err)
 
-	// 	wantMessage := "Alias already used for another peer ID"
-	// 	wantRequirement := "Peer alias should be unique within an instance of ID provider"
-	// 	assert.Equal(t, session.ClientError, err.Category())
-	// 	assert.Equal(t, session.ErrInvalidArgument, err.Code())
-	// 	assert.Equal(t, wantMessage, err.Message())
-	// 	addInfo, ok := err.AddInfo().(session.InvalidArgumentInfo)
-	// 	require.True(t, ok)
-	// 	assert.Equal(t, addInfo.Name, "PeerAlias")
-	// 	assert.Equal(t, addInfo.Value, peer1WithAlias0)
-	// 	assert.Equal(t, addInfo.Requirement, wantRequirement)
-	// })
+		wantMessage := idprovider.ErrPeerAliasAlreadyUsed.Error()
+		wantRequirement := "peer alias should be unique for each peer ID"
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
+		assert.Equal(t, wantMessage, err.Message())
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
+		require.True(t, ok)
+		assert.Equal(t, addInfo.Name, "peerAlias")
+		assert.Equal(t, addInfo.Value, peer1WithAlias0.Alias)
+		assert.Equal(t, addInfo.Requirement, wantRequirement)
+	})
 
 	t.Run("peerID_already_registered", func(t *testing.T) {
 		err := openSession.AddPeerID(peerIDs[0])
 		require.Error(t, err)
 		t.Log(err)
+
+		wantMessage := idprovider.ErrPeerIDAlreadyRegistered.Error()
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2ResourceExists, err.Code())
+		assert.Equal(t, wantMessage, err.Message())
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceExists)
+		require.True(t, ok)
+		assert.Equal(t, addInfo.Type, "peerAlias")
+		assert.Equal(t, addInfo.ID, peerIDs[0].Alias)
 	})
 
-	t.Run("session_closed", func(t *testing.T) {
-		err := closedSession.AddPeerID(peerIDs[0])
-		require.Error(t, err)
-		t.Log(err)
-	})
+	// t.Run("session_closed", func(t *testing.T) {
+	// 	err := closedSession.AddPeerID(peerIDs[0])
+	// 	require.Error(t, err)
+	// 	t.Log(err)
+	// })
 }
 
 func Test_Session_GetPeerID(t *testing.T) {
