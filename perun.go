@@ -356,6 +356,20 @@ type NodeAPI interface {
 	// This function is used internally to get a SessionAPI instance.
 	// Should not be exposed via user API.
 	GetSession(string) (SessionAPI, error)
+
+	// GetSessionV2 is a wrapper over GetSession that returns the error in the
+	// newly defined APIErrorV2 format instead of the standard error.
+	//
+	// This is introduced temporarily to facilitate refactoring all the APIs to
+	// return a newly defined API Error type instead of the standard error.
+	// Since this API is used across all the api calls, two versions are
+	// simulataneously required until all the APIs are updated to use the newly
+	// defined API Error (APIErrorV2).
+	//
+	// TODO (mano): Once all the APIs are updated to use the new newly defined API
+	// Error, remove the other version of GetSession API that returns standard
+	// error type and rename this to GetSession.
+	GetSessionV2(string) (SessionAPI, APIErrorV2)
 }
 
 //go:generate mockery --name SessionAPI --output ./internal/mocks

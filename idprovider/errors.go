@@ -10,8 +10,8 @@ func (e Error) Error() string {
 
 // Definition of error constants for this package.
 const (
-	ErrPeerIDNotFound          Error = "Peer ID not found"
-	ErrPeerAliasAlreadyUsed    Error = "Peer alias is already used for another peer ID"
-	ErrPeerIDAlreadyRegistered Error = "Peer ID already regsitered"
-	ErrParsingOffChainAddress  Error = "Parsing off-chain address"
+	ErrPeerIDNotFound          Error = "peer id not found"
+	ErrPeerAliasAlreadyUsed    Error = "peer alias is already used for another peer id"
+	ErrPeerIDAlreadyRegistered Error = "peer id already regsitered"
+	ErrParsingOffChainAddress  Error = "parsing off-chain address"
 )

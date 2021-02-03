@@ -141,18 +141,18 @@ func (a *payChAPIServer) AddPeerID(ctx context.Context, req *pb.AddPeerIDReq) (*
 		}
 	}
 
-	sess, _ := a.n.GetSession(req.SessionID)
-	// if err != nil {
-	// 	return errResponse(err), nil
-	// }
-	apiErr := sess.AddPeerID(perun.PeerID{
+	sess, err := a.n.GetSessionV2(req.SessionID)
+	if err != nil {
+		return errResponse(err), nil
+	}
+	err = sess.AddPeerID(perun.PeerID{
 		Alias:              req.PeerID.Alias,
 		OffChainAddrString: req.PeerID.OffChainAddress,
 		CommAddr:           req.PeerID.CommAddress,
 		CommType:           req.PeerID.CommType,
 	})
-	if apiErr != nil {
-		return errResponse(apiErr), nil
+	if err != nil {
+		return errResponse(err), nil
 	}
 
 	return &pb.AddPeerIDResp{
