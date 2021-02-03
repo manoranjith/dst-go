@@ -233,16 +233,15 @@ func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIErrorV2 {
 	defer s.Unlock()
 
 	if !s.isOpen {
-		return APIError{}
-		// return perun.ErrSessionClosed
+		return perun.NewAPIErrV2FailedPreCondition("operation not permitted on closed session")
 	}
 
 	err := s.idProvider.Write(peerID.Alias, peerID)
 	switch {
 	case errors.Is(err, idprovider.ErrPeerAliasAlreadyUsed):
-		return NewErrInvalidArgument("peerAlias", peerID.Alias, "peer alias should be unique for each peer ID", err.Error())
+		return perun.NewAPIErrV2InvalidArgument("peerAlias", peerID.Alias, "peer alias should be unique for each peer ID", err.Error())
 	case errors.Is(err, idprovider.ErrPeerIDAlreadyRegistered):
-		return NewErrResourceExists("peerAlias", peerID.Alias, err.Error())
+		return perun.NewAPIErrV2ResourceExists("peerAlias", peerID.Alias, err.Error())
 	default:
 		return nil
 	}

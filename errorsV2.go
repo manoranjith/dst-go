@@ -14,87 +14,95 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package session
+package perun
 
 import (
 	"fmt"
-
-	"github.com/hyperledger-labs/perun-node"
 )
 
 // APIError represents the error that will returned by the API of perun node.
-type APIError struct {
-	category perun.ErrorCategory
-	code     perun.ErrorCode
+type apiErrorV2 struct {
+	category ErrorCategory
+	code     ErrorCode
 	message  string
 	addInfo  interface{}
 }
 
 // Category returns the error category for this API Error.
-func (e APIError) Category() perun.ErrorCategory {
+func (e apiErrorV2) Category() ErrorCategory {
 	return e.category
 }
 
 // Code returns the error code for this API Error.
-func (e APIError) Code() perun.ErrorCode {
+func (e apiErrorV2) Code() ErrorCode {
 	return e.code
 }
 
 // Message returns the error message for this API Error.
-func (e APIError) Message() string {
+func (e apiErrorV2) Message() string {
 	return e.message
 }
 
 // AddInfo returns the additional info for this API Error.
-func (e APIError) AddInfo() interface{} {
+func (e apiErrorV2) AddInfo() interface{} {
 	return e.addInfo
 }
 
 // Error implement the error interface for API error.
-func (e APIError) Error() string {
+func (e apiErrorV2) Error() string {
 	return fmt.Sprintf("Category: %s, Code: %d, Message: %s, AddInfo: %+v",
 		e.Category(), e.Code(), e.Message(), e.AddInfo())
 }
 
-// NewErrResourceNotFound returns an ErrResourceNotFound API Error with
+// NewErrV2ResourceNotFound returns an ErrResourceNotFound API Error with
 // the given resource type, ID and error message.
-func NewErrResourceNotFound(resourceType, resourceID, message string) APIError {
-	return APIError{
-		category: perun.ClientError,
-		code:     perun.ErrV2ResourceNotFound,
+func NewErrV2ResourceNotFound(resourceType, resourceID, message string) APIErrorV2 {
+	return apiErrorV2{
+		category: ClientError,
+		code:     ErrV2ResourceNotFound,
 		message:  message,
-		addInfo: perun.ErrV2InfoResourceNotFound{
+		addInfo: ErrV2InfoResourceNotFound{
 			Type: resourceType,
 			ID:   resourceID,
 		},
 	}
 }
 
-// NewErrResourceExists returns an ErrResourceExists API Error with
+// NewAPIErrV2ResourceExists returns an ErrResourceExists API Error with
 // the given resource type, ID and error message.
-func NewErrResourceExists(resourceType, resourceID, message string) APIError {
-	return APIError{
-		category: perun.ClientError,
-		code:     perun.ErrV2ResourceExists,
+func NewAPIErrV2ResourceExists(resourceType, resourceID, message string) APIErrorV2 {
+	return apiErrorV2{
+		category: ClientError,
+		code:     ErrV2ResourceExists,
 		message:  message,
-		addInfo: perun.ErrV2InfoResourceExists{
+		addInfo: ErrV2InfoResourceExists{
 			Type: resourceType,
 			ID:   resourceID,
 		},
 	}
 }
 
-// NewErrInvalidArgument returns an ErrInvalidArgument API Error with the given
+// NewAPIErrV2InvalidArgument returns an ErrInvalidArgument API Error with the given
 // argument name, value, requirement for the argument and the error message.
-func NewErrInvalidArgument(name, value, requirement, message string) APIError {
-	return APIError{
-		category: perun.ClientError,
-		code:     perun.ErrV2InvalidArgument,
+func NewAPIErrV2InvalidArgument(name, value, requirement, message string) APIErrorV2 {
+	return apiErrorV2{
+		category: ClientError,
+		code:     ErrV2InvalidArgument,
 		message:  message,
-		addInfo: perun.ErrV2InfoInvalidArgument{
+		addInfo: ErrV2InfoInvalidArgument{
 			Name:        name,
 			Value:       value,
 			Requirement: requirement,
 		},
+	}
+}
+
+// NewAPIErrV2FailedPreCondition returns an ErrV2FailedPreCondition API Error with the given
+// error message.
+func NewAPIErrV2FailedPreCondition(message string) APIErrorV2 {
+	return apiErrorV2{
+		category: ClientError,
+		code:     ErrV2FailedPreCondition,
+		message:  message,
 	}
 }

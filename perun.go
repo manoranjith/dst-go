@@ -312,7 +312,6 @@ const (
 	ErrV2InvalidConfig             ErrorCode = 205
 	ErrV2ChainNodeNotReachable     ErrorCode = 206
 	ErrV2InvalidContracts          ErrorCode = 207
-	ErrV2OperationNotAllowed       ErrorCode = 208
 	ErrV2TxTimedOut                ErrorCode = 301
 	ErrV2InsufficientBalForTx      ErrorCode = 302
 	ErrV2ChainNodeDisconnected     ErrorCode = 303

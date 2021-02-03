@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package session
+package perun-node
 
 import (
 	"testing"
@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hyperledger-labs/perun-node"
 )
 
 // nolint: dupl	// not duplicate of test Test_NewErrResourceExists.
@@ -34,10 +33,10 @@ func Test_NewErrResourceNotFound(t *testing.T) {
 	err := NewErrResourceNotFound(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, perun.ClientError, err.Category())
-	assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
+	assert.Equal(t, ClientError, err.Category())
+	assert.Equal(t, ErrV2ResourceNotFound, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
+	addInfo, ok := err.AddInfo().(ErrV2InfoResourceNotFound)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Type, resourceType)
 	assert.Equal(t, addInfo.ID, resourceID)
@@ -53,10 +52,10 @@ func Test_NewErrResourceExists(t *testing.T) {
 	err := NewErrResourceExists(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, perun.ClientError, err.Category())
-	assert.Equal(t, perun.ErrV2ResourceExists, err.Code())
+	assert.Equal(t, ClientError, err.Category())
+	assert.Equal(t, ErrV2ResourceExists, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceExists)
+	addInfo, ok := err.AddInfo().(ErrV2InfoResourceExists)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Type, resourceType)
 	assert.Equal(t, addInfo.ID, resourceID)
@@ -69,13 +68,13 @@ func Test_NewErrInvalidArgument(t *testing.T) {
 	requirement := "any-requirement"
 	message := "any-message"
 
-	err := NewErrInvalidArgument(resourceType, resourceID, requirement, message)
+	err := newErrInvalidArgument(resourceType, resourceID, requirement, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, perun.ClientError, err.Category())
-	assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
+	assert.Equal(t, ClientError, err.Category())
+	assert.Equal(t, ErrV2InvalidArgument, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
+	addInfo, ok := err.AddInfo().(ErrV2InfoInvalidArgument)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Name, resourceType)
 	assert.Equal(t, addInfo.Value, resourceID)

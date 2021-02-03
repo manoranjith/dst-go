@@ -66,7 +66,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 	peerIDs := newPeerIDs(t, uint(2))
 	// In openSession, peer0 is already present, peer1 can be added.
 	openSession, _ := newSessionWMockChClient(t, true, peerIDs[0])
-	// closedSession, _ := newSessionWMockChClient(t, false, peerIDs[0])
+	closedSession, _ := newSessionWMockChClient(t, false, peerIDs[0])
 
 	t.Run("happy_add_peerID", func(t *testing.T) {
 		err := openSession.AddPeerID(peerIDs[1])
@@ -95,7 +95,6 @@ func Test_Session_AddPeerID(t *testing.T) {
 	t.Run("peerID_already_registered", func(t *testing.T) {
 		err := openSession.AddPeerID(peerIDs[0])
 		require.Error(t, err)
-		t.Log(err)
 
 		wantMessage := idprovider.ErrPeerIDAlreadyRegistered.Error()
 		assert.Equal(t, perun.ClientError, err.Category())
@@ -107,11 +106,16 @@ func Test_Session_AddPeerID(t *testing.T) {
 		assert.Equal(t, addInfo.ID, peerIDs[0].Alias)
 	})
 
-	// t.Run("session_closed", func(t *testing.T) {
-	// 	err := closedSession.AddPeerID(peerIDs[0])
-	// 	require.Error(t, err)
-	// 	t.Log(err)
-	// })
+	t.Run("session_closed", func(t *testing.T) {
+		err := closedSession.AddPeerID(peerIDs[0])
+		require.Error(t, err)
+
+		wantMessage := "operation not permitted on closed session"
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2FailedPreCondition, err.Code())
+		assert.Equal(t, wantMessage, err.Message())
+		assert.Nil(t, err.AddInfo())
+	})
 }
 
 func Test_Session_GetPeerID(t *testing.T) {
