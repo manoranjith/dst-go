@@ -16,6 +16,8 @@
 
 syntax = "proto3";
 
+import "google/protobuf/any.proto";
+
 // Package pb contains proto3 definitions for user API and the corresponding
 // generated code for grpc server and client.
 package pb;
@@ -57,6 +59,61 @@ message PayChInfo {
 
 message MsgError {
     string error = 1;
+}
+
+enum ErrorCategory {
+    ParticipantError = 0;
+    ClientError = 1;
+    ProtocolError = 2;
+    InternalError = 3;
+}
+
+enum ErrorCode {
+    /* Though "0" is an invalid error code, we still define it, because
+       proto3 requires that every enum definition should have 0 mapped to
+       atleast one constant. */
+    DefaultInvalidCode             = 0;
+
+    ErrV2PeerResponseTimedout      = 101;
+    ErrV2RejectedByPeer            = 102;
+    ErrV2PeerNotFunded             = 103;
+    ErrV2UserResponseTimedOut      = 104;
+    ErrV2ResourceNotFound          = 201;
+    ErrV2ResourceExists            = 202;
+    ErrV2InvalidArgument           = 203;
+    ErrV2FailedPreCondition        = 204;
+    ErrV2InvalidConfig             = 205;
+    ErrV2ChainNodeNotReachable     = 206;
+    ErrV2InvalidContracts          = 207;
+    ErrV2TxTimedOut                = 301;
+    ErrV2InsufficientBalForTx      = 302;
+    ErrV2ChainNodeDisconnected     = 303;
+    ErrV2InsufficientBalForDeposit = 304;
+    ErrV2UnknownInternal           = 401;
+    ErrV2OffChainComm              = 402;
+}
+
+message ErrV2InfoResourceNotFound {
+    string type = 1;
+    string id = 2;
+}
+
+message ErrV2InfoResourceExists {
+    string type = 1;
+    string id = 2;
+}
+
+message ErrV2InfoInvalidArgument {
+    string name = 1;
+    string value = 2;
+    string requirement = 3;
+}
+
+message MsgErrorV2 {
+    ErrorCategory category = 1;
+    ErrorCode code = 2;
+    string message = 3;
+    google.protobuf.Any addInfo = 4;
 }
 
 // Payment_API provides APIs for a user to open payment channels, send/receive payments
@@ -132,7 +189,7 @@ message AddPeerIDReq {
 message AddPeerIDResp {
     oneof response {
         MsgSuccess msgSuccess = 1;
-        MsgError error = 2;
+        MsgErrorV2 error = 2;
     }
     message MsgSuccess {
         bool success=1;

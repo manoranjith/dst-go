@@ -106,3 +106,13 @@ func NewAPIErrV2FailedPreCondition(message string) APIErrorV2 {
 		message:  message,
 	}
 }
+
+// NewAPIErrV2UnknownInternal returns an ErrV2UnknownInternal API Error with the given
+// error message.
+func NewAPIErrV2UnknownInternal(err error) APIErrorV2 {
+	return apiErrorV2{
+		category: ClientError,
+		code:     ErrV2UnknownInternal,
+		message:  err.Error(),
+	}
+}

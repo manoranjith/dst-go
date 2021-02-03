@@ -237,17 +237,21 @@ func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIErrorV2 {
 	}
 
 	err := s.idProvider.Write(peerID.Alias, peerID)
-	switch {
-	case errors.Is(err, idprovider.ErrPeerAliasAlreadyUsed):
-		return perun.NewAPIErrV2InvalidArgument("peerAlias", peerID.Alias, "peer alias should be unique for each peer ID", err.Error())
-	case errors.Is(err, idprovider.ErrPeerIDAlreadyRegistered):
-		return perun.NewAPIErrV2ResourceExists("peerAlias", peerID.Alias, err.Error())
-	default:
-		return nil
+	if err != nil {
+		var apiErr perun.APIErrorV2
+		switch {
+		case errors.Is(err, idprovider.ErrPeerAliasAlreadyUsed):
+			requirement := "peer alias should be unique for each peer ID"
+			apiErr = perun.NewAPIErrV2InvalidArgument("peer alias", peerID.Alias, requirement, err.Error())
+		case errors.Is(err, idprovider.ErrPeerIDAlreadyRegistered):
+			apiErr = perun.NewAPIErrV2ResourceExists("peer alias", peerID.Alias, err.Error())
+		default:
+			apiErr = perun.NewAPIErrV2UnknownInternal(err)
+		}
+		s.Error(apiErr)
+		return apiErr
 	}
-	// s.Error(err)
-	// return nil
-	// return perun.GetAPIError(err)
+	return nil
 }
 
 // GetPeerID implements sessionAPI.GetPeerID.

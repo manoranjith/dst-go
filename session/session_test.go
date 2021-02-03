@@ -87,7 +87,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 		assert.Equal(t, wantMessage, err.Message())
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 		require.True(t, ok)
-		assert.Equal(t, addInfo.Name, "peerAlias")
+		assert.Equal(t, addInfo.Name, "peer alias")
 		assert.Equal(t, addInfo.Value, peer1WithAlias0.Alias)
 		assert.Equal(t, addInfo.Requirement, wantRequirement)
 	})
@@ -102,7 +102,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 		assert.Equal(t, wantMessage, err.Message())
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceExists)
 		require.True(t, ok)
-		assert.Equal(t, addInfo.Type, "peerAlias")
+		assert.Equal(t, addInfo.Type, "peer alias")
 		assert.Equal(t, addInfo.ID, peerIDs[0].Alias)
 	})
 

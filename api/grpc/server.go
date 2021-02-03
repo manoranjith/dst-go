@@ -129,28 +129,30 @@ func (a *payChAPIServer) OpenSession(ctx context.Context, req *pb.OpenSessionReq
 
 // AddPeerID wraps session.AddPeerID.
 func (a *payChAPIServer) AddPeerID(ctx context.Context, req *pb.AddPeerIDReq) (*pb.AddPeerIDResp, error) {
-	errResponse := func(err error) *pb.AddPeerIDResp {
+	errResponse := func(err perun.APIErrorV2) *pb.AddPeerIDResp {
 		return &pb.AddPeerIDResp{
 			Response: &pb.AddPeerIDResp_Error{
-				Error: &pb.MsgError{
-					Error: err.Error(),
+				Error: &pb.MsgErrorV2{
+					Category: pb.ErrorCategory(err.Category()),
+					Code:     pb.ErrorCode(err.Code()),
+					Message:  err.Message(),
 				},
 			},
 		}
 	}
 
-	sess, err := a.n.GetSession(req.SessionID)
-	if err != nil {
-		return errResponse(err), nil
-	}
-	err = sess.AddPeerID(perun.PeerID{
+	sess, _ := a.n.GetSession(req.SessionID)
+	// if err != nil {
+	// 	return errResponse(err), nil
+	// }
+	apiErr := sess.AddPeerID(perun.PeerID{
 		Alias:              req.PeerID.Alias,
 		OffChainAddrString: req.PeerID.OffChainAddress,
 		CommAddr:           req.PeerID.CommAddress,
 		CommType:           req.PeerID.CommType,
 	})
-	if err != nil {
-		return errResponse(err), nil
+	if apiErr != nil {
+		return errResponse(apiErr), nil
 	}
 
 	return &pb.AddPeerIDResp{

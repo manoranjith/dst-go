@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package perun-node
+package perun_test
 
 import (
 	"testing"
@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/hyperledger-labs/perun-node"
 )
 
 // nolint: dupl	// not duplicate of test Test_NewErrResourceExists.
@@ -30,13 +31,13 @@ func Test_NewErrResourceNotFound(t *testing.T) {
 	resourceID := "any-id"
 	message := "any-message"
 
-	err := NewErrResourceNotFound(resourceType, resourceID, message)
+	err := perun.NewErrV2ResourceNotFound(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, ClientError, err.Category())
-	assert.Equal(t, ErrV2ResourceNotFound, err.Code())
+	assert.Equal(t, perun.ClientError, err.Category())
+	assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(ErrV2InfoResourceNotFound)
+	addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Type, resourceType)
 	assert.Equal(t, addInfo.ID, resourceID)
@@ -49,13 +50,13 @@ func Test_NewErrResourceExists(t *testing.T) {
 	resourceID := "any-id"
 	message := "any-message"
 
-	err := NewErrResourceExists(resourceType, resourceID, message)
+	err := perun.NewAPIErrV2ResourceExists(resourceType, resourceID, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, ClientError, err.Category())
-	assert.Equal(t, ErrV2ResourceExists, err.Code())
+	assert.Equal(t, perun.ClientError, err.Category())
+	assert.Equal(t, perun.ErrV2ResourceExists, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(ErrV2InfoResourceExists)
+	addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceExists)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Type, resourceType)
 	assert.Equal(t, addInfo.ID, resourceID)
@@ -68,13 +69,13 @@ func Test_NewErrInvalidArgument(t *testing.T) {
 	requirement := "any-requirement"
 	message := "any-message"
 
-	err := newErrInvalidArgument(resourceType, resourceID, requirement, message)
+	err := perun.NewAPIErrV2InvalidArgument(resourceType, resourceID, requirement, message)
 	require.NotNil(t, err)
 
-	assert.Equal(t, ClientError, err.Category())
-	assert.Equal(t, ErrV2InvalidArgument, err.Code())
+	assert.Equal(t, perun.ClientError, err.Category())
+	assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
 	assert.Equal(t, message, err.Message())
-	addInfo, ok := err.AddInfo().(ErrV2InfoInvalidArgument)
+	addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 	require.True(t, ok)
 	assert.Equal(t, addInfo.Name, resourceType)
 	assert.Equal(t, addInfo.Value, resourceID)
