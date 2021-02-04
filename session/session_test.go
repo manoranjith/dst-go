@@ -110,7 +110,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 		err := closedSession.AddPeerID(peerIDs[0])
 		require.Error(t, err)
 
-		wantMessage := "operation not permitted on closed session"
+		wantMessage := session.ErrSessionClosed.Error()
 		assert.Equal(t, perun.ClientError, err.Category())
 		assert.Equal(t, perun.ErrV2FailedPreCondition, err.Code())
 		assert.Equal(t, wantMessage, err.Message())

@@ -52,6 +52,19 @@ func init() {
 	walletBackend = ethereum.NewWalletBackend()
 }
 
+// Error type is used to define error constants for this package.
+type Error string
+
+// Error implements error interface.
+func (e Error) Error() string {
+	return string(e)
+}
+
+// Definition of error constants for this package.
+const (
+	ErrSessionClosed Error = "operation not allowed on a closed session"
+)
+
 type (
 	// Session implements perun.SessionAPI.
 	Session struct {
@@ -228,15 +241,18 @@ func (s *Session) handleRestoredCh(pch perun.Channel) {
 
 // AddPeerID implements sessionAPI.AddPeerID.
 func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIErrorV2 {
-	s.Debugf("Received request: session.AddPeerID. Params %+v", peerID)
+	s.WithFields(log.Fields{"method": "AddPeerID"}).Info("Received request with params:", peerID)
 	s.Lock()
 	defer s.Unlock()
 
 	if !s.isOpen {
-		return perun.NewAPIErrV2FailedPreCondition("operation not permitted on closed session")
+		err := ErrSessionClosed
+		s.WithFields(log.Fields{"method": "AddPeerID"}).Error(err)
+		return perun.NewAPIErrV2FailedPreCondition(err.Error())
 	}
 
 	err := s.idProvider.Write(peerID.Alias, peerID)
+	s.WithFields(log.Fields{"method": "AddPeerID", "peerAlias": peerID.Alias}).Error(err)
 	if err != nil {
 		var apiErr perun.APIErrorV2
 		switch {
@@ -245,12 +261,14 @@ func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIErrorV2 {
 			apiErr = perun.NewAPIErrV2InvalidArgument("peer alias", peerID.Alias, requirement, err.Error())
 		case errors.Is(err, idprovider.ErrPeerIDAlreadyRegistered):
 			apiErr = perun.NewAPIErrV2ResourceExists("peer alias", peerID.Alias, err.Error())
+		case errors.Is(err, idprovider.ErrParsingOffChainAddress):
+			apiErr = perun.NewAPIErrV2InvalidArgument("off-chain address string", peerID.OffChainAddrString, "", err.Error())
 		default:
 			apiErr = perun.NewAPIErrV2UnknownInternal(err)
 		}
-		s.Error(apiErr)
 		return apiErr
 	}
+	s.WithFields(log.Fields{"method": "AddPeerID", "peerAlias": peerID.Alias}).Info("Peer ID successfully added")
 	return nil
 }
 

@@ -16,8 +16,6 @@
 
 syntax = "proto3";
 
-import "google/protobuf/any.proto";
-
 // Package pb contains proto3 definitions for user API and the corresponding
 // generated code for grpc server and client.
 package pb;
@@ -113,7 +111,11 @@ message MsgErrorV2 {
     ErrorCategory category = 1;
     ErrorCode code = 2;
     string message = 3;
-    google.protobuf.Any addInfo = 4;
+    oneof addInfo {
+        ErrV2InfoResourceNotFound ErrV2InfoResourceNotFound = 4;
+        ErrV2InfoResourceExists ErrV2InfoResourceExists = 5;
+        ErrV2InfoInvalidArgument ErrV2InfoInvalidArgument = 6;
+    }
 }
 
 // Payment_API provides APIs for a user to open payment channels, send/receive payments
