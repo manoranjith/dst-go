@@ -62,10 +62,12 @@ func (e Error) Error() string {
 
 // Definition of error constants for this package.
 const (
-	ErrSessionClosed     Error = "operation not allowed on a closed session"
-	ErrUnknownPeerAlias  Error = "unknown peer alias(es)"
-	ErrRepeatedPeerAlias Error = "repeated peer alias(es)"
-	ErrNoEntryForSelf    Error = "no entry for self in peer alias(es)"
+	ErrSessionClosed          Error = "operation not allowed on a closed session"
+	ErrUnknownPeerAlias       Error = "unknown peer alias(es)"
+	ErrRepeatedPeerAlias      Error = "repeated peer alias(es)"
+	ErrNoEntryForSelf         Error = "no entry for self in peer alias(es)"
+	ErrUnknownCurrency        Error = "unknown currency"
+	ErrInvalidAmountInBalance Error = "invalid amount in balance"
 )
 
 type (
@@ -300,28 +302,28 @@ func (s *Session) GetPeerID(alias string) (perun.PeerID, perun.APIErrorV2) {
 // OpenCh implements sessionAPI.OpenCh.
 func (s *Session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app perun.App, challengeDurSecs uint64) (
 	perun.ChInfo, perun.APIErrorV2) {
-	s.Debugf("\nReceived request:session.OpenCh Params %+v,%+v,%+v", openingBalInfo, app, challengeDurSecs)
+	s.WithField("method", "OpenCh").Info("Received request with params:", openingBalInfo, app, challengeDurSecs)
 	// Session is locked only when adding the channel to session.
 
 	if !s.isOpen {
-		err := ErrSessionClosed
-		s.WithFields(log.Fields{"method": "OpenCh"}).Error(err)
-		return perun.ChInfo{}, perun.NewAPIErrV2FailedPreCondition(err.Error())
+		apiErr := perun.NewAPIErrV2FailedPreCondition(ErrSessionClosed.Error())
+		s.WithFields(perun.APIErrV2AsMap("OpenCh", apiErr)).Error(apiErr.Message())
+		return perun.ChInfo{}, apiErr
 	}
 
 	sanitizeBalInfo(openingBalInfo)
 	parts, apiErr := retrievePartIDs(openingBalInfo.Parts, s.idProvider)
 	if apiErr != nil {
-		s.WithFields(perun.APIErrV2AsMap(apiErr)).Error(apiErr.Message())
+		s.WithFields(perun.APIErrV2AsMap("OpenCh", apiErr)).Error(apiErr.Message())
 		return perun.ChInfo{}, apiErr
 	}
 	registerParts(parts, s.chClient)
 
-	allocations, err := makeAllocation(openingBalInfo, s.chAsset)
-	if err != nil {
-		s.Error(err, "making allocations")
+	allocations, apiErr := makeAllocation(openingBalInfo, s.chAsset)
+	if apiErr != nil {
+		s.WithFields(perun.APIErrV2AsMap("OpenCh", apiErr)).Error(apiErr.Message())
 		// return perun.ChInfo{}, perun.GetAPIError(err)
-		return perun.ChInfo{}, nil
+		return perun.ChInfo{}, apiErr
 	}
 
 	proposal := pclient.NewLedgerChannelProposal(
@@ -347,6 +349,7 @@ func (s *Session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app
 	ch := newCh(pch, openingBalInfo.Currency, openingBalInfo.Parts, s.timeoutCfg, challengeDurSecs)
 
 	s.addCh(ch)
+	s.WithFields(log.Fields{"method": "GetPeerID", "channelID": ch.ID()}).Info("Channel opened successfully")
 	return ch.GetChInfo(), nil
 }
 
@@ -437,9 +440,11 @@ func makeOffChainAddrs(partIDs []perun.PeerID) []pwire.Address {
 // makeAllocation makes an allocation using the BalanceInfo and the chAsset.
 // Order of amounts in the balance is same as the order of Aliases in the Balance Info.
 // It errors if any of the amounts cannot be parsed using the interpreter corresponding to the currency.
-func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Allocation, error) {
+func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Allocation, perun.APIErrorV2) {
 	if !currency.IsSupported(balInfo.Currency) {
-		return nil, perun.ErrUnsupportedCurrency
+		requirement := fmt.Sprintf("use one of the following currencies: %v", currency.ETH)
+		err := ErrUnknownCurrency
+		return nil, perun.NewAPIErrV2InvalidArgument("currency", balInfo.Currency, requirement, err.Error())
 	}
 
 	balance := make([]*big.Int, len(balInfo.Bal))
@@ -447,7 +452,8 @@ func makeAllocation(balInfo perun.BalInfo, chAsset pchannel.Asset) (*pchannel.Al
 	for i := range balInfo.Bal {
 		balance[i], err = currency.NewParser(balInfo.Currency).Parse(balInfo.Bal[i])
 		if err != nil {
-			return nil, errors.WithMessagef(err, "Parsing amount: %v", balInfo.Bal[i])
+			err = errors.Wrap(ErrInvalidAmountInBalance, err.Error())
+			return nil, perun.NewAPIErrV2InvalidArgument("amount", balInfo.Bal[i], "", err.Error())
 		}
 	}
 

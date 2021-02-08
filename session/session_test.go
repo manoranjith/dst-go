@@ -80,10 +80,8 @@ func Test_Session_AddPeerID(t *testing.T) {
 		require.Error(t, err)
 
 		wantMessage := idprovider.ErrPeerAliasAlreadyUsed.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2InvalidArgument, wantMessage)
 		wantRequirement := "peer alias should be unique for each peer ID"
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
-		assert.Equal(t, wantMessage, err.Message())
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 		require.True(t, ok)
 		assert.Equal(t, "peer alias", addInfo.Name)
@@ -96,9 +94,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 		require.Error(t, err)
 
 		wantMessage := idprovider.ErrPeerIDAlreadyRegistered.Error()
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2ResourceExists, err.Code())
-		assert.Equal(t, wantMessage, err.Message())
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2ResourceExists, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceExists)
 		require.True(t, ok)
 		assert.Equal(t, "peer alias", addInfo.Type)
@@ -112,9 +108,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 		require.Error(t, err)
 
 		wantMessage := idprovider.ErrParsingOffChainAddress.Error()
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
-		assert.Contains(t, err.Message(), wantMessage)
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2InvalidArgument, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 		require.True(t, ok)
 		assert.Equal(t, "off-chain address string", addInfo.Name)
@@ -126,9 +120,7 @@ func Test_Session_AddPeerID(t *testing.T) {
 		require.Error(t, err)
 
 		wantMessage := session.ErrSessionClosed.Error()
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2FailedPreCondition, err.Code())
-		assert.Equal(t, wantMessage, err.Message())
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2FailedPreCondition, wantMessage)
 		assert.Nil(t, err.AddInfo())
 	})
 }
@@ -150,10 +142,8 @@ func Test_Session_GetPeerID(t *testing.T) {
 		_, err := openSession.GetPeerID(unknownAlias)
 		require.Error(t, err)
 
-		wantMessage := session.ErrUnknownPeerAlias
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
-		assert.Contains(t, err.Message(), wantMessage)
+		wantMessage := session.ErrUnknownPeerAlias.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2ResourceNotFound, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
 		require.True(t, ok)
 		assert.Equal(t, "peer alias", addInfo.Type)
@@ -165,9 +155,7 @@ func Test_Session_GetPeerID(t *testing.T) {
 		require.Error(t, err)
 
 		wantMessage := session.ErrSessionClosed.Error()
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2FailedPreCondition, err.Code())
-		assert.Equal(t, wantMessage, err.Message())
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2FailedPreCondition, wantMessage)
 		assert.Nil(t, err.AddInfo())
 	})
 }
@@ -242,9 +230,7 @@ func Test_Session_OpenCh(t *testing.T) {
 		require.Error(t, err)
 
 		wantMessage := session.ErrSessionClosed.Error()
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2FailedPreCondition, err.Code())
-		assert.Equal(t, wantMessage, err.Message())
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2FailedPreCondition, wantMessage)
 		assert.Nil(t, err.AddInfo())
 	})
 
@@ -257,10 +243,8 @@ func Test_Session_OpenCh(t *testing.T) {
 		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 
-		wantMessage := session.ErrUnknownPeerAlias
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
-		assert.Contains(t, err.Message(), wantMessage)
+		wantMessage := session.ErrUnknownPeerAlias.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2ResourceNotFound, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
 		require.True(t, ok)
 		assert.Equal(t, "peer aliases", addInfo.Type)
@@ -277,10 +261,8 @@ func Test_Session_OpenCh(t *testing.T) {
 		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 
-		wantMessage := session.ErrUnknownPeerAlias
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
-		assert.Contains(t, err.Message(), wantMessage)
+		wantMessage := session.ErrUnknownPeerAlias.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2ResourceNotFound, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
 		require.True(t, ok)
 		assert.Equal(t, "peer aliases", addInfo.Type)
@@ -295,10 +277,8 @@ func Test_Session_OpenCh(t *testing.T) {
 		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 
-		wantMessage := session.ErrRepeatedPeerAlias
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
-		assert.Contains(t, err.Message(), wantMessage)
+		wantMessage := session.ErrRepeatedPeerAlias.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2InvalidArgument, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 		require.True(t, ok)
 		assert.Equal(t, "peer aliases", addInfo.Name)
@@ -314,10 +294,8 @@ func Test_Session_OpenCh(t *testing.T) {
 		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
 
-		wantMessage := session.ErrNoEntryForSelf
-		assert.Equal(t, perun.ClientError, err.Category())
-		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
-		assert.Contains(t, err.Message(), wantMessage)
+		wantMessage := session.ErrNoEntryForSelf.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2InvalidArgument, wantMessage)
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 		require.True(t, ok)
 		assert.Equal(t, "peer aliases", addInfo.Name)
@@ -325,27 +303,42 @@ func Test_Session_OpenCh(t *testing.T) {
 		t.Log("requirement:", addInfo.Requirement)
 	})
 
-	// t.Run("unsupported_currency", func(t *testing.T) {
-	// 	invalidOpeningBalInfo := validOpeningBalInfo
-	// 	invalidOpeningBalInfo.Currency = "unsupported-currency"
-	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
+	t.Run("unsupported_currency", func(t *testing.T) {
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Currency = "unsupported-currency"
+		sess, chClient := newSessionWMockChClient(t, true, peerIDs...)
+		chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-	// 	_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
-	// 	require.Error(t, err)
-	// 	t.Log(err)
-	// })
+		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+		require.Error(t, err)
 
-	// t.Run("invalid_amount", func(t *testing.T) {
-	// 	invalidOpeningBalInfo := validOpeningBalInfo
-	// 	invalidOpeningBalInfo.Bal = []string{"abc", "gef"}
-	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
+		wantMessage := session.ErrUnknownCurrency.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2InvalidArgument, wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
+		require.True(t, ok)
+		assert.Equal(t, "currency", addInfo.Name)
+		assert.Equal(t, invalidOpeningBalInfo.Currency, addInfo.Value)
+		t.Log("requirement:", addInfo.Requirement)
+	})
 
-	// 	_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
-	// 	require.Error(t, err)
-	// 	t.Log(err)
-	// })
+	t.Run("invalid_amount", func(t *testing.T) {
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Bal = []string{"abc", "gef"}
+		sess, chClient := newSessionWMockChClient(t, true, peerIDs...)
+		chClient.On("Register", mock.Anything, mock.Anything).Return()
+
+		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+		require.Error(t, err)
+
+		wantMessage := session.ErrInvalidAmountInBalance.Error()
+		assertAPIError(t, err, perun.ClientError, perun.ErrV2InvalidArgument, wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
+		require.True(t, ok)
+		assert.Equal(t, "amount", addInfo.Name)
+		assert.Equal(t, "amount", addInfo.Name)
+		assert.Equal(t, invalidOpeningBalInfo.Bal[0], addInfo.Value)
+		t.Log("requirement:", addInfo.Requirement)
+	})
 
 	// t.Run("chClient_proposeChannel_AnError", func(t *testing.T) {
 	// 	ch, _ := newMockPCh(t, validOpeningBalInfo)
@@ -797,4 +790,10 @@ func newPeerIDs(t *testing.T, n uint) []perun.PeerID {
 		require.NoError(t, err)
 	}
 	return peerIDs
+}
+
+func assertAPIError(t *testing.T, e perun.APIErrorV2, category perun.ErrorCategory, code perun.ErrorCode, msg string) {
+	assert.Equal(t, category, e.Category())
+	assert.Equal(t, code, e.Code())
+	assert.Contains(t, e.Message(), msg)
 }
