@@ -275,24 +275,23 @@ func (s *Session) AddPeerID(peerID perun.PeerID) perun.APIErrorV2 {
 
 // GetPeerID implements sessionAPI.GetPeerID.
 func (s *Session) GetPeerID(alias string) (perun.PeerID, perun.APIErrorV2) {
-	s.WithFields(log.Fields{"method": "GetPeerID"}).Info("Received request with params:", alias)
+	s.WithField("method", "GetPeerID").Info("Received request with params:", alias)
 	s.Lock()
 	defer s.Unlock()
 
 	if !s.isOpen {
-		err := ErrSessionClosed
-		s.WithFields(log.Fields{"method": "GetPeerID"}).Error(err)
-		return perun.PeerID{}, perun.NewAPIErrV2FailedPreCondition(err.Error())
+		apiErr := perun.NewAPIErrV2FailedPreCondition(ErrSessionClosed.Error())
+		s.WithFields(perun.APIErrV2AsMap("GetPeerID", apiErr)).Error(apiErr.Message())
+		return perun.PeerID{}, apiErr
 	}
 
 	peerID, isPresent := s.idProvider.ReadByAlias(alias)
 	if !isPresent {
-		err := ErrUnknownPeerAlias
-		apiErr := perun.NewAPIErrV2ResourceNotFound("peer alias", alias, err.Error())
-		s.WithFields(perun.APIErrV2AsMap(apiErr)).Error(apiErr.Message())
+		apiErr := perun.NewAPIErrV2ResourceNotFound("peer alias", alias, ErrUnknownPeerAlias.Error())
+		s.WithFields(perun.APIErrV2AsMap("GetPeerID", apiErr)).Error(apiErr.Message())
 		return perun.PeerID{}, apiErr
 	}
-	s.Info("Peer ID successfully retreived")
+	s.WithField("method", "GetPeerID").Info("Peer ID retreived successfully")
 	return peerID, nil
 }
 
