@@ -381,7 +381,7 @@ type SessionAPI interface {
 	ID() string
 	AddPeerID(PeerID) APIErrorV2
 	GetPeerID(alias string) (PeerID, APIErrorV2)
-	OpenCh(context.Context, BalInfo, App, uint64) (ChInfo, error)
+	OpenCh(context.Context, BalInfo, App, uint64) (ChInfo, APIErrorV2)
 	GetChsInfo() []ChInfo
 	SubChProposals(ChProposalNotifier) error
 	UnsubChProposals() error

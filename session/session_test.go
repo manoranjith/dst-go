@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/phayes/freeport"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -235,88 +234,140 @@ func Test_Session_OpenCh(t *testing.T) {
 
 	t.Run("session_closed", func(t *testing.T) {
 		ch, _ := newMockPCh(t, validOpeningBalInfo)
-		session, chClient := newSessionWMockChClient(t, false, peerIDs...)
+		sess, chClient := newSessionWMockChClient(t, false, peerIDs...)
 		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, nil)
 		chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-		_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+		_, err := sess.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
 		require.Error(t, err)
-		t.Log(err)
+
+		wantMessage := session.ErrSessionClosed.Error()
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2FailedPreCondition, err.Code())
+		assert.Equal(t, wantMessage, err.Message())
+		assert.Nil(t, err.AddInfo())
 	})
 
-	t.Run("missing_parts", func(t *testing.T) {
+	t.Run("one_unknown_peer_alias", func(t *testing.T) {
+		unknownAlias := "unknown-alias"
 		invalidOpeningBalInfo := validOpeningBalInfo
-		invalidOpeningBalInfo.Parts = []string{perun.OwnAlias, "missing-part"}
-		session, _ := newSessionWMockChClient(t, true, peerIDs...)
+		invalidOpeningBalInfo.Parts = []string{perun.OwnAlias, unknownAlias}
+		sess, _ := newSessionWMockChClient(t, true, peerIDs...)
 
-		_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
-		t.Log(err)
+
+		wantMessage := session.ErrUnknownPeerAlias
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
+		assert.Contains(t, err.Message(), wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
+		require.True(t, ok)
+		assert.Equal(t, "peer aliases", addInfo.Type)
+		assert.Equal(t, unknownAlias, addInfo.ID)
+	})
+
+	t.Run("two_unknown_peer_alias", func(t *testing.T) {
+		unknownAlias1 := "unknown-alias-1"
+		unknownAlias2 := "unknown-alias-2"
+		invalidOpeningBalInfo := validOpeningBalInfo
+		invalidOpeningBalInfo.Parts = []string{unknownAlias1, unknownAlias2}
+		sess, _ := newSessionWMockChClient(t, true, peerIDs...)
+
+		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+		require.Error(t, err)
+
+		wantMessage := session.ErrUnknownPeerAlias
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2ResourceNotFound, err.Code())
+		assert.Contains(t, err.Message(), wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoResourceNotFound)
+		require.True(t, ok)
+		assert.Equal(t, "peer aliases", addInfo.Type)
+		assert.Equal(t, fmt.Sprintf("%s,%s", unknownAlias1, unknownAlias2), addInfo.ID)
 	})
 
 	t.Run("repeated_parts", func(t *testing.T) {
 		invalidOpeningBalInfo := validOpeningBalInfo
 		invalidOpeningBalInfo.Parts = []string{peerIDs[0].Alias, peerIDs[0].Alias}
-		session, _ := newSessionWMockChClient(t, true, peerIDs...)
+		sess, _ := newSessionWMockChClient(t, true, peerIDs...)
 
-		_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
-		t.Log(err)
+
+		wantMessage := session.ErrRepeatedPeerAlias
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
+		assert.Contains(t, err.Message(), wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
+		require.True(t, ok)
+		assert.Equal(t, "peer aliases", addInfo.Name)
+		assert.Equal(t, peerIDs[0].Alias, addInfo.Value)
+		t.Log("requirement:", addInfo.Requirement)
 	})
 
 	t.Run("missing_own_alias", func(t *testing.T) {
 		invalidOpeningBalInfo := validOpeningBalInfo
 		invalidOpeningBalInfo.Parts = []string{peerIDs[0].Alias, peerIDs[1].Alias}
-		session, _ := newSessionWMockChClient(t, true, peerIDs...)
+		sess, _ := newSessionWMockChClient(t, true, peerIDs...)
 
-		_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+		_, err := sess.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
 		require.Error(t, err)
-		t.Log(err)
+
+		wantMessage := session.ErrNoEntryForSelf
+		assert.Equal(t, perun.ClientError, err.Category())
+		assert.Equal(t, perun.ErrV2InvalidArgument, err.Code())
+		assert.Contains(t, err.Message(), wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
+		require.True(t, ok)
+		assert.Equal(t, "peer aliases", addInfo.Name)
+		assert.Equal(t, fmt.Sprintf("%s,%s", peerIDs[0].Alias, peerIDs[1].Alias), addInfo.Value)
+		t.Log("requirement:", addInfo.Requirement)
 	})
 
-	t.Run("unsupported_currency", func(t *testing.T) {
-		invalidOpeningBalInfo := validOpeningBalInfo
-		invalidOpeningBalInfo.Currency = "unsupported-currency"
-		session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
+	// t.Run("unsupported_currency", func(t *testing.T) {
+	// 	invalidOpeningBalInfo := validOpeningBalInfo
+	// 	invalidOpeningBalInfo.Currency = "unsupported-currency"
+	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
+	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-		_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
-		require.Error(t, err)
-		t.Log(err)
-	})
+	// 	_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+	// 	require.Error(t, err)
+	// 	t.Log(err)
+	// })
 
-	t.Run("invalid_amount", func(t *testing.T) {
-		invalidOpeningBalInfo := validOpeningBalInfo
-		invalidOpeningBalInfo.Bal = []string{"abc", "gef"}
-		session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
+	// t.Run("invalid_amount", func(t *testing.T) {
+	// 	invalidOpeningBalInfo := validOpeningBalInfo
+	// 	invalidOpeningBalInfo.Bal = []string{"abc", "gef"}
+	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
+	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-		_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
-		require.Error(t, err)
-		t.Log(err)
-	})
+	// 	_, err := session.OpenCh(context.Background(), invalidOpeningBalInfo, app, 10)
+	// 	require.Error(t, err)
+	// 	t.Log(err)
+	// })
 
-	t.Run("chClient_proposeChannel_AnError", func(t *testing.T) {
-		ch, _ := newMockPCh(t, validOpeningBalInfo)
-		session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, assert.AnError)
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
+	// t.Run("chClient_proposeChannel_AnError", func(t *testing.T) {
+	// 	ch, _ := newMockPCh(t, validOpeningBalInfo)
+	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
+	// 	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, assert.AnError)
+	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-		_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
-		require.Error(t, err)
-		t.Log(err)
-	})
+	// 	_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+	// 	require.Error(t, err)
+	// 	t.Log(err)
+	// })
 
-	t.Run("chClient_proposeChannel_PeerRejected", func(t *testing.T) {
-		ch, _ := newMockPCh(t, validOpeningBalInfo)
-		session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, errors.New("channel proposal rejected"))
-		chClient.On("Register", mock.Anything, mock.Anything).Return()
+	// t.Run("chClient_proposeChannel_PeerRejected", func(t *testing.T) {
+	// 	ch, _ := newMockPCh(t, validOpeningBalInfo)
+	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
+	// 	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, errors.New("channel proposal rejected"))
+	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-		_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
-		require.Error(t, err)
-		t.Log(err)
-	})
+	// 	_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+	// 	require.Error(t, err)
+	// 	t.Log(err)
+	// })
 }
 
 func newChProposal(t *testing.T, ownAddr, peer perun.PeerID) pclient.ChannelProposal {

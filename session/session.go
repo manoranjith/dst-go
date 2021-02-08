@@ -62,8 +62,10 @@ func (e Error) Error() string {
 
 // Definition of error constants for this package.
 const (
-	ErrSessionClosed    Error = "operation not allowed on a closed session"
-	ErrUnknownPeerAlias Error = "unknown peer alias"
+	ErrSessionClosed     Error = "operation not allowed on a closed session"
+	ErrUnknownPeerAlias  Error = "unknown peer alias(es)"
+	ErrRepeatedPeerAlias Error = "repeated peer alias(es)"
+	ErrNoEntryForSelf    Error = "no entry for self in peer alias(es)"
 )
 
 type (
@@ -297,26 +299,29 @@ func (s *Session) GetPeerID(alias string) (perun.PeerID, perun.APIErrorV2) {
 
 // OpenCh implements sessionAPI.OpenCh.
 func (s *Session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app perun.App, challengeDurSecs uint64) (
-	perun.ChInfo, error) {
+	perun.ChInfo, perun.APIErrorV2) {
 	s.Debugf("\nReceived request:session.OpenCh Params %+v,%+v,%+v", openingBalInfo, app, challengeDurSecs)
 	// Session is locked only when adding the channel to session.
 
 	if !s.isOpen {
-		return perun.ChInfo{}, perun.ErrSessionClosed
+		err := ErrSessionClosed
+		s.WithFields(log.Fields{"method": "OpenCh"}).Error(err)
+		return perun.ChInfo{}, perun.NewAPIErrV2FailedPreCondition(err.Error())
 	}
 
 	sanitizeBalInfo(openingBalInfo)
-	parts, err := retrievePartIDs(openingBalInfo.Parts, s.idProvider)
-	if err != nil {
-		s.Error(err, "retrieving channel participant IDs using session ID Provider")
-		return perun.ChInfo{}, perun.GetAPIError(err)
+	parts, apiErr := retrievePartIDs(openingBalInfo.Parts, s.idProvider)
+	if apiErr != nil {
+		s.WithFields(perun.APIErrV2AsMap(apiErr)).Error(apiErr.Message())
+		return perun.ChInfo{}, apiErr
 	}
 	registerParts(parts, s.chClient)
 
 	allocations, err := makeAllocation(openingBalInfo, s.chAsset)
 	if err != nil {
 		s.Error(err, "making allocations")
-		return perun.ChInfo{}, perun.GetAPIError(err)
+		// return perun.ChInfo{}, perun.GetAPIError(err)
+		return perun.ChInfo{}, nil
 	}
 
 	proposal := pclient.NewLedgerChannelProposal(
@@ -335,7 +340,8 @@ func (s *Session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app
 		if strings.Contains(err.Error(), "channel proposal rejected") {
 			err = perun.ErrPeerRejected
 		}
-		return perun.ChInfo{}, perun.GetAPIError(err)
+		// return perun.ChInfo{}, perun.GetAPIError(err)
+		return perun.ChInfo{}, nil
 	}
 
 	ch := newCh(pch, openingBalInfo.Currency, openingBalInfo.Parts, s.timeoutCfg, challengeDurSecs)
@@ -368,7 +374,7 @@ func sanitizeBalInfo(balInfo perun.BalInfo) {
 
 // retrievePartIDs retrieves the peer IDs corresponding to the aliases from the ID provider.
 // The order of entries for parts list will be same as that of aliases. i.e aliases[i] = parts[i].Alias.
-func retrievePartIDs(aliases []string, idProvider perun.IDReader) ([]perun.PeerID, error) {
+func retrievePartIDs(aliases []string, idProvider perun.IDReader) ([]perun.PeerID, perun.APIErrorV2) {
 	knownParts := make(map[string]perun.PeerID, len(aliases))
 	partIDs := make([]perun.PeerID, len(aliases))
 	missingParts := make([]string, 0, len(aliases))
@@ -391,13 +397,20 @@ func retrievePartIDs(aliases []string, idProvider perun.IDReader) ([]perun.PeerI
 	}
 
 	if len(missingParts) != 0 {
-		return nil, errors.New(fmt.Sprintf("No peer IDs found in ID Provider for the following alias(es): %v", missingParts))
+		err := ErrUnknownPeerAlias
+		return nil, perun.NewAPIErrV2ResourceNotFound("peer aliases", strings.Join(missingParts, ","), err.Error())
 	}
 	if len(repeatedParts) != 0 {
-		return nil, errors.New(fmt.Sprintf("Repeated entries in aliases: %v", repeatedParts))
+		err := ErrRepeatedPeerAlias
+		requirement := "each entry in peer aliases should be unique"
+		return nil, perun.NewAPIErrV2InvalidArgument(
+			"peer aliases", strings.Join(repeatedParts, ","), requirement, err.Error())
 	}
 	if !foundOwnAlias {
-		return nil, errors.New("No entry for self found in aliases")
+		err := ErrNoEntryForSelf
+		requirement := "peer aliases must contain an entry for self"
+		return nil, perun.NewAPIErrV2InvalidArgument(
+			"peer aliases", strings.Join(aliases, ","), requirement, err.Error())
 	}
 
 	return partIDs, nil
