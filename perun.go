@@ -321,6 +321,13 @@ const (
 )
 
 type (
+	// ErrV2InfoRejectedByPeer represents the fields in the additional info for
+	// ErrRejectedByPeer.
+	ErrV2InfoRejectedByPeer struct {
+		PeerAlias string
+		Reason    string
+	}
+
 	// ErrV2InfoResourceNotFound represents the fields in the additional info for
 	// ErrResourceNotFound.
 	ErrV2InfoResourceNotFound struct {

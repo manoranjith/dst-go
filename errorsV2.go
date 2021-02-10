@@ -54,6 +54,20 @@ func (e apiErrorV2) Error() string {
 		e.Category(), e.Code(), e.Message(), e.AddInfo())
 }
 
+// NewAPIErrV2RejectedByPeer returns an ErrV2RejectedByPeer API Error with
+// the given peer alias and reason.
+func NewAPIErrV2RejectedByPeer(peerAlias, reason, message string) APIErrorV2 {
+	return apiErrorV2{
+		category: ParticipantError,
+		code:     ErrV2RejectedByPeer,
+		message:  message,
+		addInfo: ErrV2InfoRejectedByPeer{
+			PeerAlias: peerAlias,
+			Reason:    reason,
+		},
+	}
+}
+
 // NewAPIErrV2ResourceNotFound returns an ErrResourceNotFound API Error with
 // the given resource type, ID and error message.
 func NewAPIErrV2ResourceNotFound(resourceType, resourceID, message string) APIErrorV2 {
@@ -111,7 +125,7 @@ func NewAPIErrV2FailedPreCondition(message string) APIErrorV2 {
 // error message.
 func NewAPIErrV2UnknownInternal(err error) APIErrorV2 {
 	return apiErrorV2{
-		category: ClientError,
+		category: InternalError,
 		code:     ErrV2UnknownInternal,
 		message:  err.Error(),
 	}

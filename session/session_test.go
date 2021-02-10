@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/phayes/freeport"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -335,32 +336,44 @@ func Test_Session_OpenCh(t *testing.T) {
 		addInfo, ok := err.AddInfo().(perun.ErrV2InfoInvalidArgument)
 		require.True(t, ok)
 		assert.Equal(t, "amount", addInfo.Name)
-		assert.Equal(t, "amount", addInfo.Name)
 		assert.Equal(t, invalidOpeningBalInfo.Bal[0], addInfo.Value)
 		t.Log("requirement:", addInfo.Requirement)
 	})
 
-	// t.Run("chClient_proposeChannel_AnError", func(t *testing.T) {
-	// 	ch, _ := newMockPCh(t, validOpeningBalInfo)
-	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-	// 	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, assert.AnError)
-	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
+	t.Run("chClient_proposeChannel_AnError", func(t *testing.T) {
+		ch, _ := newMockPCh(t, validOpeningBalInfo)
+		sess, chClient := newSessionWMockChClient(t, true, peerIDs...)
+		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, assert.AnError)
+		chClient.On("Register", mock.Anything, mock.Anything).Return()
 
-	// 	_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
-	// 	require.Error(t, err)
-	// 	t.Log(err)
-	// })
+		_, err := sess.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+		require.Error(t, err)
 
-	// t.Run("chClient_proposeChannel_PeerRejected", func(t *testing.T) {
-	// 	ch, _ := newMockPCh(t, validOpeningBalInfo)
-	// 	session, chClient := newSessionWMockChClient(t, true, peerIDs...)
-	// 	chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, errors.New("channel proposal rejected"))
-	// 	chClient.On("Register", mock.Anything, mock.Anything).Return()
+		wantMessage := "proposing channel"
+		assertAPIError(t, err, perun.InternalError, perun.ErrV2UnknownInternal, wantMessage)
+		t.Log(err.Message())
+	})
 
-	// 	_, err := session.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
-	// 	require.Error(t, err)
-	// 	t.Log(err)
-	// })
+	t.Run("chClient_proposeChannel_PeerRejected", func(t *testing.T) {
+		proposeChErrMsg := "channel proposal rejected"
+		reason := "some random reason"
+		// Currently, the error message is expected to be in this format. See implementation of "OpenCh" API.
+		proposeChErr := errors.New(proposeChErrMsg + ": " + reason)
+		ch, _ := newMockPCh(t, validOpeningBalInfo)
+		sess, chClient := newSessionWMockChClient(t, true, peerIDs...)
+		chClient.On("ProposeChannel", mock.Anything, mock.Anything).Return(ch, proposeChErr)
+		chClient.On("Register", mock.Anything, mock.Anything).Return()
+
+		_, err := sess.OpenCh(context.Background(), validOpeningBalInfo, app, 10)
+		require.Error(t, err)
+
+		wantMessage := session.ErrPeerRejectedProposal.Error()
+		assertAPIError(t, err, perun.ParticipantError, perun.ErrV2RejectedByPeer, wantMessage)
+		addInfo, ok := err.AddInfo().(perun.ErrV2InfoRejectedByPeer)
+		require.True(t, ok)
+		assert.Equal(t, peerIDs[0].Alias, addInfo.PeerAlias)
+		assert.Equal(t, reason, addInfo.Reason)
+	})
 }
 
 func newChProposal(t *testing.T, ownAddr, peer perun.PeerID) pclient.ChannelProposal {

@@ -68,6 +68,7 @@ const (
 	ErrNoEntryForSelf         Error = "no entry for self in peer alias(es)"
 	ErrUnknownCurrency        Error = "unknown currency"
 	ErrInvalidAmountInBalance Error = "invalid amount in balance"
+	ErrPeerRejectedProposal   Error = "channel proposal rejected by peer"
 )
 
 type (
@@ -337,19 +338,28 @@ func (s *Session) OpenCh(pctx context.Context, openingBalInfo perun.BalInfo, app
 	defer cancel()
 	pch, err := s.chClient.ProposeChannel(ctx, proposal)
 	if err != nil {
-		s.Error(err)
+		var apiErr perun.APIErrorV2
+		switch {
 		// TODO: (mano) Use errors.Is here once a sentinel error value is defined in the SDK.
-		if strings.Contains(err.Error(), "channel proposal rejected") {
-			err = perun.ErrPeerRejected
+		// For now, the error message is assumed to be in the below format:
+		// "channel proposal rejected: <reason>"
+		case strings.Contains(err.Error(), "channel proposal rejected"):
+			reason := strings.Split(err.Error(), ": ")[1]
+			message := ErrPeerRejectedProposal.Error()
+			// Once openingBalInfo is sanitized, the peer alias is expected to be at index 1.
+			// TODO: (mano) Retrieve the peer alias from the sentinel error returned from go-perun.
+			apiErr = perun.NewAPIErrV2RejectedByPeer(openingBalInfo.Parts[1], reason, message)
+		default:
+			err = errors.WithMessage(err, "proposing channel")
+			apiErr = perun.NewAPIErrV2UnknownInternal(err)
 		}
-		// return perun.ChInfo{}, perun.GetAPIError(err)
-		return perun.ChInfo{}, nil
+		s.WithFields(perun.APIErrV2AsMap("OpenCh", apiErr)).Error(apiErr.Message())
+		return perun.ChInfo{}, apiErr
 	}
 
 	ch := newCh(pch, openingBalInfo.Currency, openingBalInfo.Parts, s.timeoutCfg, challengeDurSecs)
-
 	s.addCh(ch)
-	s.WithFields(log.Fields{"method": "GetPeerID", "channelID": ch.ID()}).Info("Channel opened successfully")
+	s.WithFields(log.Fields{"method": "OpenCh", "channelID": ch.ID()}).Info("Channel opened successfully")
 	return ch.GetChInfo(), nil
 }
 
