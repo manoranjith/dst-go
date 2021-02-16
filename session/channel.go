@@ -107,13 +107,31 @@ func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeou
 func (ch *Channel) HandleAdjudicatorEvent(e pchannel.AdjudicatorEvent) {
 	ch.Lock()
 	defer ch.Unlock()
-	ch.Infof("Got adjudcator event of type %T: %v", e, e)
+	ch.Infof("[%s] Got adjudcator event of type %T: %v", ch.pch.Phase().String(), e, e)
 	err := e.Timeout().Wait(context.Background())
 	if err != nil {
-		ch.Errorf("Error waiting for timeout to elapse: %v")
+		ch.Errorf("Error waiting for timeout to elapse: %v", err)
 		return
 	}
-	ch.Infof("Timeout elapsed")
+	ch.Infof("[%s] Timeout elapsed", ch.pch.Phase().String())
+
+	if ch.pch.Phase() == pchannel.Final {
+		ch.Info("Starting secondary settle phase")
+		err := ch.settleSecondary(context.Background())
+		if err != nil {
+			ch.Errorf("Error secondary settle: %v", err)
+		}
+		ch.Info("Secondary settle successful")
+	}
+	if ch.pch.Phase() == pchannel.Registered {
+		ch.Info("Starting secondary settle register")
+		err := ch.settleSecondary(context.Background())
+		if err != nil {
+			ch.Errorf("Error secondary settle: %v", err)
+		}
+		ch.Info("Secondary settle successful")
+	}
+
 }
 
 // ID returns the ID of the channel.
@@ -499,7 +517,12 @@ func (ch *Channel) settleSecondary(pctx context.Context) error {
 	// TODO (mano): Document what happens when a Settle fails, should channel close be called again ?
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.settleChSecondary(ch.challengeDurSecs))
 	defer cancel()
-	err := ch.pch.Settle(ctx, true)
+	err := ch.pch.Register(ctx)
+	if err != nil {
+		ch.Error("Registering channel", err)
+		return perun.GetAPIError(err)
+	}
+	err = ch.pch.Settle(ctx, true)
 	if err != nil {
 		ch.Error("Settling channel", err)
 		return perun.GetAPIError(err)

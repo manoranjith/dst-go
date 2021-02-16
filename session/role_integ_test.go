@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -318,6 +319,8 @@ func Test_Integ_Role(t *testing.T) {
 		notif := <-bobChUpdateNotif
 		_, err = bobCh.RespondChUpdate(ctx, notif.UpdateID, true)
 		require.NoError(t, err, "bob accepting channel update")
+
+		time.Sleep(45 * time.Second)
 
 		// closing update for bob.
 		// notif = <-bobChUpdateNotif

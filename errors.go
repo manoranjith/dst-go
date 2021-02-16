@@ -16,9 +16,7 @@
 
 package perun
 
-import (
-	"errors"
-)
+import "github.com/pkg/errors"
 
 // APIError represents the errors that will be communicated via the user API.
 type APIError string
@@ -35,7 +33,7 @@ func GetAPIError(err error) error {
 	}
 	var apiErr APIError
 	if !errors.As(err, &apiErr) {
-		return ErrInternalServer
+		return errors.WithMessage(ErrInternalServer, err.Error())
 	}
 	return apiErr
 }
