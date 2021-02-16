@@ -105,31 +105,35 @@ func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeou
 }
 
 func (ch *Channel) HandleAdjudicatorEvent(e pchannel.AdjudicatorEvent) {
-	ch.Lock()
-	defer ch.Unlock()
-	ch.Infof("[%s] Got adjudcator event of type %T: %v", ch.pch.Phase().String(), e, e)
-	err := e.Timeout().Wait(context.Background())
-	if err != nil {
-		ch.Errorf("Error waiting for timeout to elapse: %v", err)
-		return
-	}
-	ch.Infof("[%s] Timeout elapsed", ch.pch.Phase().String())
+	if _, ok := e.(*pchannel.ConcludedEvent); ok {
+		ch.Infof("[%s] Got adjudcator event of type %T: %v", ch.pch.Phase().String(), e, e)
+		func() {
+			ch.Lock()
+			defer ch.Unlock()
+			err := e.Timeout().Wait(context.Background())
+			if err != nil {
+				ch.Errorf("Error waiting for timeout to elapse: %v", err)
+				return
+			}
+			ch.Infof("[%s] Timeout elapsed", ch.pch.Phase().String())
 
-	if ch.pch.Phase() == pchannel.Final {
-		ch.Info("Starting secondary settle phase")
-		err := ch.settleSecondary(context.Background())
-		if err != nil {
-			ch.Errorf("Error secondary settle: %v", err)
-		}
-		ch.Info("Secondary settle successful")
-	}
-	if ch.pch.Phase() == pchannel.Registered {
-		ch.Info("Starting secondary settle register")
-		err := ch.settleSecondary(context.Background())
-		if err != nil {
-			ch.Errorf("Error secondary settle: %v", err)
-		}
-		ch.Info("Secondary settle successful")
+			if ch.pch.Phase() == pchannel.Final {
+				ch.Info("Starting secondary settle phase")
+				err = ch.settleSecondary(context.Background())
+				ch.Errorf("Error secondary settle: %v", err)
+			}
+			ch.Infof("[%s] Timeout elapsed 2", ch.pch.Phase().String())
+			if ch.pch.Phase() == pchannel.Withdrawn {
+				if ch.chUpdateNotifier == nil {
+					ch.Debug("HandleWatcherReturned: Notification dropped as there is no active subscription")
+					return
+				}
+				notif := makeChCloseNotif(ch.getChInfo(), err)
+				ch.chUpdateNotifier(notif)
+				ch.unsubChUpdates()
+				ch.Debug("HandleWatcherReturned: Notification sent")
+			}
+		}()
 	}
 
 }

@@ -320,29 +320,29 @@ func Test_Integ_Role(t *testing.T) {
 		_, err = bobCh.RespondChUpdate(ctx, notif.UpdateID, true)
 		require.NoError(t, err, "bob accepting channel update")
 
-		time.Sleep(45 * time.Second)
+		time.Sleep(15 * time.Second)
 
 		// closing update for bob.
-		// notif = <-bobChUpdateNotif
-		// t.Log("bob", notif)
-		// assert.Equal(t, perun.ChUpdateTypeClosed, notif.Type)
+		notif = <-bobChUpdateNotif
+		t.Log("bob", notif)
+		assert.Equal(t, perun.ChUpdateTypeClosed, notif.Type)
 
-		// // error on responding to channel update closed.
-		// _, err = bobCh.RespondChUpdate(ctx, notif.UpdateID, false)
-		// require.Error(t, err, "bob responding to channel update closed")
+		// error on responding to channel update closed.
+		_, err = bobCh.RespondChUpdate(ctx, notif.UpdateID, false)
+		require.Error(t, err, "bob responding to channel update closed")
 
-		// err = bobCh.UnsubChUpdates()
-		// assert.Error(t, err)
-		// t.Log(err, "UnsubChUpdates for alice")
+		err = bobCh.UnsubChUpdates()
+		assert.Error(t, err)
+		t.Log(err, "UnsubChUpdates for alice")
 
-		// require.EqualError(t, err, perun.ErrChClosed.Error())
-		// // Receive, unsub channel close notifs.
-		// notif = <-aliceChUpdateNotif
-		// t.Log("alice", notif)
-		// assert.Equal(t, perun.ChUpdateTypeClosed, notif.Type)
-		// err = aliceCh.UnsubChUpdates()
-		// assert.Error(t, err)
-		// t.Log(err, "UnsubChUpdates for alice")
+		require.EqualError(t, err, perun.ErrChClosed.Error())
+		// Receive, unsub channel close notifs.
+		notif = <-aliceChUpdateNotif
+		t.Log("alice", notif)
+		assert.Equal(t, perun.ChUpdateTypeClosed, notif.Type)
+		err = aliceCh.UnsubChUpdates()
+		assert.Error(t, err)
+		t.Log(err, "UnsubChUpdates for alice")
 
 		// t.Run("Session_Close_NoForce_Sucesss", func(t *testing.T) {
 		// 	var openChsInfo []perun.ChInfo
