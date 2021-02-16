@@ -312,7 +312,9 @@ func (ch *Channel) RespondChUpdate(pctx context.Context, updateID string, accept
 		err = ch.acceptChUpdate(pctx, entry)
 		if err == nil && entry.notif.Type == perun.ChUpdateTypeFinal {
 			ch.Info("Responded to update successfully, settling the state as it was final update.")
-			err = ch.settleSecondary(pctx)
+			// err = ch.settleSecondary(pctx)
+			// Channel will be settled when the event in received in the watcher.
+			// Because, currently there is no secondaryRegister function.
 		}
 	case false:
 		err = ch.rejectChUpdate(pctx, entry, "rejected by user")
@@ -478,12 +480,17 @@ func (ch *Channel) settlePrimary(pctx context.Context) error {
 	// TODO (mano): Document what happens when a Settle fails, should channel close be called again ?
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.settleChPrimary(ch.challengeDurSecs))
 	defer cancel()
-	err := ch.pch.Settle(ctx, false)
+	err := ch.pch.Register(ctx)
+	if err != nil {
+		ch.Error("Registering channel", err)
+		return perun.GetAPIError(err)
+	}
+	err = ch.pch.Settle(ctx, false)
 	if err != nil {
 		ch.Error("Settling channel", err)
 		return perun.GetAPIError(err)
 	}
-	ch.close()
+	// ch.close()
 	return nil
 }
 

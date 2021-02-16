@@ -64,7 +64,7 @@ func (t timeoutConfig) settleChPrimary(challegeDurSecs uint64) time.Duration {
 	// 3. Conclude the final state on blockchain.
 	// 4. Withdraw amount.
 	challegeDur := time.Duration(challegeDurSecs) * time.Second
-	return 3*t.onChainTx + 1*challegeDur + processingTime
+	return 3*t.onChainTx + 3*challegeDur + processingTime
 }
 
 func (t timeoutConfig) settleChSecondary(challegeDurSecs uint64) time.Duration {
