@@ -18,11 +18,13 @@ package ethereumtest
 
 import (
 	"context"
+	"math/big"
 	"math/rand"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 	pethchannel "perun.network/go-perun/backend/ethereum/channel"
 	pethchanneltest "perun.network/go-perun/backend/ethereum/channel/test"
@@ -87,6 +89,6 @@ func newSimContractBackend(t *testing.T, accs []pwallet.Account, ks *keystore.Ke
 	ksWallet, err := pkeystore.NewWallet(ks, "") // Password for test accounts is always empty string.
 	require.NoError(t, err)
 
-	tr := pkeystore.NewTransactor(*ksWallet)
+	tr := pkeystore.NewTransactor(*ksWallet, types.NewEIP155Signer(big.NewInt(1337)))
 	return pethchannel.NewContractBackend(simBackend, tr)
 }

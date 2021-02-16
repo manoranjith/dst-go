@@ -96,12 +96,24 @@ func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeou
 	}
 	ch.watcherWg.Add(1)
 	go func(ch *Channel) {
-		err := ch.pch.Watch()
+		err := ch.pch.Watch(ch)
 		ch.watcherWg.Done()
 
 		ch.HandleWatcherReturned(err)
 	}(ch)
 	return ch
+}
+
+func (ch *Channel) HandleAdjudicatorEvent(e pchannel.AdjudicatorEvent) {
+	ch.Lock()
+	defer ch.Unlock()
+	ch.Infof("Got adjudcator event of type %T: %v", e, e)
+	err := e.Timeout().Wait(context.Background())
+	if err != nil {
+		ch.Errorf("Error waiting for timeout to elapse: %v")
+		return
+	}
+	ch.Infof("Timeout elapsed")
 }
 
 // ID returns the ID of the channel.
@@ -466,7 +478,7 @@ func (ch *Channel) settlePrimary(pctx context.Context) error {
 	// TODO (mano): Document what happens when a Settle fails, should channel close be called again ?
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.settleChPrimary(ch.challengeDurSecs))
 	defer cancel()
-	err := ch.pch.Settle(ctx)
+	err := ch.pch.Settle(ctx, false)
 	if err != nil {
 		ch.Error("Settling channel", err)
 		return perun.GetAPIError(err)
@@ -480,7 +492,7 @@ func (ch *Channel) settleSecondary(pctx context.Context) error {
 	// TODO (mano): Document what happens when a Settle fails, should channel close be called again ?
 	ctx, cancel := context.WithTimeout(pctx, ch.timeoutCfg.settleChSecondary(ch.challengeDurSecs))
 	defer cancel()
-	err := ch.pch.SettleSecondary(ctx)
+	err := ch.pch.Settle(ctx, true)
 	if err != nil {
 		ch.Error("Settling channel", err)
 		return perun.GetAPIError(err)

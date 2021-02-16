@@ -23,6 +23,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	pethchannel "perun.network/go-perun/backend/ethereum/channel"
@@ -60,7 +61,7 @@ func NewChainBackend(url string, chainConnTimeout, onChainTxTimeout time.Duratio
 	if err != nil {
 		return nil, err
 	}
-	tr := pkeystore.NewTransactor(*ksWallet)
+	tr := pkeystore.NewTransactor(*ksWallet, types.NewEIP155Signer(big.NewInt(1337)))
 	cb := pethchannel.NewContractBackend(ethereumBackend, tr)
 	return &internal.ChainBackend{Cb: &cb, TxTimeout: onChainTxTimeout}, nil
 }
