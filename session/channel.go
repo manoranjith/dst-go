@@ -26,7 +26,6 @@ import (
 
 	pchannel "perun.network/go-perun/channel"
 	pclient "perun.network/go-perun/client"
-	psync "perun.network/go-perun/pkg/sync"
 
 	"github.com/pkg/errors"
 
@@ -59,7 +58,7 @@ type (
 		chUpdateResponders map[string]chUpdateResponderEntry
 
 		watcherWg *sync.WaitGroup
-		psync.Mutex
+		sync.Mutex
 	}
 
 	chStatus uint8
@@ -97,9 +96,11 @@ func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeou
 	ch.watcherWg.Add(1)
 	go func(ch *Channel) {
 		err := ch.pch.Watch(ch)
-		ch.watcherWg.Done()
+		// Since v0.6.0, watcher will never return. Hence comment out following two lines.
+		// ch.watcherWg.Done()
 
-		ch.HandleWatcherReturned(err)
+		_ = err
+		// ch.HandleWatcherReturned(err)
 	}(ch)
 	return ch
 }
@@ -107,33 +108,34 @@ func newCh(pch perun.Channel, currency string, parts []string, timeoutCfg timeou
 func (ch *Channel) HandleAdjudicatorEvent(e pchannel.AdjudicatorEvent) {
 	if _, ok := e.(*pchannel.ConcludedEvent); ok {
 		ch.Infof("[%s] Got adjudcator event of type %T: %v", ch.pch.Phase().String(), e, e)
-		func() {
-			ch.Lock()
-			defer ch.Unlock()
-			err := e.Timeout().Wait(context.Background())
-			if err != nil {
-				ch.Errorf("Error waiting for timeout to elapse: %v", err)
-				return
-			}
-			ch.Infof("[%s] Timeout elapsed", ch.pch.Phase().String())
-
-			if ch.pch.Phase() == pchannel.Final {
-				ch.Info("Starting secondary settle phase")
-				err = ch.settleSecondary(context.Background())
-				ch.Errorf("Error secondary settle: %v", err)
-			}
-			ch.Infof("[%s] Timeout elapsed 2", ch.pch.Phase().String())
-			if ch.pch.Phase() == pchannel.Withdrawn {
-				if ch.chUpdateNotifier == nil {
-					ch.Debug("HandleWatcherReturned: Notification dropped as there is no active subscription")
-					return
-				}
-				notif := makeChCloseNotif(ch.getChInfo(), err)
-				ch.chUpdateNotifier(notif)
-				ch.unsubChUpdates()
-				ch.Debug("HandleWatcherReturned: Notification sent")
-			}
+		ch.Lock()
+		ch.Debugf("Mutex acquired on ch. Ch:%+v, Mutex: %+v, Mutex Addr: %p", ch, ch.Mutex, &ch.Mutex)
+		defer func() {
+			ch.Unlock()
+			ch.Debugf("Mutex released on ch. Ch:%+v, Mutex: %+v, Mutex Addr: %p", ch, ch.Mutex, &ch.Mutex)
 		}()
+
+		err := e.Timeout().Wait(context.Background())
+		if err != nil {
+			ch.Errorf("Error waiting for timeout to elapse: %v", err)
+		}
+		ch.Infof("[%s] Timeout elapsed %p %+v", ch.pch.Phase().String(), &ch.Mutex, ch.chUpdateNotifier)
+
+		phase := ch.pch.Phase()
+		if phase == pchannel.Final && ch.chUpdateNotifier != nil {
+			ch.Info("Starting secondary settle phase")
+			err = ch.settleSecondary(context.Background())
+			ch.Errorf("Error secondary settle: %v", err)
+			ch.Infof("[%s] Timeout elapsed - 2 %p %+v", ch.pch.Phase().String(), &ch.Mutex, ch.chUpdateNotifier)
+			ch.Info("Waiting for watcher close")
+			ch.close()
+			ch.sendCloseNotification()
+		}
+		if phase == pchannel.Withdrawn && ch.chUpdateNotifier != nil {
+			ch.Info("Wating for watcher close")
+			ch.close()
+			ch.sendCloseNotification()
+		}
 	}
 
 }
@@ -309,7 +311,11 @@ func (ch *Channel) unsubChUpdates() {
 func (ch *Channel) RespondChUpdate(pctx context.Context, updateID string, accept bool) (perun.ChInfo, error) {
 	ch.Debug("Received request channel.RespondChUpdate")
 	ch.Lock()
-	defer ch.Unlock()
+	ch.Debugf("Mutex acquired on ch. Ch:%+v, Mutex: %+v, Mutex Addr: %p", ch, ch.Mutex, &ch.Mutex)
+	defer func() {
+		ch.Unlock()
+		ch.Debugf("Mutex released on ch. Ch:%+v, Mutex: %+v, Mutex Addr: %p", ch, ch.Mutex, &ch.Mutex)
+	}()
 
 	if ch.status == closed {
 		return ch.getChInfo(), perun.ErrChClosed
@@ -420,51 +426,35 @@ func makeBalInfoFromRawBal(parts []string, curr string, rawBal []*big.Int) perun
 	return balInfo
 }
 
-// HandleWatcherReturned is invoked when the watcher for this channel has returned.
-// If the channel is open (happens when watcher refuted to a wrong state that was registered on-chain),
-//		it will be marked closed.
-// Then it sends a channel close notification if the channel is already subscribed.
-// If the channel is not subscribed, notification will not be cached as it not possible for the user
-// to subscribe to channel after it is closed.
-func (ch *Channel) HandleWatcherReturned(err error) {
-	ch.Lock()
-	defer ch.Unlock()
-	ch.Debug("Watch returned")
-
-	if ch.status == open {
-		ch.close()
-	}
-
+func (ch *Channel) sendCloseNotification() {
 	if ch.chUpdateNotifier == nil {
-		ch.Debug("HandleWatcherReturned: Notification dropped as there is no active subscription")
+		ch.Debug("Channel close notification dropped as there is no active subscription")
 		return
 	}
-	notif := makeChCloseNotif(ch.getChInfo(), err)
-	ch.chUpdateNotifier(notif)
-	ch.unsubChUpdates()
-	ch.Debug("HandleWatcherReturned: Notification sent")
-}
-
-func makeChCloseNotif(currChInfo perun.ChInfo, err error) perun.ChUpdateNotif {
-	var errMsg string
-	if err != nil {
-		errMsg = err.Error()
-	}
-	return perun.ChUpdateNotif{
+	currChInfo := ch.getChInfo()
+	notif := perun.ChUpdateNotif{
 		UpdateID:       fmt.Sprintf("%s_%s_%s", currChInfo.ChID, currChInfo.Version, "closed"),
 		CurrChInfo:     currChInfo,
 		ProposedChInfo: perun.ChInfo{},
 		Type:           perun.ChUpdateTypeClosed,
 		Expiry:         0,
-		Error:          errMsg,
+		Error:          "",
 	}
+
+	ch.chUpdateNotifier(notif)
+	ch.unsubChUpdates()
+	ch.Debug("Channel close notification sent")
 }
 
 // Close implements chAPI.Close.
 func (ch *Channel) Close(pctx context.Context) (perun.ChInfo, error) {
 	ch.Debug("Received request channel.Close")
 	ch.Lock()
-	defer ch.Unlock()
+	ch.Debugf("Mutex acquired on ch. Ch:%+v, Mutex: %+v, Mutex Addr: %p", ch, ch.Mutex, &ch.Mutex)
+	defer func() {
+		ch.Unlock()
+		ch.Debugf("Mutex released on ch. Ch:%+v, Mutex: %+v, Mutex Addr: %p", ch, ch.Mutex, &ch.Mutex)
+	}()
 
 	if ch.status == closed {
 		return ch.getChInfo(), perun.ErrChClosed
@@ -531,7 +521,7 @@ func (ch *Channel) settleSecondary(pctx context.Context) error {
 		ch.Error("Settling channel", err)
 		return perun.GetAPIError(err)
 	}
-	ch.close()
+	// ch.close()
 	return nil
 }
 
@@ -539,7 +529,7 @@ func (ch *Channel) settleSecondary(pctx context.Context) error {
 // If it fails, this error can be ignored.
 // It also removes the channel from the session.
 func (ch *Channel) close() {
-	ch.watcherWg.Wait()
+	// ch.watcherWg.Wait()
 
 	if err := ch.pch.Close(); err != nil {
 		ch.Error("Closing channel", err)

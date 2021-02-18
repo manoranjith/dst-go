@@ -62,7 +62,7 @@ func InitLogger(levelStr, logFile string) error {
 
 	newLogger.SetFormatter(&customTextFormatter{logrus.TextFormatter{
 		FullTimestamp:          true,
-		TimestampFormat:        "2006-01-02 15:04:05 Z0700",
+		TimestampFormat:        "2006-01-02 15:04:05..000000000 Z0700",
 		DisableLevelTruncation: true,
 	}})
 	logger = newLogger
