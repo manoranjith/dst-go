@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,6 +118,7 @@ func Test_Integ_Role(t *testing.T) {
 		defer wg.Wait()
 
 		// Accept channel by bob.
+		time.Sleep(1 * time.Second)
 		bobChProposalNotif := make(chan perun.ChProposalNotif)
 		bobChProposalNotifier := func(notif perun.ChProposalNotif) {
 			bobChProposalNotif <- notif

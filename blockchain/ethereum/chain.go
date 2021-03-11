@@ -18,6 +18,7 @@ package ethereum
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -67,6 +68,7 @@ func NewChainBackend(url string,
 	}
 	tr := pkeystore.NewTransactor(*ksWallet, types.NewEIP155Signer(big.NewInt(int64(chainID))))
 	cb := pethchannel.NewContractBackend(ethereumBackend, tr)
+	fmt.Printf("\nCreating contract backend for %s\n\n", cred.Addr.String())
 	return &internal.ChainBackend{Cb: &cb, TxTimeout: onChainTxTimeout}, nil
 }
 
